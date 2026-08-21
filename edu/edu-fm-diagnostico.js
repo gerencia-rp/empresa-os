@@ -33,7 +33,7 @@ async function fmDiagnoseSubmit() {
     if (!r.ok) throw new Error(r.error || 'falló');
     fmState.diagnoseChat.push({ role: 'assistant', content: r.response });
   } catch (e) {
-    fmState.diagnoseChat.push({ role: 'assistant', content: `❌ Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
+    fmState.diagnoseChat.push({ role: 'assistant', content: `Error: ${e.message}\n\n¿Está deployada la edge function \`fm-ai-coach\`?` });
   }
   fmState.diagnoseLoading = false;
   fmRender();
@@ -63,7 +63,7 @@ function fmRenderDoc(doc) {
             </div>
           ` : ''}
         </div>
-        <button onclick="fmCopyDoc('${doc.id}')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700">📋 Copiar md</button>
+        <button onclick="fmCopyDoc('${doc.id}')" class="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700">${osIcon('clipboard')} Copiar md</button>
       </div>
     </div>
     <article id="fm-doc-content" class="bg-white rounded-xl shadow-sm border border-slate-200 p-8 prose prose-slate max-w-none">
@@ -89,23 +89,23 @@ async function fmRenderMarkdown(doc) {
   const html = marked.parse(data.contenido_md || '');
   const clean = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html, { ADD_ATTR: ['target','rel'] }) : html;
   container.innerHTML = `<style>
-    #fm-doc-content h1{font-size:1.875rem;font-weight:700;margin:1.5rem 0 1rem;color:#0F172A;border-bottom:2px solid #E2E8F0;padding-bottom:0.5rem}
-    #fm-doc-content h2{font-size:1.5rem;font-weight:700;margin:1.5rem 0 0.75rem;color:#1E293B}
-    #fm-doc-content h3{font-size:1.25rem;font-weight:600;margin:1.25rem 0 0.5rem;color:#334155}
-    #fm-doc-content h4{font-size:1rem;font-weight:600;margin:1rem 0 0.5rem;color:#475569}
-    #fm-doc-content p{margin:0.75rem 0;line-height:1.65;color:#334155}
+    #fm-doc-content h1{font-size:1.875rem;font-weight:700;margin:1.5rem 0 1rem;color:#0e1420;border-bottom:2px solid #dfe4ec;padding-bottom:0.5rem}
+    #fm-doc-content h2{font-size:1.5rem;font-weight:700;margin:1.5rem 0 0.75rem;color:#1e2430}
+    #fm-doc-content h3{font-size:1.25rem;font-weight:600;margin:1.25rem 0 0.5rem;color:#3a4250}
+    #fm-doc-content h4{font-size:1rem;font-weight:600;margin:1rem 0 0.5rem;color:#5a6270}
+    #fm-doc-content p{margin:0.75rem 0;line-height:1.65;color:#3a4250}
     #fm-doc-content ul,#fm-doc-content ol{margin:0.75rem 0 0.75rem 1.5rem}
-    #fm-doc-content li{margin:0.35rem 0;line-height:1.55;color:#334155}
-    #fm-doc-content code{background:#F1F5F9;padding:0.15rem 0.4rem;border-radius:0.25rem;font-size:0.875rem;color:#0F172A;font-family:ui-monospace,monospace}
-    #fm-doc-content pre{background:#0F172A;color:#F1F5F9;padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0;font-size:0.875rem}
-    #fm-doc-content pre code{background:transparent;padding:0;color:#F1F5F9}
-    #fm-doc-content blockquote{border-left:4px solid #2563EB;padding:0.5rem 1rem;background:#EFF6FF;color:#1E40AF;font-style:italic;margin:1rem 0}
+    #fm-doc-content li{margin:0.35rem 0;line-height:1.55;color:#3a4250}
+    #fm-doc-content code{background:#eef1f6;padding:0.15rem 0.4rem;border-radius:0.25rem;font-size:0.875rem;color:#0e1420;font-family:ui-monospace,monospace}
+    #fm-doc-content pre{background:#0e1420;color:#eef1f6;padding:1rem;border-radius:0.5rem;overflow-x:auto;margin:1rem 0;font-size:0.875rem}
+    #fm-doc-content pre code{background:transparent;padding:0;color:#eef1f6}
+    #fm-doc-content blockquote{border-left:4px solid #3a5be0;padding:0.5rem 1rem;background:#EFF6FF;color:#1E40AF;font-style:italic;margin:1rem 0}
     #fm-doc-content table{border-collapse:collapse;margin:1rem 0;font-size:0.875rem;width:100%}
-    #fm-doc-content th{background:#F1F5F9;border:1px solid #CBD5E1;padding:0.5rem 0.75rem;text-align:left;font-weight:600;color:#0F172A}
-    #fm-doc-content td{border:1px solid #E2E8F0;padding:0.5rem 0.75rem;color:#334155}
-    #fm-doc-content a{color:#2563EB;text-decoration:underline}
-    #fm-doc-content strong{color:#0F172A;font-weight:600}
-    #fm-doc-content hr{border:none;border-top:1px solid #E2E8F0;margin:1.5rem 0}
+    #fm-doc-content th{background:#eef1f6;border:1px solid #d8d2c6;padding:0.5rem 0.75rem;text-align:left;font-weight:600;color:#0e1420}
+    #fm-doc-content td{border:1px solid #dfe4ec;padding:0.5rem 0.75rem;color:#3a4250}
+    #fm-doc-content a{color:#3a5be0;text-decoration:underline}
+    #fm-doc-content strong{color:#0e1420;font-weight:600}
+    #fm-doc-content hr{border:none;border-top:1px solid #dfe4ec;margin:1.5rem 0}
   </style>${clean}`;
   // Open external links in new tab
   container.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
@@ -338,7 +338,7 @@ async function eduCrearPlanEstudianteAuto(studentId) {
     if (tErr) console.error('[tasks insert]', tErr);
   }
 
-  alert(`✅ Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas accionables`);
+  alert(`Plan creado para ${student.full_name}\n\n${bloques.length} bloques · ${tasks.length} tareas accionables`);
   await eduLoadStudentPlan(studentId);
   eduRender();
 }
@@ -405,10 +405,10 @@ function eduRenderStudentPlan() {
     return `
       <div class="p-6">
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-          <div class="text-4xl mb-2">🎯</div>
+          <div class="text-4xl mb-2">${osIcon('target')}</div>
           <h3 class="font-bold text-slate-900 mb-1">Sin plan de acción activo</h3>
           <p class="text-sm text-slate-600 mb-4">Generá un plan personalizado para <strong>${student.full_name}</strong>.<br>El sistema va a inferir el perfil desde su etapa actual, capital, grupo, etc.</p>
-          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-5 py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700">🎯 Generar plan de acción</button>
+          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-5 py-2.5 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700">${osIcon('target')} Generar plan de acción</button>
         </div>
       </div>
     `;
@@ -435,7 +435,7 @@ function eduRenderStudentPlan() {
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-xs font-bold text-amber-300 tracking-wider mb-1">PLAN DE ACCIÓN · ${student.full_name}</div>
-            <div class="text-lg font-bold">${perfil.emoji || '🎯'} ${perfil.nombre || 'Plan personalizado'}</div>
+            <div class="text-lg font-bold">${perfil.emoji || osIcon('target')} ${perfil.nombre || 'Plan personalizado'}</div>
             <div class="text-xs text-slate-300 mt-1">${cronograma}</div>
           </div>
           <div class="text-right">
@@ -447,15 +447,15 @@ function eduRenderStudentPlan() {
           <div class="h-full bg-amber-500 transition-all" style="width: ${progressPct}%"></div>
         </div>
         <div class="mt-3 flex gap-2 text-xs flex-wrap">
-          <button onclick="eduAbrirAnalisisProfundoFM('${student.id}')" class="px-3 py-1.5 bg-violet-500 hover:bg-violet-400 rounded text-white font-bold" title="Abre el análisis profundo completo en Metodología FlipMentoría (objetivo operativo, regla del plan, análisis profundo del cliente, fortalezas/gaps, bloques con tiempo/entregable/errores/recursos)">🎯 Ver análisis profundo (FlipMentoría)</button>
-          <button onclick="eduDescargarPlan('pdf')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-slate-900 font-bold">📄 Descargar PDF</button>
-          <button onclick="eduDescargarPlan('md')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">📝 Markdown</button>
-          ${student.phone ? `<a href="https://wa.me/${student.phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hola ' + student.full_name + '! Te comparto tu plan de acción personalizado de FlipMentoría. Vamos paso a paso 💪')}" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-white">💬 WhatsApp</a>` : ''}
-          ${student.email ? `<a href="mailto:${student.email}?subject=${encodeURIComponent('Tu plan de acción FlipMentoría')}&body=${encodeURIComponent('Hola ' + student.full_name + ',\n\nTe comparto el plan de acción personalizado. Avísame cuando podamos revisarlo juntos.\n\nCoach FlipMentoría')}" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white">✉️ Email</a>` : ''}
-          <button onclick="eduArchivarPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🗄 Archivar</button>
-          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">🔄 Regenerar</button>
+          <button onclick="eduAbrirAnalisisProfundoFM('${student.id}')" class="px-3 py-1.5 bg-violet-500 hover:bg-violet-400 rounded text-white font-bold" title="Abre el análisis profundo completo en Metodología FlipMentoría (objetivo operativo, regla del plan, análisis profundo del cliente, fortalezas/gaps, bloques con tiempo/entregable/errores/recursos)">${osIcon('target')} Ver análisis profundo (FlipMentoría)</button>
+          <button onclick="eduDescargarPlan('pdf')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 rounded text-slate-900 font-bold">${osIcon('file')} Descargar PDF</button>
+          <button onclick="eduDescargarPlan('md')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">${osIcon('pencil-line')} Markdown</button>
+          ${student.phone ? `<a href="https://wa.me/${student.phone.replace(/\D/g,'')}?text=${encodeURIComponent('Hola ' + student.full_name + '! Te comparto tu plan de acción personalizado de FlipMentoría. Vamos paso a paso ')}" target="_blank" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-white">${osIcon('message')} WhatsApp</a>` : ''}
+          ${student.email ? `<a href="mailto:${student.email}?subject=${encodeURIComponent('Tu plan de acción FlipMentoría')}&body=${encodeURIComponent('Hola ' + student.full_name + ',\n\nTe comparto el plan de acción personalizado. Avísame cuando podamos revisarlo juntos.\n\nCoach FlipMentoría')}" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-white">${osIcon('mail')} Email</a>` : ''}
+          <button onclick="eduArchivarPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">${osIcon('folder')} Archivar</button>
+          <button onclick="eduCrearPlanEstudiante('${student.id}')" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-white">${osIcon('refresh')} Regenerar</button>
         </div>
-        <div class="mt-2 text-[10px] text-amber-200 italic">💡 Si querés el análisis profundo del cliente con bloques completos, click "🎯 Ver análisis profundo".</div>
+        <div class="mt-2 text-[10px] text-amber-200 italic">${osIcon('lightbulb')} Si querés el análisis profundo del cliente con bloques completos, click "${osIcon('target')} Ver análisis profundo".</div>
       </div>
 
       <!-- Bloques con checklist -->
@@ -698,7 +698,7 @@ function eduCuellosBotella(distribucion) {
 function eduRenderDashboard() {
   const students = eduMyStudents();
   if (students.length === 0) {
-    return `<div class="p-8 text-center"><div class="text-6xl mb-2">📭</div><p class="text-slate-500">Sin estudiantes en esta mentoría. Sincronizá con Airtable o agregá manualmente.</p></div>`;
+    return `<div class="p-8 text-center"><div class="text-6xl mb-2">${osIcon('inbox')}</div><p class="text-slate-500">Sin estudiantes en esta mentoría. Sincronizá con Airtable o agregá manualmente.</p></div>`;
   }
 
   const stats = eduCalcularStats(students);
@@ -743,17 +743,17 @@ function eduRenderDashboard() {
       <!-- Alertas resumen -->
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-gradient-to-br from-red-50 to-rose-50 border-2 border-red-300 rounded-xl p-4">
-          <div class="text-[10px] uppercase font-bold text-red-700 mb-1">🚨 Críticas</div>
+          <div class="text-[10px] uppercase font-bold text-red-700 mb-1">${osIcon('alert')} Críticas</div>
           <div class="text-3xl font-bold text-red-900">${criticas.length}</div>
           <div class="text-xs text-red-700 mt-1">Acción HOY</div>
         </div>
         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
-          <div class="text-[10px] uppercase font-bold text-amber-700 mb-1">⚠️ Altas</div>
+          <div class="text-[10px] uppercase font-bold text-amber-700 mb-1">${osIcon('alert')} Altas</div>
           <div class="text-3xl font-bold text-amber-900">${altas.length}</div>
           <div class="text-xs text-amber-700 mt-1">Esta semana</div>
         </div>
         <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
-          <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">📌 Medias</div>
+          <div class="text-[10px] uppercase font-bold text-blue-700 mb-1">${osIcon('map-pin')} Medias</div>
           <div class="text-3xl font-bold text-blue-900">${medias.length}</div>
           <div class="text-xs text-blue-700 mt-1">Este mes</div>
         </div>
@@ -763,7 +763,7 @@ function eduRenderDashboard() {
       ${topUrgentes.length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div class="bg-slate-900 text-white px-4 py-2 flex items-center justify-between">
-            <div class="text-xs font-bold uppercase">🎯 Top 10 que necesitan tu atención AHORA</div>
+            <div class="text-xs font-bold uppercase">${osIcon('target')} Top 10 que necesitan tu atención AHORA</div>
             <button onclick="eduSetTab('alerts')" class="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Ver todas las alertas →</button>
           </div>
           <ul class="divide-y divide-slate-100">
@@ -788,14 +788,14 @@ function eduRenderDashboard() {
         </div>
       ` : ''}
 
-      <!-- ⚠️ Estudiantes en riesgo por inactividad -->
+      <!-- Estudiantes en riesgo por inactividad -->
       ${(() => {
         const enRiesgo = (typeof eduStudentsEnRiesgo === 'function' ? eduStudentsEnRiesgo() : []).slice(0, 8);
         if (enRiesgo.length === 0) return '';
         return `
         <div class="bg-white border-2 border-amber-300 rounded-xl overflow-hidden">
           <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 flex items-center justify-between">
-            <div class="text-xs font-bold uppercase">⚠️ ${enRiesgo.length} estudiante(s) en riesgo por inactividad</div>
+            <div class="text-xs font-bold uppercase">${osIcon('alert')} ${enRiesgo.length} estudiante(s) en riesgo por inactividad</div>
             <button onclick="eduState.tab='students'; eduState.searchQuery='sin_contacto_30d'; eduRender()" class="text-[10px] bg-white/20 hover:bg-white/30 px-2 py-1 rounded">Ver todos →</button>
           </div>
           <ul class="divide-y divide-slate-100">
@@ -807,7 +807,7 @@ function eduRenderDashboard() {
                 </div>
                 <div class="text-right flex-shrink-0">
                   <div class="text-[11px] font-bold ${s._daysWithoutContact > 30 ? 'text-red-700' : 'text-amber-700'}">${s._riskReason}</div>
-                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" onclick="event.stopPropagation()" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded font-bold inline-block mt-0.5">💬 WhatsApp</a>` : ''}
+                  ${s.phone ? `<a href="https://wa.me/${s.phone.replace(/[^0-9]/g,'')}" target="_blank" onclick="event.stopPropagation()" class="text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded font-bold inline-block mt-0.5">${osIcon('message')} WhatsApp</a>` : ''}
                 </div>
               </li>
             `).join('')}
@@ -819,7 +819,7 @@ function eduRenderDashboard() {
       <!-- Distribución por etapa + cuellos de botella -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-3">📊 Distribución por etapa</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">${osIcon('chart')} Distribución por etapa</div>
           <div class="space-y-2">
             ${distribucion.slice(0, 8).map(d => {
               const pct = stats.total > 0 ? (d.total / stats.total * 100) : 0;
@@ -828,7 +828,7 @@ function eduRenderDashboard() {
                 <div>
                   <div class="flex items-center justify-between text-xs mb-1">
                     <span class="text-slate-700 truncate">${d.stage}</span>
-                    <span class="font-bold text-slate-900 flex-shrink-0 ml-2">${d.total} · ${d.dias_promedio}d avg ${stalled ? `· <span class="text-red-700">${d.estancados} 🐢</span>` : ''}</span>
+                    <span class="font-bold text-slate-900 flex-shrink-0 ml-2">${d.total} · ${d.dias_promedio}d avg ${stalled ? `· <span class="text-red-700">${d.estancados} </span>` : ''}</span>
                   </div>
                   <div class="bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div class="${stalled && d.estancados/d.total > 0.3 ? 'bg-red-500' : 'bg-blue-500'} h-full transition-all" style="width: ${pct}%"></div>
@@ -840,16 +840,16 @@ function eduRenderDashboard() {
         </div>
 
         <div class="bg-white border border-slate-200 rounded-xl p-4">
-          <div class="text-xs font-bold uppercase text-slate-600 mb-3">🚧 Cuellos de botella</div>
+          <div class="text-xs font-bold uppercase text-slate-600 mb-3">${osIcon('construction')} Cuellos de botella</div>
           ${cuellos.length === 0 ? `
-            <div class="text-center py-6 text-emerald-600 text-sm">✅ Sin cuellos de botella detectados</div>
+            <div class="text-center py-6 text-emerald-600 text-sm">${osIcon('check-circle')} Sin cuellos de botella detectados</div>
           ` : `
             <ul class="space-y-2 text-xs">
               ${cuellos.map(c => `
                 <li class="bg-red-50 border border-red-200 rounded-lg p-2.5">
                   <div class="font-bold text-red-900">${c.stage}</div>
                   <div class="text-red-700 mt-0.5">${c.estancados} de ${c.total} estancados (${Math.round(c.estancados/c.total*100)}%) · avg ${c.dias_promedio}d</div>
-                  <div class="text-slate-700 mt-1.5 text-[11px]">💡 ${eduSugerenciaCuello(c.stage)}</div>
+                  <div class="text-slate-700 mt-1.5 text-[11px]">${osIcon('lightbulb')} ${eduSugerenciaCuello(c.stage)}</div>
                 </li>
               `).join('')}
             </ul>
@@ -859,7 +859,7 @@ function eduRenderDashboard() {
 
       <!-- Resumen análisis -->
       <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-blue-700 mb-2">🤖 Análisis automático</div>
+        <div class="text-xs font-bold uppercase text-blue-700 mb-2">${osIcon('bot')} Análisis automático</div>
         <ul class="space-y-1 text-sm text-slate-700">
           ${eduGenerarInsights(stats, distribucion, cuellos, criticas.length, altas.length).map(i => `<li class="flex gap-2"><span>•</span><span>${i}</span></li>`).join('')}
         </ul>
@@ -891,8 +891,8 @@ function eduGenerarInsights(stats, distribucion, cuellos, criticasN, altasN) {
   if (cuellos.length > 0) insights.push(`Cuello principal: <strong>${cuellos[0].stage}</strong> con ${cuellos[0].estancados} estancados. ${eduSugerenciaCuello(cuellos[0].stage)}`);
   if (stats.sin_actividad_30d > 0) insights.push(`<strong>${stats.sin_actividad_30d} estudiantes</strong> sin contacto >30 días. Riesgo alto de churn.`);
   const ratioAvanzando = stats.total > 0 ? stats.avanzando_bien / stats.total : 0;
-  if (ratioAvanzando > 0.6) insights.push(`✅ <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong> — métricas saludables.`);
-  else if (ratioAvanzando < 0.3) insights.push(`⚠️ Solo <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong>. Mayoría estancada/en riesgo — revisar capacidad del equipo de mentores.`);
+  if (ratioAvanzando > 0.6) insights.push(`${osIcon('check-circle')} <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong> — métricas saludables.`);
+  else if (ratioAvanzando < 0.3) insights.push(`${osIcon('alert')} Solo <strong>${Math.round(ratioAvanzando*100)}% avanzando bien</strong>. Mayoría estancada/en riesgo — revisar capacidad del equipo de mentores.`);
   if (insights.length === 0) insights.push('Sin alertas significativas. Mantener cadencia de seguimientos semanales.');
   return insights;
 }
@@ -911,7 +911,7 @@ function eduRenderAlertsAvanzado() {
   const medium = all.filter(a => a.severity === 'medium');
   const totalCount = all.length;
 
-  if (totalCount === 0) return `<div class="p-8 text-center"><div class="text-5xl mb-2">✅</div><p class="text-slate-500">Sin alertas activas. Todo bajo control.</p></div>`;
+  if (totalCount === 0) return `<div class="p-8 text-center"><div class="text-5xl mb-2">${osIcon('check-circle')}</div><p class="text-slate-500">Sin alertas activas. Todo bajo control.</p></div>`;
 
   const renderGroup = (alerts, title, color, icon) => {
     if (!alerts.length) return '';
@@ -930,11 +930,11 @@ function eduRenderAlertsAvanzado() {
                     <span class="text-[10px] text-slate-500">${a.student.grupo || ''}</span>
                   </div>
                   <div class="text-xs text-${color}-800 font-medium">${a.mensaje}</div>
-                  <div class="text-[11px] text-slate-600 mt-1">💡 ${a.accion}</div>
+                  <div class="text-[11px] text-slate-600 mt-1">${osIcon('lightbulb')} ${a.accion}</div>
                 </div>
                 <div class="flex flex-col gap-1 flex-shrink-0">
-                  <button onclick="eduShowStudentDetail('${a.student.id}')" class="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700">👤 Ver detalle</button>
-                  <button onclick="eduOpenStudent('${a.student.id}')" class="text-[10px] px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded text-amber-800">🎯 Ver plan</button>
+                  <button onclick="eduShowStudentDetail('${a.student.id}')" class="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700">${osIcon('user')} Ver detalle</button>
+                  <button onclick="eduOpenStudent('${a.student.id}')" class="text-[10px] px-2 py-1 bg-amber-100 hover:bg-amber-200 rounded text-amber-800">${osIcon('target')} Ver plan</button>
                 </div>
               </div>
             </li>
@@ -957,9 +957,9 @@ function eduRenderAlertsAvanzado() {
           <div class="bg-blue-500/20 px-3 py-1.5 rounded"><span class="font-bold text-blue-300">${medium.length}</span> medias</div>
         </div>
       </div>
-      ${renderGroup(critical, 'Críticas — acción HOY', 'red', '🚨')}
-      ${renderGroup(high, 'Altas — esta semana', 'amber', '⚠️')}
-      ${renderGroup(medium, 'Medias — este mes', 'blue', '📌')}
+      ${renderGroup(critical, 'Críticas — acción HOY', 'red', osIcon('alert'))}
+      ${renderGroup(high, 'Altas — esta semana', 'amber', osIcon('alert'))}
+      ${renderGroup(medium, 'Medias — este mes', 'blue', osIcon('map-pin'))}
     </div>
   `;
 }

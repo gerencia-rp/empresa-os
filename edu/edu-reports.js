@@ -67,7 +67,7 @@ function eduRenderKpiDetalles(kpis) {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <!-- Tiempo por etapa -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">⏱ Tiempo promedio en cada etapa</div>
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">${osIcon('clock')} Tiempo promedio en cada etapa</div>
         <div class="p-2">
           ${(kpis.tiempoEtapa||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin historial todavía. A medida que cambies estudiantes de etapa, se irá llenando.</div>` : `
             <table class="w-full text-xs">
@@ -88,7 +88,7 @@ function eduRenderKpiDetalles(kpis) {
 
       <!-- No-shows por coach -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">👤 No-shows por coach (este mes)</div>
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">${osIcon('user')} No-shows por coach (este mes)</div>
         <div class="p-2">
           ${(kpis.noShows||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin datos del mes.</div>` : `
             <table class="w-full text-xs">
@@ -108,7 +108,7 @@ function eduRenderKpiDetalles(kpis) {
 
       <!-- Top motivos no-asistencia -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">🚨 Top motivos no-asistencia</div>
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase">${osIcon('alert')} Top motivos no-asistencia</div>
         <div class="p-2">
           ${(kpis.motivos||[]).length === 0 ? `<div class="text-xs text-slate-400 italic p-3 text-center">Sin no-asistencias registradas.</div>` : `
             <ul class="text-xs space-y-1">
@@ -123,9 +123,9 @@ function eduRenderKpiDetalles(kpis) {
 
       <!-- Estudiantes inactivos >30d -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase text-red-700">⚠️ Inactivos >30d (top 10)</div>
+        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 text-xs font-bold uppercase text-red-700">${osIcon('alert')} Inactivos >30d (top 10)</div>
         <div class="p-2 max-h-64 overflow-y-auto">
-          ${(kpis.inactivos||[]).length === 0 ? `<div class="text-xs text-emerald-700 italic p-3 text-center">✅ Todos tuvieron sesión en últimos 30 días.</div>` : `
+          ${(kpis.inactivos||[]).length === 0 ? `<div class="text-xs text-emerald-700 italic p-3 text-center">${osIcon('check-circle')} Todos tuvieron sesión en últimos 30 días.</div>` : `
             <table class="w-full text-xs">
               <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Estudiante</th><th class="text-left p-1">Etapa</th><th class="text-right p-1">Días</th><th></th></tr></thead>
               <tbody>
@@ -133,7 +133,7 @@ function eduRenderKpiDetalles(kpis) {
                   <td class="p-1 truncate max-w-[140px]"><button onclick="eduShowStudentDetail('${i.student_id}')" class="text-blue-600 hover:underline text-left">${(i.full_name||'?').replace(/</g,'&lt;')}</button></td>
                   <td class="p-1 truncate max-w-[100px] text-slate-600">${i.current_stage||'—'}</td>
                   <td class="p-1 text-right font-bold ${i.dias_inactivo>60?'text-red-700':'text-amber-700'}">${i.dias_inactivo}d</td>
-                  <td class="p-1 text-right">${i.email ? `<a href="mailto:${i.email}" class="text-blue-600 text-[10px]">📧</a>` : ''}</td>
+                  <td class="p-1 text-right">${i.email ? `<a href="mailto:${i.email}" class="text-blue-600 text-[10px]">${osIcon('mail')}</a>` : ''}</td>
                 </tr>`).join('')}
               </tbody>
             </table>
@@ -200,7 +200,7 @@ async function eduAbrirAnalisisProfundoFM(studentId) {
   // Reconstruir fmState.diagResult desde el plan guardado
   const answers = plan.diagnostico || {};
   if (!answers || Object.keys(answers).length === 0) {
-    return alert('El plan guardado no tiene las respuestas del diagnóstico (formato viejo).\n\nRegenerá el plan desde el botón "🔄 Regenerar" para tener el análisis profundo.');
+    return alert('El plan guardado no tiene las respuestas del diagnóstico (formato viejo).\n\nRegenerá el plan desde el botón "Regenerar" para tener el análisis profundo.');
   }
 
   // Recalcular usando los mismos motores de FM para garantizar consistencia
@@ -267,9 +267,9 @@ function eduRenderInformeProfundo(k) {
     <div class="space-y-4 mt-3">
       <!-- Botones export -->
       <div class="flex gap-2 justify-end">
-        <button onclick="eduGenerateReportProfundoIA()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">🤖 Narrativa con IA</button>
-        <button onclick="eduInformePrint()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🖨️ Imprimir / PDF</button>
-        <button onclick="eduExportKpisCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 CSV</button>
+        <button onclick="eduGenerateReportProfundoIA()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('bot')} Narrativa con IA</button>
+        <button onclick="eduInformePrint()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('printer')} Imprimir / PDF</button>
+        <button onclick="eduExportKpisCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('inbox')} CSV</button>
       </div>
 
       <div id="edu-informe-print">
@@ -280,7 +280,7 @@ function eduRenderInformeProfundo(k) {
         ${eduRenderSeccion5Calidad(k)}
         <div id="edu-informe-seccion6">
           <div class="bg-white border border-slate-200 rounded-lg p-4 mt-3">
-            <div class="font-bold text-sm mb-1">📋 6. Diagnósticos & Planes (análisis profundo)</div>
+            <div class="font-bold text-sm mb-1">${osIcon('clipboard')} 6. Diagnósticos & Planes (análisis profundo)</div>
             <div class="text-xs text-slate-500">Cargando agregaciones de diagnósticos y planes…</div>
           </div>
         </div>
@@ -424,7 +424,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
   return `
     <div class="bg-white border border-slate-200 rounded-lg p-4 mt-3 space-y-3">
       <div>
-        <div class="font-bold text-sm">📋 6. Diagnósticos & Planes (análisis profundo)</div>
+        <div class="font-bold text-sm">${osIcon('clipboard')} 6. Diagnósticos & Planes (análisis profundo)</div>
         <div class="text-xs text-slate-500 mt-0.5">Data agregada de los formularios completados + planes asignados + progreso real de tareas.</div>
       </div>
 
@@ -461,7 +461,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
 
       <!-- Distribución de respuestas clave -->
       <div>
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Distribución de respuestas clave (para marketing/ventas)</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('chart')} Distribución de respuestas clave (para marketing/ventas)</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           ${renderDist('objetivo', 'Objetivo principal')}
           ${renderDist('mayor_obstaculo', 'Mayor obstáculo')}
@@ -477,7 +477,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
       <!-- Distribución de perfiles asignados -->
       ${Object.keys(perfilesDist).length ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🎯 Perfiles asignados (planes activos)</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('target')} Perfiles asignados (planes activos)</div>
           <div class="bg-slate-50 rounded p-2.5 space-y-0.5">
             ${Object.entries(perfilesDist).sort((a,b)=>b[1]-a[1]).map(([n,c]) => {
               const totalActivos = activos.length;
@@ -496,7 +496,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
       <!-- Top estudiantes por progreso -->
       ${top5Estudiantes.length ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🏆 Top 5 estudiantes con más avance</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('trophy')} Top 5 estudiantes con más avance</div>
           <div class="bg-emerald-50 rounded p-2 space-y-0.5">
             ${top5Estudiantes.map(s => `
               <div class="flex items-center gap-2 text-[11px]">
@@ -511,7 +511,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
       <!-- Estudiantes más inactivos -->
       ${inactivos.length ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">⚠️ Estudiantes con actividad más antigua (riesgo)</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('alert')} Estudiantes con actividad más antigua (riesgo)</div>
           <div class="bg-red-50 rounded p-2 space-y-0.5">
             ${inactivos.map(s => {
               const dias = s.last ? Math.floor((Date.now() - s.last)/86400000) : null;
@@ -528,7 +528,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
       ${top5Avance.length ? `
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">✅ Bloques más completados</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('check-circle')} Bloques más completados</div>
             <div class="bg-emerald-50 rounded p-2 space-y-0.5">
               ${top5Avance.map(b => `
                 <div class="flex items-center gap-2 text-[11px]">
@@ -540,7 +540,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
             </div>
           </div>
           <div>
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">⏳ Bloques con menos progreso</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('loader')} Bloques con menos progreso</div>
             <div class="bg-amber-50 rounded p-2 space-y-0.5">
               ${bottom5Avance.map(b => `
                 <div class="flex items-center gap-2 text-[11px]">
@@ -555,7 +555,7 @@ function eduRenderSeccion6(invites, plans, tasks) {
 
       <!-- Insights resumen -->
       <div class="bg-slate-900 text-white rounded p-3 text-xs">
-        <div class="font-bold text-amber-300 uppercase text-[10px] mb-1">💡 INSIGHTS PARA DECISIONES</div>
+        <div class="font-bold text-amber-300 uppercase text-[10px] mb-1">${osIcon('lightbulb')} INSIGHTS PARA DECISIONES</div>
         <ul class="space-y-1">
           <li>• <strong>Tasa de completación de diagnóstico:</strong> ${pctCompl}%. ${pctCompl < 70 ? 'Hay que mejorar el follow-up de invites pendientes — quizás recordatorio automático a las 48h.' : 'Buen ratio. Mantener la cadencia de envío.'}</li>
           ${avgDias ? `<li>• <strong>Tiempo promedio para completar:</strong> ${avgDias} días. ${avgDias > 3 ? 'Es alto — explorar enviar el link justo después del primer call.' : 'Rápido — los estudiantes responden con interés inicial.'}</li>` : ''}
@@ -598,7 +598,7 @@ function eduRenderSeccion1Inventario(k) {
   return `
     <section class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-slate-900 text-white px-4 py-3">
-        <h3 class="font-bold text-sm">📋 Sección 1 · Inventario de la cartera</h3>
+        <h3 class="font-bold text-sm">${osIcon('clipboard')} Sección 1 · Inventario de la cartera</h3>
       </div>
       <div class="p-4 space-y-4">
         <!-- KPIs status -->
@@ -657,7 +657,7 @@ function eduRenderSeccion1Inventario(k) {
             <div class="text-[10px] text-slate-600 mt-1">${ap.estudiantes_con_plan||0} estudiante(s) con plan activo</div>
           </div>
           <div class="border border-red-200 rounded p-3 bg-red-50">
-            <div class="text-xs font-bold uppercase text-red-800 mb-2">⚠️ Cuellos de botella (etapas lentas)</div>
+            <div class="text-xs font-bold uppercase text-red-800 mb-2">${osIcon('alert')} Cuellos de botella (etapas lentas)</div>
             ${cuellosBotella.length === 0 ? `<div class="text-[11px] text-emerald-700 italic">✓ Sin cuellos de botella detectados.</div>` : `
               <ul class="text-xs space-y-1">
                 ${cuellosBotella.slice(0,5).map(c => `<li><strong>${(c.stage||'').replace(/</g,'&lt;')}</strong><div class="text-[10px] text-red-700">${c.promedio_dias} días promedio (mediana global: ${medianaEtapa}d)</div></li>`).join('')}
@@ -685,7 +685,7 @@ function eduRenderSeccion2Sesiones(k) {
 
   return `
     <section class="bg-white border border-slate-200 rounded-xl overflow-hidden mt-4">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">📞 Sección 2 · Operación de sesiones</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('phone')} Sección 2 · Operación de sesiones</h3></div>
       <div class="p-4 space-y-4">
         <!-- KPIs mes vs anterior -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -757,7 +757,7 @@ function eduRenderSeccion3Desercion(k) {
 
   return `
     <section class="bg-white border border-slate-200 rounded-xl overflow-hidden mt-4">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">🚪 Sección 3 · Deserción y retención</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('door')} Sección 3 · Deserción y retención</h3></div>
       <div class="p-4 space-y-4">
         <!-- KPIs mes -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -769,7 +769,7 @@ function eduRenderSeccion3Desercion(k) {
 
         <!-- Churns con motivo -->
         <div class="border border-slate-200 rounded overflow-hidden">
-          <div class="bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">📉 Churns del mes (con motivo)</div>
+          <div class="bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-700 border-b border-slate-200">${osIcon('trending-down')} Churns del mes (con motivo)</div>
           ${churns.length === 0 ? `<div class="text-xs text-emerald-700 italic p-3">✓ Sin churns este mes.</div>` : `
             <div class="max-h-64 overflow-y-auto">
               <table class="w-full text-xs">
@@ -799,7 +799,7 @@ function eduRenderSeccion3Desercion(k) {
             `}
           </div>
           <div class="border border-red-200 rounded p-3 bg-red-50">
-            <div class="text-xs font-bold uppercase text-red-800 mb-2">⚠️ Estudiantes en riesgo (top 10)</div>
+            <div class="text-xs font-bold uppercase text-red-800 mb-2">${osIcon('alert')} Estudiantes en riesgo (top 10)</div>
             ${inactivos.length === 0 ? `<div class="text-xs text-emerald-700 italic">✓ Todos tuvieron sesión en últimos 30d.</div>` : `
               <ul class="text-xs space-y-1 max-h-48 overflow-y-auto">
                 ${inactivos.slice(0,10).map(i => `<li class="flex items-center justify-between bg-white border border-red-200 rounded px-2 py-1"><span class="truncate flex-1 min-w-0"><button onclick="eduShowStudentDetail('${i.student_id}')" class="font-medium hover:underline text-left">${(i.full_name||'?').replace(/</g,'&lt;')}</button><span class="text-[10px] text-slate-500 block">${(i.current_stage||'—').replace(/</g,'&lt;')}</span></span><span class="font-bold ml-2 ${i.dias_inactivo>60?'text-red-700':'text-amber-700'}">${i.dias_inactivo}d</span></li>`).join('')}
@@ -822,7 +822,7 @@ function eduRenderSeccion4Resultados(k) {
 
   return `
     <section class="bg-white border border-slate-200 rounded-xl overflow-hidden mt-4">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">🎯 Sección 4 · Resultados de negocio</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('target')} Sección 4 · Resultados de negocio</h3></div>
       <div class="p-4 space-y-4">
         <!-- KPIs -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -836,7 +836,7 @@ function eduRenderSeccion4Resultados(k) {
         <!-- Top deals + NPS breakdown -->
         <div class="grid md:grid-cols-2 gap-3">
           <div class="border border-slate-200 rounded p-3">
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">🏆 Top deals cerrados</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('trophy')} Top deals cerrados</div>
             ${top.length === 0 ? `<div class="text-xs text-slate-400 italic">Sin deals cerrados todavía. Llená first_deal_at en CRM.</div>` : `
               <table class="w-full text-xs">
                 <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Estudiante</th><th class="text-left p-1">Tipo</th><th class="text-right p-1">Valor</th><th class="text-right p-1">Días</th></tr></thead>
@@ -847,7 +847,7 @@ function eduRenderSeccion4Resultados(k) {
             `}
           </div>
           <div class="border border-slate-200 rounded p-3">
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 NPS breakdown</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('chart')} NPS breakdown</div>
             ${(nps.respuestas||0) === 0 ? `<div class="text-xs text-slate-400 italic">Sin respuestas NPS. Capturalo en encuesta post-sesión.</div>` : `
               <ul class="text-xs space-y-2">
                 <li class="flex items-center gap-2"><span class="bg-emerald-500 text-white px-2 py-0.5 rounded text-[10px] font-bold">PROMOTORES</span><span class="font-bold">${nps.promotores||0}</span> <span class="text-slate-500">(9-10)</span></li>
@@ -876,16 +876,16 @@ function eduRenderSeccion5Calidad(k) {
   // Aggregar créditos por tier
   const tiers = {};
   creditos.forEach(c => { tiers[c.tier] = (tiers[c.tier]||0) + (+c.cantidad||0); });
-  const tierLabels = { sin_historial:'🆕 Sin historial', reconstruir:'🛠️ Reconstruir', limitado:'⚠️ Limitado', bueno:'✅ Bueno', excelente:'⭐ Excelente' };
+  const tierLabels = { sin_historial:'Sin historial', reconstruir:'Reconstruir', limitado:'Limitado', bueno:'Bueno', excelente:'Excelente' };
 
   return `
     <section class="bg-white border border-slate-200 rounded-xl overflow-hidden mt-4">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">📚 Sección 5 · Calidad pedagógica</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('book')} Sección 5 · Calidad pedagógica</h3></div>
       <div class="p-4 space-y-4">
         <!-- Bloques que tranquean vs que avanzan -->
         <div class="grid md:grid-cols-2 gap-3">
           <div class="border border-red-200 rounded p-3 bg-red-50">
-            <div class="text-xs font-bold uppercase text-red-800 mb-2">🐌 Bloques que tranquean (menos completados)</div>
+            <div class="text-xs font-bold uppercase text-red-800 mb-2">Bloques que tranquean (menos completados)</div>
             ${bajos.length === 0 ? `<div class="text-xs text-slate-400 italic">—</div>` : `
               <ul class="text-xs space-y-2">
                 ${bajos.map(b => `<li><div class="font-medium">${(b.bloque_subetapa||b.bloque_id||'?').replace(/</g,'&lt;')}</div><div class="text-[10px] text-slate-600">${(b.bloque_etapa||'').replace(/</g,'&lt;')} · ${b.completadas||0}/${b.tareas_totales||0} (<span class="font-bold text-red-700">${b.pct_completado||0}%</span>)</div></li>`).join('')}
@@ -893,7 +893,7 @@ function eduRenderSeccion5Calidad(k) {
             `}
           </div>
           <div class="border border-emerald-200 rounded p-3 bg-emerald-50">
-            <div class="text-xs font-bold uppercase text-emerald-800 mb-2">🚀 Bloques que avanzan (más completados)</div>
+            <div class="text-xs font-bold uppercase text-emerald-800 mb-2">${osIcon('rocket')} Bloques que avanzan (más completados)</div>
             ${altos.length === 0 ? `<div class="text-xs text-slate-400 italic">—</div>` : `
               <ul class="text-xs space-y-2">
                 ${altos.map(b => `<li><div class="font-medium">${(b.bloque_subetapa||b.bloque_id||'?').replace(/</g,'&lt;')}</div><div class="text-[10px] text-slate-600">${(b.bloque_etapa||'').replace(/</g,'&lt;')} · ${b.completadas||0}/${b.tareas_totales||0} (<span class="font-bold text-emerald-700">${b.pct_completado||0}%</span>)</div></li>`).join('')}
@@ -905,7 +905,7 @@ function eduRenderSeccion5Calidad(k) {
         <!-- Diagnósticos de crédito + Coaches activos -->
         <div class="grid md:grid-cols-2 gap-3">
           <div class="border border-slate-200 rounded p-3">
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">💳 Diagnósticos crédito por perfil</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('credit-card')} Diagnósticos crédito por perfil</div>
             ${Object.keys(tiers).length === 0 ? `<div class="text-xs text-slate-400 italic">Sin diagnósticos generados.</div>` : `
               <ul class="text-xs space-y-1">
                 ${Object.entries(tiers).sort((a,b)=>b[1]-a[1]).map(([tier,n]) => `<li class="flex justify-between"><span>${tierLabels[tier]||tier}</span><span class="font-bold">${n}</span></li>`).join('')}
@@ -913,7 +913,7 @@ function eduRenderSeccion5Calidad(k) {
             `}
           </div>
           <div class="border border-slate-200 rounded p-3">
-            <div class="text-xs font-bold uppercase text-slate-700 mb-2">👤 Coaches activos (este mes)</div>
+            <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('user')} Coaches activos (este mes)</div>
             ${coaches.length === 0 ? `<div class="text-xs text-slate-400 italic">Sin datos.</div>` : `
               <table class="w-full text-xs">
                 <thead><tr class="text-[10px] uppercase text-slate-500"><th class="text-left p-1">Coach</th><th class="text-right p-1">Agendadas</th><th class="text-right p-1">Atendidas</th></tr></thead>

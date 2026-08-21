@@ -170,10 +170,10 @@
     if (relajado >= 2 && nivel === 'alta') nivel = 'media';
     const razones = [usables.length + ' comps reconciliados (mediana ponderada)', 'CV ' + cv.toFixed(1) + '%', 'gross adj prom ' + grossProm.toFixed(1) + '%',
       'venta media hace ' + mProm.toFixed(1) + 'm', 'a ' + dProm.toFixed(2) + ' mi prom'];
-    if (relajado) razones.push('🔎 búsqueda expandida (escalón ' + relajado + ': ' + Math.round(f.meses) + 'm / ' + f.dist + ' mi) por pocos comps');
+    if (relajado) razones.push('búsqueda expandida (escalón ' + relajado + ': ' + Math.round(f.meses) + 'm / ' + f.dist + ' mi) por pocos comps');
     if (outliers.length) razones.push(outliers.length + ' outlier(s) estadístico(s) excluido(s)');
     if (bias) razones.push('sesgo calibrado ' + (Math.round(bias * 100) / 100) + '%' + (zipBias ? ' (incluye submercado ' + s.zip + ': ' + zipBias + '%)' : ''));
-    if (usables.length < minN) razones.push('⚠ menos de ' + minN + ' comps válidos');
+    if (usables.length < minN) razones.push('menos de ' + minN + ' comps válidos');
     return { usables, outliers, arv, p25, p75, cv, score, grossProm, dispersion: cv, distProm: dProm, mesesProm: mProm, bias, relajado, filtrosUsados: f,
       conservador: p25, optimista: p75, confianza: { nivel, score, razones } };
   }

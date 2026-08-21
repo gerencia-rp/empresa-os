@@ -22,15 +22,15 @@
     const out = document.getElementById('tab-metricas'); if (!out) return;
     out.dataset.rendered = '1';
     if (!window.Memory || !window.Memory.enabled()) {
-      out.innerHTML = `<h2 class="font-display text-2xl font-extrabold text-accent mb-2">📊 Métricas</h2><p class="text-sm text-zinc-400">Memoria no configurada (config.public.js).</p>`;
+      out.innerHTML = `<h2 class="font-display text-2xl font-extrabold text-accent mb-2">${osIcon('chart')} Métricas</h2><p class="text-sm text-zinc-400">Memoria no configurada (config.public.js).</p>`;
       return;
     }
     out.innerHTML = `
       <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div><h2 class="font-display text-2xl font-extrabold text-accent">📊 Métricas</h2><p class="text-xs text-zinc-500">Carga manual de números → análisis de qué funciona</p></div>
+        <div><h2 class="font-display text-2xl font-extrabold text-accent">${osIcon('chart')} Métricas</h2><p class="text-xs text-zinc-500">Carga manual de números → análisis de qué funciona</p></div>
         <div class="flex gap-2">
-          <button onclick="metricsOpenCargar()" class="text-sm px-3 py-2 rounded-lg bg-accent text-primary font-semibold">📥 Cargar métricas</button>
-          <button onclick="metricsLoadDashboard()" class="text-sm px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700">📈 Refrescar</button>
+          <button onclick="metricsOpenCargar()" class="text-sm px-3 py-2 rounded-lg bg-accent text-primary font-semibold">${osIcon('inbox')} Cargar métricas</button>
+          <button onclick="metricsLoadDashboard()" class="text-sm px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700">${osIcon('trending-up')} Refrescar</button>
         </div>
       </div>
       <div id="metrics-modal"></div>
@@ -56,7 +56,7 @@
     const el = document.getElementById('metrics-insights'); if (!el) return;
     window.Memory.computeInsights().then(r => {
       if (r.need_more) {
-        el.innerHTML = `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-3 text-[13px] text-zinc-400">🧠 Llevás <b class="text-accent">${r.count || 0}</b> publicación(es) con métricas. Necesitás al menos <b>3</b> para que el sistema detecte patrones.</div>`;
+        el.innerHTML = `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-3 text-[13px] text-zinc-400">${osIcon('brain')} Llevás <b class="text-accent">${r.count || 0}</b> publicación(es) con métricas. Necesitás al menos <b>3</b> para que el sistema detecte patrones.</div>`;
         return;
       }
       const ins = (r.insights || []).filter(x => !dismissed().includes(x.headline));
@@ -68,7 +68,7 @@
         ${(x.evidence_ids && x.evidence_ids.length) ? `<div class="text-[10px] text-zinc-500 mt-1">Basado en ${x.evidence_ids.length} pieza(s)</div>` : ''}
         <div class="text-[9px] uppercase text-zinc-600 mt-1">${Eh(x.tipo)} · prioridad ${Eh(x.priority || 'media')}</div>
       </div>`).join('');
-      el.innerHTML = `<div class="flex items-center justify-between mb-2"><h3 class="font-display text-lg font-bold text-accent">🧠 Insights</h3><button onclick="metricsMarkRead('${r.id || ''}')" class="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">Marcar leídos</button></div><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
+      el.innerHTML = `<div class="flex items-center justify-between mb-2"><h3 class="font-display text-lg font-bold text-accent">${osIcon('brain')} Insights</h3><button onclick="metricsMarkRead('${r.id || ''}')" class="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700">Marcar leídos</button></div><div class="grid sm:grid-cols-2 gap-3">${cards}</div>`;
     }).catch(e => { el.innerHTML = `<div class="text-xs text-red-400">Insights: ${Eh(e.message)}</div>`; });
   }
   window.metricsDismiss = (headline) => { const d = dismissed(); d.push(headline); localStorage.setItem('metricsInsightsDismissed', JSON.stringify(d)); loadInsights(); };
@@ -111,7 +111,7 @@
     window.Memory.getDashboard().then(d => {
       const k = d.kpis || {};
       if (!k.con_metricas) {
-        el.innerHTML = `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-6 text-center text-sm text-zinc-400">Todavía no hay métricas cargadas.<br>Generá contenido, publicalo y cargá los números con <b class="text-accent">📥 Cargar métricas</b>.</div>`;
+        el.innerHTML = `<div class="bg-primary/40 border border-zinc-800 rounded-xl p-6 text-center text-sm text-zinc-400">Todavía no hay métricas cargadas.<br>Generá contenido, publicalo y cargá los números con <b class="text-accent">${osIcon('inbox')} Cargar métricas</b>.</div>`;
         return;
       }
       const top = k.top_reel;
@@ -136,7 +136,7 @@
   function openCargar() {
     const m = document.getElementById('metrics-modal'); if (!m) return;
     m.innerHTML = `<div class="bg-primary/40 border border-accent/30 rounded-xl p-4 mb-4">
-      <div class="flex items-center justify-between mb-2"><h3 class="font-display font-bold text-accent">📥 Cargar métricas</h3><button onclick="metricsCloseCargar()" class="text-zinc-500 hover:text-white">✕</button></div>
+      <div class="flex items-center justify-between mb-2"><h3 class="font-display font-bold text-accent">${osIcon('inbox')} Cargar métricas</h3><button onclick="metricsCloseCargar()" class="text-zinc-500 hover:text-white">✕</button></div>
       <div id="metrics-step" class="text-sm text-zinc-500">Cargando piezas…</div></div>`;
     window.Memory.listGenerations({ limit: 100 }).then(gens => {
       const elig = gens.filter(g => ['producida', 'publicada'].includes(g.estado));
@@ -193,13 +193,13 @@
       <div class="text-[11px] uppercase text-emerald-300 font-bold mb-2">Cargar números</div>
       <div class="bg-primary/40 border border-accent/25 rounded-lg p-2 mb-3">
         <label class="text-[11px] text-accent font-semibold cursor-pointer flex items-center gap-2">
-          📸 Subir pantallazo (autocompleta con IA)
+          ${osIcon('camera')} Subir pantallazo (autocompleta con IA)
           <input type="file" accept="image/*" onchange="metricsOcr(this)" class="text-[11px] text-zinc-400">
         </label>
         <div id="m-ocr" class="text-[11px] text-zinc-500 mt-1"></div>
       </div>
       <div class="grid grid-cols-2 gap-2">${METRIC_FIELDS.map(f => `<label class="block"><span class="text-[11px] text-zinc-400">${f.label}</span><input id="mf-${f.id}" type="number" min="0" ${f.pct ? 'max="100"' : ''} class="mt-0.5 w-full bg-dark border border-zinc-800 rounded px-2 py-1.5 text-sm focus:border-accent outline-none"></label>`).join('')}</div>
-      <button onclick="metricsSave('${publishedId}')" class="w-full bg-accent text-primary font-semibold py-2 rounded text-sm mt-3">💾 Guardar métricas</button>
+      <button onclick="metricsSave('${publishedId}')" class="w-full bg-accent text-primary font-semibold py-2 rounded text-sm mt-3">${osIcon('save')} Guardar métricas</button>
       <div id="m-saveerr" class="text-[11px] mt-1"></div>
     </div>`;
   }

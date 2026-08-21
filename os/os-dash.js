@@ -20,11 +20,11 @@ const dhX = v => (v == null || isNaN(+v)) ? '—' : (+v).toFixed(2) + 'x';
 const dhN = v => (v == null || isNaN(+v)) ? '—' : Math.round(+v).toLocaleString('en-US');
 const dhHoy = () => new Date().toISOString().slice(0, 10);
 const DH_EMP = {
-  'fix-and-flip': { key: 'fix_flip', nombre: 'Fix & Flip', icon: '🏚' },
-  'remodelacion': { key: 'remodelacion', nombre: 'Remodelación', icon: '🔨' },
-  'rentas': { key: 'rentas', nombre: 'Rentas', icon: '🏠' },
-  'educacion': { key: 'educacion', nombre: 'Educación', icon: '🎓' },
-  'holding': { key: 'holding', nombre: 'Holding consolidado', icon: '🏛' },
+  'fix-and-flip': { key: 'fix_flip', nombre: 'Fix & Flip', icon: osIcon('construction') },
+  'remodelacion': { key: 'remodelacion', nombre: 'Remodelación', icon: osIcon('hammer') },
+  'rentas': { key: 'rentas', nombre: 'Rentas', icon: osIcon('house') },
+  'educacion': { key: 'educacion', nombre: 'Educación', icon: osIcon('graduation-cap') },
+  'holding': { key: 'holding', nombre: 'Holding consolidado', icon: osIcon('landmark') },
 };
 
 // ─── base: metas (config editable) + glosario (⓵ educativo) ───
@@ -120,15 +120,15 @@ async function dhRiesgos(empKey) {
 function dhRiesgosHtml(r, empKey) {
   const sev = s => '<span class="lm-pill ' + (s === 'critica' || s === 'alta' ? 'bug' : 'warn') + '" style="font-size:8px">' + OS_E(s || '—') + '</span>';
   return '<div class="grid k2" style="align-items:start">'
-    + '<div class="card" style="margin:0"><div class="chart-h"><div class="t">🐕 Sabueso Contable</div><div class="k">abiertos por $ impacto' + dhSrc('ct_findings') + '</div></div>'
-    + ((r.ct || []).map(f => '<div class="kv"><span style="max-width:70%">' + sev(f.severidad) + ' ' + OS_E(f.titulo) + '</span><b class="down">' + (f.impacto_usd != null ? dhM(f.impacto_usd) : '—') + '</b></div>').join('') || '<div class="empty" style="padding:14px">Sin hallazgos abiertos de esta empresa 🎯</div>')
+    + '<div class="card" style="margin:0"><div class="chart-h"><div class="t">' + osIcon('dog') + ' Sabueso Contable</div><div class="k">abiertos por $ impacto' + dhSrc('ct_findings') + '</div></div>'
+    + ((r.ct || []).map(f => '<div class="kv"><span style="max-width:70%">' + sev(f.severidad) + ' ' + OS_E(f.titulo) + '</span><b class="down">' + (f.impacto_usd != null ? dhM(f.impacto_usd) : '—') + '</b></div>').join('') || '<div class="empty" style="padding:14px">Sin hallazgos abiertos de esta empresa ' + osIcon('target') + '</div>')
     + '</div>'
-    + '<div class="card" style="margin:0"><div class="chart-h"><div class="t">🐕 Sabueso Ops</div><div class="k">operativos abiertos' + dhSrc('sabueso_findings') + '</div></div>'
-    + ((r.ops || []).map(f => '<div class="kv"><span style="max-width:75%">' + sev(f.severidad) + ' ' + OS_E(f.task_name || f.detalle || '') + '</span><b class="meta">' + OS_E(f.dueno_sugerido || '') + '</b></div>').join('') || '<div class="empty" style="padding:14px">Sin hallazgos operativos abiertos 🎯</div>')
+    + '<div class="card" style="margin:0"><div class="chart-h"><div class="t">' + osIcon('dog') + ' Sabueso Ops</div><div class="k">operativos abiertos' + dhSrc('sabueso_findings') + '</div></div>'
+    + ((r.ops || []).map(f => '<div class="kv"><span style="max-width:75%">' + sev(f.severidad) + ' ' + OS_E(f.task_name || f.detalle || '') + '</span><b class="meta">' + OS_E(f.dueno_sugerido || '') + '</b></div>').join('') || '<div class="empty" style="padding:14px">Sin hallazgos operativos abiertos ' + osIcon('target') + '</div>')
     + '</div></div>';
 }
 function dhDecHtml(decs) {
-  if (!decs.length) return '<div class="empty" style="padding:16px">Sin decisiones urgentes según los datos de hoy 🎯</div>';
+  if (!decs.length) return '<div class="empty" style="padding:16px">Sin decisiones urgentes según los datos de hoy ' + osIcon('target') + '</div>';
   return '<div class="grid k3" style="align-items:start">' + decs.slice(0, 3).map((d, i) => '<div class="dh-dec">'
     + '<div style="font-size:11px;color:var(--mut2)">#' + (i + 1) + ' · impacto ' + (d.imp != null ? dhM(d.imp) : 'estratégico') + '</div>'
     + '<div style="font-weight:700;font-size:13px;margin:4px 0">' + d.t + '</div>'
@@ -136,7 +136,7 @@ function dhDecHtml(decs) {
     + '<div style="margin-top:8px">' + (d.accion ? '<button class="ibtn" onclick="' + d.accion + '">' + (d.accionLbl || 'Ir') + '</button>' : '<span class="meta">dueño: <b>' + OS_E(d.dueno || '—') + '</b></span>') + '</div>'
     + '</div>').join('') + '</div>';
 }
-const DH_BANNER_PAPEL = '<div class="dh-banner">📄 Los valores de portafolio/equity son sobre <b>valor en papel</b> (appraisal/ARV; vendidas a precio real) — no son ganancias realizadas hasta la venta o el refi.</div>';
+const DH_BANNER_PAPEL = '<div class="dh-banner">' + osIcon('file') + ' Los valores de portafolio/equity son sobre <b>valor en papel</b> (appraisal/ARV; vendidas a precio real) — no son ganancias realizadas hasta la venta o el refi.</div>';
 
 // ════════ FIX & FLIP ════════
 async function dhLoadFF() {
@@ -178,7 +178,7 @@ async function dhLoadFF() {
   DH.d.ff = { ind, casas, port, loans, ciclo, deficit, capT, distT, resid, errArv, trend, riesgos, hoy };
 }
 function dhViewFF() {
-  const D = DH.d.ff; if (!D) { dhLoadFF().then(osRender); return '<div class="empty">⏳ Calculando el portafolio…</div>'; }
+  const D = DH.d.ff; if (!D) { dhLoadFF().then(osRender); return '<div class="empty">' + osIcon('loader') + ' Calculando el portafolio…</div>'; }
   const p = D.port;
   const invEng = window.invEngine || {};
   const big = dhBig([
@@ -189,7 +189,7 @@ function dhViewFF() {
     { lab: 'Déficit acumulado', glos: 'deficit_harmony', v: D.deficit, txt: dhM(D.deficit), meta: 'ff_deficit', fuente: 'Σ ff_deals.deficit_total (Airtable FF)', linea: 'Harmony + rentas · plata propia tapando huecos', cls: D.deficit > 0 ? 'down' : 'up' },
   ]);
   const venc60 = D.ind.filter(r => { const ln = D.loans.find(l => (l.address || '').startsWith(r.casa)); return ln && ln.fecha_vencimiento && !ln.fecha_refi && !r.vendida && (new Date(ln.fecha_vencimiento) - Date.now()) < 60 * 86400000; });
-  const ue = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Por casa</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">🔮 Analizador: escenarios de venta 3/5/8 + waterfall →</a></div></div><table class="dh-tbl"><thead><tr><th>Casa</th><th class="dh-num">All-in</th><th class="dh-num">Papel</th><th>Fuente</th><th class="dh-num">Margen s/all-in</th><th class="dh-num">Compra → Papel</th><th class="dh-num">Aprec./año</th><th class="dh-num">Equity hoy</th><th class="dh-num">Deuda</th><th>Vence HML</th><th></th></tr></thead><tbody>'
+  const ue = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Por casa</div><div class="k"><a style="cursor:pointer;color:var(--a2)" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">Analizador: escenarios de venta 3/5/8 + waterfall →</a></div></div><table class="dh-tbl"><thead><tr><th>Casa</th><th class="dh-num">All-in</th><th class="dh-num">Papel</th><th>Fuente</th><th class="dh-num">Margen s/all-in</th><th class="dh-num">Compra → Papel</th><th class="dh-num">Aprec./año</th><th class="dh-num">Equity hoy</th><th class="dh-num">Deuda</th><th>Vence HML</th><th></th></tr></thead><tbody>'
     + D.casas.slice().sort((a, b) => (b.multAllIn || 0) - (a.multAllIn || 0)).map(c => {
       const ln = D.loans.find(l => (l.address || '').startsWith(c.casa)) || {};
       const vencSoon = ln.fecha_vencimiento && !ln.fecha_refi && !c.vendida && (new Date(ln.fecha_vencimiento) - Date.now()) < 60 * 86400000;
@@ -200,8 +200,8 @@ function dhViewFF() {
         + '<td class="dh-num">' + (c.tirNA ? 'n/a' : dhP(c.aprecAnual)) + '</td>'
         + '<td class="dh-num">' + (c.equityHoy != null ? dhM(c.equityHoy) : '—') + '</td>'
         + '<td class="dh-num">' + (c.deuda_vigente != null ? dhM(c.deuda_vigente) : dhPend('por completar')) + '</td>'
-        + '<td>' + (ln.fecha_vencimiento ? OS_E(ln.fecha_vencimiento) + (vencSoon ? ' <b class="down">⚠ <60d</b>' : '') : '—') + '</td>'
-        + '<td><a style="cursor:pointer;color:var(--a2);font-size:10px" title="escenarios de venta 3/5/8 de esta casa" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">🔮 3/5/8</a></td></tr>';
+        + '<td>' + (ln.fecha_vencimiento ? OS_E(ln.fecha_vencimiento) + (vencSoon ? ' <b class="down">' + osIcon('alert') + ' <60d</b>' : '') : '—') + '</td>'
+        + '<td><a style="cursor:pointer;color:var(--a2);font-size:10px" title="escenarios de venta 3/5/8 de esta casa" onclick="window.IA&&(IA.tab=\'analizador\');osNav(\'/inversionistas\')">3/5/8</a></td></tr>';
     }).join('') + '</tbody></table></div>';
   const extra = '<div class="grid k3" style="margin-top:12px;align-items:start">'
     + '<div class="card" style="margin:0"><div class="lab">Precisión de estimación' + dhIGlos('appraisal', dhP(D.errArv)) + '</div><div class="big">' + dhP(D.errArv) + '</div><div class="meta">error |appraisal − ARV| promedio · ¿compramos bien?' + dhSrc('ff_deals (casas con ambos)') + '</div></div>'
@@ -213,8 +213,8 @@ function dhViewFF() {
   if (D.deficit > 0) decs.push({ t: 'Bajar el déficit acumulado', d: 'Hoy ' + dhM(D.deficit) + ' de plata propia tapando huecos (Harmony+rentas). Priorizar refis con cash-out.', imp: D.deficit, dueno: 'Juan / CEO' });
   setTimeout(() => {
     dhDrawChart('dh-ff-t', { type: 'bar', data: { labels: D.trend.map(t => t.corte.slice(2, 7)), datasets: [
-      { type: 'line', label: 'TIR all-in al corte', yAxisID: 'y1', data: D.trend.map(t => t.tir != null ? +(t.tir * 100).toFixed(1) : null), borderColor: '#48d69c', pointRadius: 2 },
-      { label: 'Capital desplegado acum.', yAxisID: 'y', data: D.trend.map(t => Math.round(t.cap)), backgroundColor: 'rgba(79,141,255,.5)' },
+      { type: 'line', label: 'TIR all-in al corte', yAxisID: 'y1', data: D.trend.map(t => t.tir != null ? +(t.tir * 100).toFixed(1) : null), borderColor: '#4ade9e', pointRadius: 2 },
+      { label: 'Capital desplegado acum.', yAxisID: 'y', data: D.trend.map(t => Math.round(t.cap)), backgroundColor: 'rgba(58,91,224,.5)' },
     ] }, options: { scales: { y: { ticks: { font: { size: 9 } } }, y1: { position: 'right', ticks: { callback: v => v + '%', font: { size: 9 } }, grid: { drawOnChartArea: false } }, x: { ticks: { font: { size: 9 } } } }, plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } } } });
   }, 80);
   return DH_BANNER_PAPEL + big
@@ -236,7 +236,7 @@ async function dhLoadRM() {
   DH.d.rm = { obras, oh, horas, riesgos };
 }
 function dhViewRM() {
-  const D = DH.d.rm; if (!D) { dhLoadRM().then(osRender); return '<div class="empty">⏳ Cargando obras…</div>'; }
+  const D = DH.d.rm; if (!D) { dhLoadRM().then(osRender); return '<div class="empty">' + osIcon('loader') + ' Cargando obras…</div>'; }
   const fin = D.obras.filter(o => o.proceso === 'Finalizado');
   const act = D.obras.filter(o => o.proceso !== 'Finalizado');
   const gasto = o => (Number(o.gasto_materiales) || 0) + (Number(o.gasto_trabajadores) || 0);
@@ -289,8 +289,8 @@ function dhViewRM() {
   if (backlog > 0 && act.length) decs.push({ t: 'Convertir el backlog', d: dhM(backlog) + ' contratados por ejecutar en ' + act.length + ' obras — cada semana de retraso posterga ese ingreso.', imp: backlog, accion: "osOpenApp('remodelacion','command-center')", accionLbl: 'Abrir Command Center' });
   setTimeout(() => {
     dhDrawChart('dh-rm-t', { type: 'bar', data: { labels: ms.map(m => invEngineSafeMes(m)), datasets: [
-      { label: 'Utilidad limpia/mes', data: ms.map(m => Math.round(porMes[m].u)), backgroundColor: 'rgba(72,214,156,.6)' },
-      { label: 'Valor cliente/mes', data: ms.map(m => Math.round(porMes[m].vc)), backgroundColor: 'rgba(79,141,255,.4)' },
+      { label: 'Utilidad limpia/mes', data: ms.map(m => Math.round(porMes[m].u)), backgroundColor: 'rgba(74,222,158,.6)' },
+      { label: 'Valor cliente/mes', data: ms.map(m => Math.round(porMes[m].vc)), backgroundColor: 'rgba(58,91,224,.4)' },
     ] }, options: { plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return big
@@ -321,7 +321,7 @@ async function dhLoadRE() {
   DH.d.re = { oc, pays, exps, kpi, cart, props, units, deals, riesgos, esHipo };
 }
 function dhViewRE() {
-  const D = DH.d.re; if (!D) { dhLoadRE().then(osRender); return '<div class="empty">⏳ Cargando Rentas…</div>'; }
+  const D = DH.d.re; if (!D) { dhLoadRE().then(osRender); return '<div class="empty">' + osIcon('loader') + ' Cargando Rentas…</div>'; }
   const ym = new Date().toISOString().slice(0, 7);
   const S = (arr, f) => arr.reduce((s, x) => s + (f(x) ? +x.amount || 0 : 0), 0);
   const rentaMes = S(D.pays, p => p.billing_ym === ym);
@@ -359,11 +359,11 @@ function dhViewRE() {
   const ue = '<div class="card overx" style="margin:0"><table class="dh-tbl"><thead><tr><th>Casa</th><th class="dh-num">Renta/mes (12m)</th><th class="dh-num">NOI/mes</th><th class="dh-num">Ocupación</th><th class="dh-num">DSCR</th></tr></thead><tbody>'
     + filas.map(f => '<tr><td>' + OS_E(f.nombre) + '</td><td class="dh-num">' + dhM(f.rentaM) + '</td><td class="dh-num ' + (f.noiM >= 0 ? 'up' : 'down') + '">' + dhM(f.noiM) + '</td>'
       + '<td class="dh-num">' + dhP(f.ocp, 0) + '</td>'
-      + '<td class="dh-num ' + (f.dscr != null && f.dscr < 1 ? 'down' : '') + '">' + (f.dscr != null ? f.dscr.toFixed(2) + 'x' + (f.dscr < 1 ? ' ⚠' : '') : dhPend('deuda FF: requiere área fix-flip')) + '</td></tr>').join('')
+      + '<td class="dh-num ' + (f.dscr != null && f.dscr < 1 ? 'down' : '') + '">' + (f.dscr != null ? f.dscr.toFixed(2) + 'x' + (f.dscr < 1 ? osIcon('alert') : '') : dhPend('deuda FF: requiere área fix-flip')) + '</td></tr>').join('')
     + '</tbody></table><div class="meta" style="margin-top:6px;font-size:10px">DSCR' + dhIGlos('dscr') + ' = NOI mensual ÷ servicio de deuda (hml+ref30 de ff_deals) — sin acceso al área FF se declara, no se inventa.</div></div>'
     + '<div class="grid k2" style="margin-top:12px;align-items:start">'
     + '<div class="card" style="margin:0"><div class="chart-h"><div class="t">Top 5 deudores (neteado)</div><div class="k">' + dhSrc('v_cartera_inquilino') + ' · <a style="cursor:pointer;color:var(--a2)" onclick="osNav(\'/cobros\')">abrir Cobros →</a></div></div>'
-    + (morosos.slice(0, 5).map(x => '<div class="kv"><span>' + OS_E(x.inquilino || x.tenant || '—') + '</span><b class="down">' + dhM(x.vencido_neto != null ? x.vencido_neto : x.vencido) + '</b></div>').join('') || '<div class="empty" style="padding:12px">Sin morosos netos 🎯</div>') + '</div>'
+    + (morosos.slice(0, 5).map(x => '<div class="kv"><span>' + OS_E(x.inquilino || x.tenant || '—') + '</span><b class="down">' + dhM(x.vencido_neto != null ? x.vencido_neto : x.vencido) + '</b></div>').join('') || '<div class="empty" style="padding:12px">Sin morosos netos ' + osIcon('target') + '</div>') + '</div>'
     + '<div class="card" style="margin:0"><div class="lab">% cobranza del mes · churn</div><div class="big">' + (function () { const pact = (D.cart || []).reduce((s, x) => s + (+x.por_cobrar_mes || 0), 0) + rentaMes; return pact ? dhP(rentaMes / pact) : '—'; })() + '</div><div class="meta">cobrado ÷ pactado del mes' + dhSrc('cartera + billing_ym') + ' · churn de inquilinos: ' + dhPend('sin serie de salidas espejada — pendiente de dato') + '</div></div></div>';
   const meses12 = [...new Set(D.pays.map(p => p.billing_ym))].sort().slice(-12);
   const serie = meses12.map(m => { const r = S(D.pays, p => p.billing_ym === m); const g = S(D.exps, e => e.billing_ym === m && !D.esHipo(e)); const h = S(D.exps, e => e.billing_ym === m && D.esHipo(e)); return { m, r, noi: r - g, cf: r - g - h }; });
@@ -374,9 +374,9 @@ function dhViewRE() {
   if (D.oc && +D.oc.disponibles > 0) decs.push({ t: 'Llenar ' + D.oc.disponibles + ' unidades disponibles', d: 'Cada unidad vacía es renta que no entra — priorizar publicación y showing.', imp: null, dueno: 'Carlos' });
   setTimeout(() => {
     dhDrawChart('dh-re-t', { type: 'line', data: { labels: serie.map(s => s.m.slice(2)), datasets: [
-      { label: 'Renta cobrada', data: serie.map(s => Math.round(s.r)), borderColor: '#48d69c', pointRadius: 2 },
-      { label: 'NOI', data: serie.map(s => Math.round(s.noi)), borderColor: '#4f8dff', pointRadius: 2 },
-      { label: 'Post-deuda', data: serie.map(s => Math.round(s.cf)), borderColor: '#f0687a', pointRadius: 2 },
+      { label: 'Renta cobrada', data: serie.map(s => Math.round(s.r)), borderColor: '#4ade9e', pointRadius: 2 },
+      { label: 'NOI', data: serie.map(s => Math.round(s.noi)), borderColor: '#3a5be0', pointRadius: 2 },
+      { label: 'Post-deuda', data: serie.map(s => Math.round(s.cf)), borderColor: '#ff6b6b', pointRadius: 2 },
     ] }, options: { plugins: { legend: { labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return big
@@ -399,7 +399,7 @@ async function dhLoadED() {
   DH.d.ed = { snap, etapas, creditos, tiempos, rev, riesgos, tend6 };
 }
 function dhViewED() {
-  const D = DH.d.ed; if (!D) { dhLoadED().then(osRender); return '<div class="empty">⏳ Cargando Educación…</div>'; }
+  const D = DH.d.ed; if (!D) { dhLoadED().then(osRender); return '<div class="empty">' + osIcon('loader') + ' Cargando Educación…</div>'; }
   const s = D.snap || {};
   const cred = D.creditos && D.creditos[0] ? D.creditos[0] : null;
   const credN = cred ? +(cred.diagnosticados != null ? cred.diagnosticados : (cred.total != null ? cred.total : Object.values(cred).find(v => !isNaN(+v)))) : null;
@@ -420,7 +420,7 @@ function dhViewED() {
   if ((s.en_riesgo || 0) > 0) decs.push({ t: 'Rescatar ' + s.en_riesgo + ' estudiantes en riesgo', d: 'Sesión de seguimiento antes de que se conviertan en churn.', imp: null, dueno: 'Coaches' });
   if ((s.inactivos_30d || 0) > 0) decs.push({ t: 'Reactivar ' + s.inactivos_30d + ' inactivos 30d', d: 'Sin actividad en 30 días — campaña de reactivación.', imp: null, dueno: 'Coordinación' });
   if ((s.churn_rate_30d || 0) > 0.05) decs.push({ t: 'Frenar el churn', d: 'Churn 30d ' + dhP(s.churn_rate_30d) + ' — revisar motivos de deserción (edu_ceo_motivos_desercion).', imp: null, dueno: 'CEO Educación' });
-  return '<div class="dh-banner">🧾 Esta empresa <b>no tiene libros en QBO</b> — contabilidad pendiente de conectar. Acá NO se inventa EBITDA: solo métricas operativas con fuente.</div>'
+  return '<div class="dh-banner">' + osIcon('receipt') + ' Esta empresa <b>no tiene libros en QBO</b> — contabilidad pendiente de conectar. Acá NO se inventa EBITDA: solo métricas operativas con fuente.</div>'
     + big
     + dhSecTitle('2', 'Tendencia', '(vista edu_ceo_tendencia_6m del módulo Educación — 6 meses)') + tbl(D.tend6 || [], 'Tendencia 6m — edu_ceo_tendencia_6m')
     + dhSecTitle('3', 'Unit economics · cartera por etapa') + tbl(D.etapas, 'Cartera de créditos por etapa' + ' ')
@@ -441,7 +441,7 @@ async function dhLoadHO() {
   DH.d.ho = { pnl, qb, ct, ops };
 }
 function dhViewHO() {
-  const D = DH.d.ho; if (!D) { dhLoadHO().then(osRender); return '<div class="empty">⏳ Consolidando el holding…</div>'; }
+  const D = DH.d.ho; if (!D) { dhLoadHO().then(osRender); return '<div class="empty">' + osIcon('loader') + ' Consolidando el holding…</div>'; }
   const ff = DH.d.ff, port = ff && ff.port;
   const qbv = (emp, lab) => { const r = D.qb.find(x => x.empresa === emp && String(x.label).toLowerCase() === lab.toLowerCase()); return r ? +r.value : null; };
   const liab = qbv('fix_flip', 'Total Liabilities'), eq = qbv('fix_flip', 'Total Equity');
@@ -468,10 +468,10 @@ function dhViewHO() {
       + '<td><span class="dh-sem ' + (r.ebitda == null ? 'pend' : ok ? 'ok' : 'bad') + '" style="position:static;display:inline-block"></span> <span class="meta" style="font-size:10px">entrar →</span></td></tr>';
   };
   const tabla = '<div class="card overx" style="margin:0"><table class="dh-tbl"><thead><tr><th>Empresa</th><th class="dh-num">Ingreso</th><th class="dh-num">Utilidad bruta</th><th class="dh-num">EBITDA</th><th>Nota</th><th>Estado</th></tr></thead><tbody>'
-    + filaEmp('🏚 Fix & Flip', '/fix-and-flip/dashboard', 'fix_flip', 'TIR papel ' + (port ? dhP(port.xirrAllIn) : '—') + ' · déficit ' + dhM(ff && ff.deficit))
-    + filaEmp('🔨 Remodelación', '/remodelacion/dashboard', 'remodelacion', 'v_holding_pnl usa la fórmula VIEJA — el dashboard usa la limpia (declarado)')
-    + filaEmp('🏠 Rentas', '/rentas/dashboard', 'rentas', 'vencido neto ' + (DH.d.re && DH.d.re.kpi ? dhM(DH.d.re.kpi.vencido_neto) : '—'))
-    + filaEmp('🎓 Educación', '/educacion/dashboard', 'educacion', 'contabilidad pendiente de conectar')
+    + filaEmp('Fix & Flip', '/fix-and-flip/dashboard', 'fix_flip', 'TIR papel ' + (port ? dhP(port.xirrAllIn) : '—') + ' · déficit ' + dhM(ff && ff.deficit))
+    + filaEmp('Remodelación', '/remodelacion/dashboard', 'remodelacion', 'v_holding_pnl usa la fórmula VIEJA — el dashboard usa la limpia (declarado)')
+    + filaEmp('Rentas', '/rentas/dashboard', 'rentas', 'vencido neto ' + (DH.d.re && DH.d.re.kpi ? dhM(DH.d.re.kpi.vencido_neto) : '—'))
+    + filaEmp('Educación', '/educacion/dashboard', 'educacion', 'contabilidad pendiente de conectar')
     + '</tbody></table></div>';
   const decs = [
     { t: 'Bajar el apalancamiento (D/E ' + dhX(de) + ')', d: 'Semáforo rojo sobre ' + (dhMeta('hold_de_max') ? dhMeta('hold_de_max').meta + '×' : '8×') + ': cada refi con cash-out o venta baja pasivos y libera equity.', imp: liab, dueno: 'CEO + Juan' },
@@ -480,7 +480,7 @@ function dhViewHO() {
   ];
   setTimeout(() => {
     const emps = ['fix_flip', 'remodelacion', 'rentas'];
-    dhDrawChart('dh-ho-t', { type: 'bar', data: { labels: emps, datasets: [{ label: 'EBITDA (v_holding_pnl)', data: emps.map(e => { const r = D.pnl.find(x => x.empresa === e) || {}; return r.ebitda != null ? Math.round(+r.ebitda) : null; }), backgroundColor: ['rgba(240,104,122,.6)', 'rgba(72,214,156,.6)', 'rgba(79,141,255,.6)'] }] }, options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 9 } } } } } });
+    dhDrawChart('dh-ho-t', { type: 'bar', data: { labels: emps, datasets: [{ label: 'EBITDA (v_holding_pnl)', data: emps.map(e => { const r = D.pnl.find(x => x.empresa === e) || {}; return r.ebitda != null ? Math.round(+r.ebitda) : null; }), backgroundColor: ['rgba(255,107,107,.6)', 'rgba(74,222,158,.6)', 'rgba(58,91,224,.6)'] }] }, options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 9 } } } } } });
   }, 80);
   return DH_BANNER_PAPEL + big
     + dhSecTitle('2', 'Tendencia', '(EBITDA por empresa — QBO espejo sin snapshots mensuales: serie pendiente de dato, declarado)') + dhChartBox('dh-ho-t', 220)
@@ -494,7 +494,7 @@ function osDashView() {
   dhCSS();
   const emp = OS.route.dashEmp || 'holding';
   const meta = DH_EMP[emp] || DH_EMP.holding;
-  if (!DH.metas) { dhBase().then(osRender); return '<div class="empty">⏳</div>'; }
+  if (!DH.metas) { dhBase().then(osRender); return '<div class="empty">' + osIcon('loader') + '</div>'; }
   DH.charts.forEach(c => { try { c.destroy(); } catch (e) {} }); DH.charts = [];
   let body = '';
   try {
@@ -502,7 +502,7 @@ function osDashView() {
   } catch (e) { body = (window.kitError ? kitError(e.message, 'DH.d={};osRender()') : '<div class="empty down">' + OS_E(e.message) + '</div>'); }
   return '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><h1>' + meta.icon + ' Dashboard Ejecutivo <span>· ' + meta.nombre + '</span></h1>'
     + '<span class="meta">corte ' + dhHoy() + ' · metas editables en dash_metas · cada cifra declara fuente · ⓘ = qué es</span>'
-    + (emp !== 'holding' ? '<button class="ibtn" style="margin-left:auto" onclick="osNav(\'/holding\')">🏛 Holding</button>' : '') + '</div>'
+    + (emp !== 'holding' ? '<button class="ibtn" style="margin-left:auto" onclick="osNav(\'/holding\')">' + osIcon('landmark') + ' Holding</button>' : '') + '</div>'
     + '<div style="margin-top:10px">' + body + '</div>';
 }
 window.osDashView = osDashView;

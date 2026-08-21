@@ -151,7 +151,7 @@ async function pmLoadAll() {
     }
     const sess = await sbAuth.auth.getSession();
     if (!sess?.data?.session?.access_token) {
-      pmaState.loadError = '⚠️ Sin sesión activa. Cerrá sesión (botón Salir abajo a la izquierda) y volvé a entrar.';
+      pmaState.loadError = 'Sin sesión activa. Cerrá sesión (botón Salir abajo a la izquierda) y volvé a entrar.';
       console.error('[pm]', pmaState.loadError);
       pmaState.loading = false;
       return pmRender();
@@ -265,7 +265,7 @@ function pmSyncStatusLabel() {
   const color = s.status === 'success' ? 'text-emerald-600' : s.status === 'running' ? 'text-blue-600' : s.status === 'error' ? 'text-red-600' : 'text-amber-600';
   const dot = s.status === 'running' ? '<span class="animate-pulse">●</span>' : '●';
   const stale = mins > 60
-    ? `<span class="ml-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="La última sincronización fue hace más de 1 hora">⚠️ Datos desactualizados</span>`
+    ? `<span class="ml-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="La última sincronización fue hace más de 1 hora">${osIcon('alert')} Datos desactualizados</span>`
     : '';
   return `<span class="text-[11px] ${color} font-semibold whitespace-nowrap" title="Estado: ${s.status||'?'}">${dot} Última sync: ${rel}</span>${stale}`;
 }
@@ -470,16 +470,16 @@ function pmTextoVencido(dias) {
 // Atrasado = saldo pendiente y ya pasó el día de vencimiento del inquilino
 // (incluye el mes en curso). Antes de vencer → Pendiente.
 function pmPayStatus(p) {
-  if (pmPayEsPlataforma(p)) return { key: 'aldia', label: '🏦 Plataforma', cls: 'text-slate-500 bg-slate-50', debe: 0, dias: 0 };
+  if (pmPayEsPlataforma(p)) return { key: 'aldia', label: 'Plataforma', cls: 'text-slate-500 bg-slate-50', debe: 0, dias: 0 };
   // Sin "Renta pactada - Contrato" no hay balance confiable (la fórmula da 0 igual):
   // → revisar, nunca asumir la renta actual del inquilino.
   const bal = (p && typeof p.renta_pactada !== 'number') ? null : pmPayBalance(p);
-  if (bal == null) return { key: 'revisar', label: '⚠️ Revisar (sin renta pactada)', cls: 'text-amber-700 bg-amber-50', debe: 0, dias: 0 };
-  if (bal < 0) return { key: 'aldia', label: '💚 Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
-  if (bal === 0) return { key: 'aldia', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
+  if (bal == null) return { key: 'revisar', label: 'Revisar (sin renta pactada)', cls: 'text-amber-700 bg-amber-50', debe: 0, dias: 0 };
+  if (bal < 0) return { key: 'aldia', label: 'Saldo a favor', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
+  if (bal === 0) return { key: 'aldia', label: 'Pagado', cls: 'text-emerald-700 bg-emerald-50', debe: 0, dias: 0 };
   const dias = pmDiasVencido(p);
-  if (dias > 0) return { key: 'atrasado', label: `🔴 Atrasado · ${pmTextoVencido(dias)}`, cls: 'text-red-700 bg-red-50', debe: bal, dias };
-  return { key: 'pendiente', label: '⏳ Pendiente', cls: 'text-amber-700 bg-amber-50', debe: bal, dias: 0 };
+  if (dias > 0) return { key: 'atrasado', label: `Atrasado · ${pmTextoVencido(dias)}`, cls: 'text-red-700 bg-red-50', debe: bal, dias };
+  return { key: 'pendiente', label: 'Pendiente', cls: 'text-amber-700 bg-amber-50', debe: bal, dias: 0 };
 }
 // Deuda vencida real de un inquilino = Σ balance>0 de sus pagos ya vencidos.
 function pmTenantDebt(tenantId) {
@@ -550,7 +550,7 @@ function openPmSystem() {
   pmaState.tab = 'dashboard';   // landing CEO
   pmaState.selectedPropertyId = null;
   pmEnsureModalNav();
-  openModal('🏠 Property Management · Rental Profits', '<div id="pm-root" style="min-height:60vh;">Cargando…</div>');
+  openModal('Property Management · Rental Profits', '<div id="pm-root" style="min-height:60vh;">Cargando…</div>');
   // Ensanchar modal
   setTimeout(() => {
     const md = document.querySelector('#modal > div');
@@ -574,15 +574,15 @@ function pmInjectTheme() {
   st.textContent = `
   /* #13 sidebar (sub-nav vertical) — patrón unificado con Fix & Flip */
   #pm-root .pm-nav{width:190px;position:sticky;top:0}
-  #pm-root .pm-navitem-active{background:rgba(37,99,235,.1);color:#2563eb !important;box-shadow:inset 3px 0 0 #2563eb} /* light canon 12-jul */
-  html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(69,227,198,.14);color:#45e3c6 !important;box-shadow:inset 3px 0 0 #45e3c6}
-  html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#e7ecf5 !important}
+  #pm-root .pm-navitem-active{background:rgba(37,99,235,.1);color:#3a5be0 !important;box-shadow:inset 3px 0 0 #3a5be0} /* light canon 12-jul */
+  html[data-osreskin="dark"] #pm-root .pm-navitem-active{background:rgba(92,121,240,.14);color:#5c79f0 !important;box-shadow:inset 3px 0 0 #5c79f0}
+  html[data-osreskin="dark"] #pm-root .pm-navitem:hover{background:rgba(255,255,255,.05) !important;color:#f1f3f7 !important}
   @media (max-width:820px){#pm-root .pm-shell{flex-direction:column}#pm-root .pm-nav{width:100% !important;flex-direction:row !important;overflow-x:auto;position:static}}
   /* Solo lo específico de PM que el diseño compartido no cubre: clases propias + calendario inline */
-  ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:rgba(255,255,255,.05) !important;border-color:rgba(255,255,255,.14) !important;color:#e7ecf5 !important}
+  ${D} .pm-filter-select,${D} .pm-filter-select:hover{background:rgba(255,255,255,.05) !important;border-color:rgba(255,255,255,.14) !important;color:#f1f3f7 !important}
   ${D} .pm-filter-select.has-value{background:rgba(212,175,55,.16) !important;border-color:#d4af37 !important;color:#ecd28f !important}
-  ${D} .pm-filter-dropdown label{color:#93a0b6 !important}
-  ${D} .pm-clear-filters{border-color:rgba(255,255,255,.14) !important;color:#93a0b6 !important}
+  ${D} .pm-filter-dropdown label{color:#8b93a1 !important}
+  ${D} .pm-clear-filters{border-color:rgba(255,255,255,.14) !important;color:#8b93a1 !important}
   ${D} .pm-resize-handle{border-color:rgba(255,255,255,.1) !important}
   ${D} .pm-split-sidebar{background:rgba(255,255,255,.03) !important}
   /* calendario: estilos inline por atributo (celdas/bordes/labels) */
@@ -590,9 +590,9 @@ function pmInjectTheme() {
   ${D} [style*="background:#fff"],${D} [style*="background: #fff"],${D} [style*="background:#ffffff"]{background:rgba(255,255,255,.045) !important}
   ${D} [style*="solid #f1f5f9"]{border-color:rgba(255,255,255,.07) !important}
   ${D} [style*="solid #e2e8f0"],${D} [style*="solid #cbd5e1"]{border-color:rgba(255,255,255,.1) !important}
-  ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#e7ecf5 !important}
-  ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#93a0b6 !important}
-  ${D} [style*="color:#000"],${D} [style*="color: #000"],${D} [style*="color:black"],${D} [style*="color:#111"],${D} [style*="color:#020617"]{color:#e7ecf5 !important} /* ola 3: texto negro sobre vidrio */
+  ${D} [style*="color:#1e293b"],${D} [style*="color: #1e293b"],${D} [style*="color:#334155"],${D} [style*="color:#475569"],${D} [style*="color:#0f172a"]{color:#f1f3f7 !important}
+  ${D} [style*="color:#64748b"],${D} [style*="color:#94a3b8"]{color:#8b93a1 !important}
+  ${D} [style*="color:#000"],${D} [style*="color: #000"],${D} [style*="color:black"],${D} [style*="color:#111"],${D} [style*="color:#020617"]{color:#f1f3f7 !important} /* ola 3: texto negro sobre vidrio */
   ${D} [style*="background:white"],${D} [style*="background-color:#fff"],${D} [style*="background-color: #fff"]{background:rgba(255,255,255,.045) !important}
   /* barras de reserva (gradientes por tipo) y marcador HOY se conservan tal cual */
   html[data-osreskin="light"] #pm-root .pm-filter-select.has-value{background:#fdf8e7 !important}
@@ -680,18 +680,18 @@ function pmRender() {
   if (!root) return;
   pmEnsureResizerInfra();
   if (pmaState.loading) {
-    root.innerHTML = '<div class="p-8 text-center text-slate-500">⏳ Cargando datos...</div>';
+    root.innerHTML = '<div class="p-8 text-center text-slate-500">' + osIcon('loader') + ' Cargando datos...</div>';
     return;
   }
   if (pmaState.loadError) {
     root.innerHTML = `
       <div class="p-8">
         <div class="bg-red-50 border-2 border-red-200 rounded-xl p-6 text-center">
-          <div class="text-5xl mb-2">⚠️</div>
+          <div class="text-5xl mb-2">${osIcon('alert')}</div>
           <div class="font-bold text-red-900 mb-2">No pude cargar los datos</div>
           <div class="text-sm text-red-700 mb-4 whitespace-pre-wrap">${pmaState.loadError}</div>
           <div class="flex gap-2 justify-center">
-            <button onclick="pmLoadAll()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded">🔄 Reintentar</button>
+            <button onclick="pmLoadAll()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded">${osIcon('refresh')} Reintentar</button>
             <button onclick="closeModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-bold px-4 py-2 rounded">Cerrar</button>
           </div>
           <div class="text-[10px] text-red-600 mt-3">Abrí la consola (F12 → Console) para ver el error completo</div>
@@ -709,14 +709,14 @@ function pmRender() {
         <nav class="pm-nav shrink-0 flex flex-col gap-1">
           ${[
             ['dashboard','Resumen', ''],
-            ['properties','🏘️ Propiedades', pmaState.properties.length],
-            ['calendar','📅 Calendario', ''],
-            ['bookings','📋 Reservas', pmaState.bookings.length],
-            ['tenants','👥 Inquilinos', pmActiveBookings().length],
-            ['payments','💵 Pagos', ''],
-            ['expenses','📤 Gastos', ''],
-            ['operations','🛠 Operación', ''],
-            ['finance','💰 Finanzas', '']
+            ['properties','Propiedades', pmaState.properties.length],
+            ['calendar','Calendario', ''],
+            ['bookings','Reservas', pmaState.bookings.length],
+            ['tenants','Inquilinos', pmActiveBookings().length],
+            ['payments','Pagos', ''],
+            ['expenses','Gastos', ''],
+            ['operations','Operación', ''],
+            ['finance','Finanzas', '']
           ].map(([k, label, count]) => `
             <button onclick="pmSetTab('${k}')" class="pm-navitem text-left px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-between gap-2 whitespace-nowrap ${pmaState.tab===k?'pm-navitem-active':'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}">
               <span>${label}</span>${count!==''?`<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${count}</span>`:''}
@@ -771,18 +771,18 @@ function pmEnsureResizerInfra() {
     .pm-split{display:flex;align-items:stretch}
     .pm-split-sidebar{min-width:240px;max-width:600px;overflow-x:hidden}
     .pm-split-main{flex:1;min-width:0;overflow-x:auto}
-    .pm-resize-handle{width:6px;cursor:col-resize;background:transparent;border-left:1px solid #e2e8f0;transition:background .15s;user-select:none;flex-shrink:0}
+    .pm-resize-handle{width:6px;cursor:col-resize;background:transparent;border-left:1px solid #dfe4ec;transition:background .15s;user-select:none;flex-shrink:0}
     .pm-resize-handle:hover,.pm-resize-handle.is-dragging{background:#d4af37;border-color:#d4af37}
     .pm-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .pm-clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
     .pm-clamp1{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
     .pm-filters-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
     .pm-filter-dropdown{display:flex;flex-direction:column;gap:3px;min-width:148px}
-    .pm-filter-dropdown label{font-size:10px;text-transform:uppercase;color:#94a3b8;font-weight:700;letter-spacing:.04em}
-    .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;color:#334155;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
+    .pm-filter-dropdown label{font-size:10px;text-transform:uppercase;color:#8b93a1;font-weight:700;letter-spacing:.04em}
+    .pm-filter-select{padding:7px 10px;background:#fff;border:1px solid #d8d2c6;border-radius:6px;color:#3a4250;font-size:13px;cursor:pointer;transition:all .15s;max-width:220px}
     .pm-filter-select:hover,.pm-filter-select:focus{border-color:#d4af37;outline:none}
     .pm-filter-select.has-value{background:#fdf8e7;border-color:#d4af37;color:#92710f;font-weight:600}
-    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #cbd5e1;border-radius:6px;color:#64748b;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
+    .pm-clear-filters{padding:7px 14px;background:transparent;border:1px solid #d8d2c6;border-radius:6px;color:#6f7785;cursor:pointer;font-size:12px;font-weight:700;align-self:flex-end;white-space:nowrap}
     .pm-clear-filters:hover{color:#92710f;border-color:#d4af37}
     @media (max-width:767px){
       .pm-split{flex-direction:column}
@@ -928,15 +928,15 @@ function pmCeoActions(){
 // ── Detalle expandible de alertas CEO (overlay accionable, ESC-cerrable) ──
 function pmRenderCeoDetailOverlay(key) {
   let title = 'Detalle', body = '';
-  if (key === 'late-tenants') { title = '🔴 Inquilinos sin pago +30 días'; body = pmCeoBodyLate(); }
-  else if (key === 'expiring-contracts') { title = '📋 Contratos que terminan en 30 días'; body = pmCeoBodyExpiring(); }
-  else if (key.startsWith('negpnl-')) { const p = pmaState.properties.find(x=>x.id===key.slice(7)); title = '📉 P&L negativo · ' + (p?.name||''); body = pmCeoBodyNegPnl(key.slice(7)); }
-  else if (key.startsWith('vacant-')) { const u = pmaState.units.find(x=>x.id===key.slice(7)); title = '🏚 Unidad vacía · ' + (u?.code||u?.name||''); body = pmCeoBodyVacant(key.slice(7)); }
-  else if (key.startsWith('oppy-')) { const p = pmaState.properties.find(x=>x.id===key.slice(5)); title = '🏆 Oportunidad · ' + (p?.name||''); body = `<div class="p-4 text-sm text-slate-600">Esta casa rinde por encima de su promedio. Revisá su estrategia (precio, plataforma, tipo de inquilino) para replicarla.<div class="mt-3"><button onclick="pmaState.ceoDetailKey=null;pmSetTab('finance')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded">Ir a Finanzas →</button></div></div>`; }
+  if (key === 'late-tenants') { title = 'Inquilinos sin pago +30 días'; body = pmCeoBodyLate(); }
+  else if (key === 'expiring-contracts') { title = 'Contratos que terminan en 30 días'; body = pmCeoBodyExpiring(); }
+  else if (key.startsWith('negpnl-')) { const p = pmaState.properties.find(x=>x.id===key.slice(7)); title = 'P&L negativo · ' + (p?.name||''); body = pmCeoBodyNegPnl(key.slice(7)); }
+  else if (key.startsWith('vacant-')) { const u = pmaState.units.find(x=>x.id===key.slice(7)); title = 'Unidad vacía · ' + (u?.code||u?.name||''); body = pmCeoBodyVacant(key.slice(7)); }
+  else if (key.startsWith('oppy-')) { const p = pmaState.properties.find(x=>x.id===key.slice(5)); title = 'Oportunidad · ' + (p?.name||''); body = `<div class="p-4 text-sm text-slate-600">Esta casa rinde por encima de su promedio. Revisá su estrategia (precio, plataforma, tipo de inquilino) para replicarla.<div class="mt-3"><button onclick="pmaState.ceoDetailKey=null;pmSetTab('finance')" class="bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded">Ir a Finanzas →</button></div></div>`; }
   return `
     <div onclick="pmaState.ceoDetailKey=null;pmRender()" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px" class="pm-fade">
       <div onclick="event.stopPropagation()" class="bg-white rounded-xl shadow-2xl w-full" style="max-width:760px;max-height:82vh;display:flex;flex-direction:column">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200" style="background:#1e293b">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200" style="background:#1e2430">
           <span class="text-sm font-bold text-white">${title}</span>
           <button onclick="pmaState.ceoDetailKey=null;pmRender()" class="text-slate-300 hover:text-white text-xl leading-none">&times;</button>
         </div>
@@ -968,7 +968,7 @@ function pmCeoBodyLate() {
       <td class="px-2 py-2 text-right text-slate-700 font-bold" title="Σ balance >0 en períodos cerrados (lo que realmente debe, no la renta)">$${pmTenantDebt(b.tenant_id).toLocaleString()}</td>
       <td class="px-2 py-2 text-center whitespace-nowrap">
         <button onclick="pmMarkPayment('${b.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-1 rounded">Marcar pago</button>
-        ${phone?`<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-1 rounded text-xs inline-block">💬</a>`:''}
+        ${phone?`<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-1.5 py-1 rounded text-xs inline-block">${osIcon('message')}</a>`:''}
         <button onclick="pmEditBooking('${b.id}')" title="Iniciar proceso de salida" class="bg-red-50 hover:bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-1 rounded">Salida</button>
       </td>
     </tr>`;
@@ -1053,7 +1053,7 @@ function pmTrendSvg(trend){
     <path d="${area('income')}" fill="rgba(5,150,105,.07)"/><path d="${area('gastos')}" fill="rgba(220,38,38,.05)"/>
     <path d="${path('income')}" fill="none" stroke="#059669" stroke-width="2"/><path d="${path('gastos')}" fill="none" stroke="#dc2626" stroke-width="2"/>
     ${dots('income','#059669')}${dots('gastos','#dc2626')}
-    ${trend.map((t,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#94a3b8" text-anchor="middle">${t.label}</text>`).join('')}
+    ${trend.map((t,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#8b93a1" text-anchor="middle">${t.label}</text>`).join('')}
   </svg>`;
 }
 
@@ -1075,7 +1075,7 @@ function pmRenderDashboard(){
   let health='yellow';
   if(occ.pct>0.85 && cf.net>0 && expiringCount<2 && lateCount<3) health='green';
   else if(occ.pct<0.70 || cf.net<0 || expiringCount>5 || lateCount>5) health='red';
-  const HB={ green:['🟢','NEGOCIO SANO','bg-emerald-50 border-emerald-200 text-emerald-900'], yellow:['🟡','ATENCIÓN','bg-amber-50 border-amber-200 text-amber-900'], red:['🔴','ACCIÓN REQUERIDA','bg-red-50 border-red-200 text-red-900'] }[health];
+  const HB={ green:[kitStatusDot('ok'),'NEGOCIO SANO','bg-emerald-50 border-emerald-200 text-emerald-900'], yellow:[kitStatusDot('warn'),'ATENCIÓN','bg-amber-50 border-amber-200 text-amber-900'], red:[kitStatusDot('bad'),'ACCIÓN REQUERIDA','bg-red-50 border-red-200 text-red-900'] }[health];
 
   // Trends KPI
   const occDelta=Math.round((occ.pct-occPrev.pct)*100);
@@ -1111,7 +1111,7 @@ function pmRenderDashboard(){
     </div>
 
     ${(pmaState.dataWarnings||[]).length ? `<button onclick="pmSetTab('operations');pmaState.opsSubTab='datawarn';pmRender()" class="w-full text-left bg-amber-50 border-2 border-amber-300 hover:bg-amber-100 rounded-xl px-4 py-3 flex items-center justify-between transition">
-      <div class="flex items-center gap-3"><span class="text-2xl">🔎</span><div><div class="text-sm font-extrabold text-amber-900">${pmaState.dataWarnings.length} inconsistencia${pmaState.dataWarnings.length>1?'s':''} de datos</div><div class="text-xs text-amber-700">Airtable tiene datos contradictorios — revisá y corregí</div></div></div>
+      <div class="flex items-center gap-3"><span class="text-2xl">${osIcon('search')}</span><div><div class="text-sm font-extrabold text-amber-900">${pmaState.dataWarnings.length} inconsistencia${pmaState.dataWarnings.length>1?'s':''} de datos</div><div class="text-xs text-amber-700">Airtable tiene datos contradictorios — revisá y corregí</div></div></div>
       <span class="text-amber-800 font-bold text-sm">Ver →</span>
     </button>` : ''}
 
@@ -1195,11 +1195,11 @@ function pmRenderPropertiesList() {
   return `
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center bg-slate-100 rounded-full p-0.5">${vb('list','🏘️ Lista')}${vb('availability','🟢 Disponibilidad')}</div>
+        <div class="flex items-center bg-slate-100 rounded-full p-0.5">${vb('list','Lista')}${vb('availability','Disponibilidad')}</div>
         <div class="flex items-center gap-2">
           ${pmSyncStatusLabel()}
-          <button onclick="pmToggleArchived()" class="text-xs font-bold px-3 py-1.5 rounded ${pmaState.showArchived?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}" title="Mostrar/ocultar registros archivados (ya no están en Airtable)">📦 ${pmaState.showArchived?'Ocultar':'Mostrar'} archivados</button>
-          <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Sync Airtable</button>
+          <button onclick="pmToggleArchived()" class="text-xs font-bold px-3 py-1.5 rounded ${pmaState.showArchived?'bg-slate-800 text-white':'bg-slate-100 hover:bg-slate-200 text-slate-700'}" title="Mostrar/ocultar registros archivados (ya no están en Airtable)">${pmaState.showArchived?'Ocultar':'Mostrar'} archivados</button>
+          <button onclick="pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">${osIcon('refresh')} Sync Airtable</button>
           <button onclick="pmEditProperty(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nueva Propiedad</button>
         </div>
       </div>
@@ -1207,7 +1207,7 @@ function pmRenderPropertiesList() {
       <div class="text-xs text-slate-500">${props.length} propiedades · ${pmTotalRentableUnits()} unidades rentables (${pmTotalOccupiedRentableUnits()} ocupadas · ${pmFreeRentableUnits()} libres) · ${pmaState.bookings.filter(b => ['activo','confirmado','reservada'].includes(b.status)).length} reservas activas</div>
       ${!props.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
-          <div class="text-5xl mb-2">🏠</div>
+          <div class="text-5xl mb-2">${osIcon('house')}</div>
           <div class="font-bold text-slate-700">Sin propiedades cargadas</div>
           <div class="text-xs text-slate-500 mt-1">Cargá la primera para empezar.</div>
           <button onclick="pmEditProperty(null)" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Nueva Propiedad</button>
@@ -1246,11 +1246,11 @@ function pmUnitState(u) {
 // Paleta ÚNICA y coherente en toda la app (ficha, disponibilidad, tiles):
 // Ocupada=verde (rinde) · Reservada=azul (próxima) · Disponible=ámbar (a colocar) · Mant=gris.
 const PM_UNIT_STATE = {
-  ocupada:      { label: 'Ocupada',       dot: '🟢', bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800', border: 'border-l-emerald-500', dotc: 'bg-emerald-500', hex: '#10b981' },
-  reservada:    { label: 'Reservada',     dot: '🔵', bg: 'bg-blue-50 border-blue-300',       txt: 'text-blue-700',    chip: 'bg-blue-100 text-blue-800',       border: 'border-l-blue-500',    dotc: 'bg-blue-500',    hex: '#3b82f6' },
-  libre:        { label: 'Disponible',    dot: '🟡', bg: 'bg-amber-50 border-amber-300',     txt: 'text-amber-700',   chip: 'bg-amber-100 text-amber-800',     border: 'border-l-amber-500',   dotc: 'bg-amber-500',   hex: '#f59e0b' },
-  mantenimiento:{ label: 'Mantenimiento', dot: '⚙️', bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#64748b' },
-  inactiva:     { label: 'Inactiva',      dot: '⚪', bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400',   chip: 'bg-slate-100 text-slate-500',     border: 'border-l-slate-300',   dotc: 'bg-slate-400',   hex: '#94a3b8' },
+  ocupada:      { label: 'Ocupada',       dot: kitStatusDot('ok'), bg: 'bg-emerald-50 border-emerald-300', txt: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-800', border: 'border-l-emerald-500', dotc: 'bg-emerald-500', hex: '#059669' },
+  reservada:    { label: 'Reservada',     dot: kitStatusDot('off'), bg: 'bg-blue-50 border-blue-300',       txt: 'text-blue-700',    chip: 'bg-blue-100 text-blue-800',       border: 'border-l-blue-500',    dotc: 'bg-blue-500',    hex: '#3a5be0' },
+  libre:        { label: 'Disponible',    dot: kitStatusDot('warn'), bg: 'bg-amber-50 border-amber-300',     txt: 'text-amber-700',   chip: 'bg-amber-100 text-amber-800',     border: 'border-l-amber-500',   dotc: 'bg-amber-500',   hex: '#f59e0b' },
+  mantenimiento:{ label: 'Mantenimiento', dot: kitStatusDot('off'), bg: 'bg-slate-100 border-slate-300',    txt: 'text-slate-600',   chip: 'bg-slate-200 text-slate-700',     border: 'border-l-slate-500',   dotc: 'bg-slate-500',   hex: '#6f7785' },
+  inactiva:     { label: 'Inactiva',      dot: kitStatusDot('off'), bg: 'bg-slate-50 border-slate-200',      txt: 'text-slate-400',   chip: 'bg-slate-100 text-slate-500',     border: 'border-l-slate-300',   dotc: 'bg-slate-400',   hex: '#8b93a1' },
 };
 function pmLastBookingOf(unitId) {
   return pmaState.bookings.filter(b => b.unit_id===unitId && b.end_date).sort((a,b)=>(b.end_date||'').localeCompare(a.end_date||''))[0] || null;
@@ -1280,7 +1280,7 @@ function pmAvgVacancyDays() {
 
 function pmShowFreeUnits() {
   const free = pmFreeUnitsNow().sort((a,b)=>(pmDaysVacant(b)??0)-(pmDaysVacant(a)??0));
-  openModal('🟢 Unidades libres ahora · ' + free.length, `
+  openModal('Unidades libres ahora · ' + free.length, `
     <div class="max-h-[65vh] overflow-y-auto">
       ${free.length ? `<table class="w-full text-xs">
         <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0"><tr>
@@ -1296,7 +1296,7 @@ function pmShowFreeUnits() {
           <td class="px-2 py-2 text-center whitespace-nowrap">
             <button onclick="closeModal();setTimeout(()=>pmEditBooking(null,'${u.id}'),60)" title="Marcar reservada" class="bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-1 rounded">Reservar</button>
             <a href="https://www.airbnb.com/host/homes" target="_blank" title="Listar en Airbnb" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-1 rounded inline-block">Airbnb</a>
-            <button onclick="pmMarkMaintenance('${u.id}')" title="Marcar mantenimiento" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-1 rounded">⚙️</button>
+            <button onclick="pmMarkMaintenance('${u.id}')" title="Marcar mantenimiento" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold px-1.5 py-1 rounded">${osIcon('settings')}</button>
           </td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="text-center py-10 text-slate-400 text-sm">✓ No hay unidades libres ahora mismo.</div>'}
@@ -1309,7 +1309,7 @@ async function pmMarkMaintenance(unitId) {
   if (!u) return;
   const active = pmActiveBookingOf(unitId) || pmaState.bookings.find(b => b.unit_id===unitId && ['confirmado','reservada'].includes(b.status) && b.status!=='cancelado');
   if (active) {
-    if (!confirm('⚠️ Esta unidad tiene una reserva ('+pmTenantName(active.tenant_id)+'). Hay que mover esa reserva antes. ¿Abrir "Mover reserva" para reubicarla en una unidad libre?')) return;
+    if (!confirm('Esta unidad tiene una reserva ('+pmTenantName(active.tenant_id)+'). Hay que mover esa reserva antes. ¿Abrir "Mover reserva" para reubicarla en una unidad libre?')) return;
     closeModal();
     setTimeout(() => pmMoveBooking(active.id), 80);
     return;
@@ -1366,11 +1366,11 @@ function pmRenderAvailability() {
       <!-- Filtros -->
       <div class="flex flex-wrap items-center gap-1.5">
         ${chip(!stF,"pmaState.availFilterState=null;pmRender()",'Todas')}
-        ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'🟢 Ocupadas',counts.ocupada,'#10b981')}
-        ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'🔵 Reservadas',counts.reservada,'#3b82f6')}
-        ${chip(stF==='libre',"pmaState.availFilterState='libre';pmRender()",'🟡 Disponibles',counts.libre,'#f59e0b')}
-        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'⚙️ Mant.',counts.mantenimiento,'#64748b')}
-        <select onchange="pmaState.availFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs ml-1"><option value="">🏠 Todas</option>${activeProps.map(p=>`<option value="${p.id}" ${propF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+        ${chip(stF==='ocupada',"pmaState.availFilterState='ocupada';pmRender()",'Ocupadas',counts.ocupada,'#059669')}
+        ${chip(stF==='reservada',"pmaState.availFilterState='reservada';pmRender()",'Reservadas',counts.reservada,'#3a5be0')}
+        ${chip(stF==='libre',"pmaState.availFilterState='libre';pmRender()",'Disponibles',counts.libre,'#f59e0b')}
+        ${chip(stF==='mantenimiento',"pmaState.availFilterState='mantenimiento';pmRender()",'Mant.',counts.mantenimiento,'#6f7785')}
+        <select onchange="pmaState.availFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs ml-1"><option value="">${osIcon('house')} Todas</option>${activeProps.map(p=>`<option value="${p.id}" ${propF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
         <select onchange="pmaState.availFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Tipo</option>${['casa_completa','apartamento','estudio','habitacion'].map(t=>`<option value="${t}" ${typeF===t?'selected':''}>${pmUnitTypeLabel(t)}</option>`).join('')}</select>
       </div>
 
@@ -1435,13 +1435,13 @@ function pmRenderPropertyCardInline(p) {
   const maintenanceUnits = units.filter(u => pmUnitState(u) === 'mantenimiento');
   const freeUnits = Math.max(0, units.length - occupiedUnits.length - reservedUnits.length - maintenanceUnits.length);
   const potentialMo = units.reduce((s, u) => s + Number(u.target_rent || 0), 0);
-  const modelLabel = p.rental_model === 'casa_completa' ? '🏡 Casa Completa'
-                   : p.rental_model === 'por_habitaciones' ? '🛏 Habitaciones'
-                   : p.rental_model === 'por_unidades' ? '🏘 Unidades'
-                   : p.rental_model === 'por_estudios' ? '🎨 Estudios'
-                   : p.rental_model === 'por_apartamentos' ? '🏢 Apartamentos'
-                   : p.rental_model === 'mixta' ? '🔀 Mixta'
-                   : '🔀 Mixto';
+  const modelLabel = p.rental_model === 'casa_completa' ? 'Casa Completa'
+                   : p.rental_model === 'por_habitaciones' ? 'Habitaciones'
+                   : p.rental_model === 'por_unidades' ? 'Unidades'
+                   : p.rental_model === 'por_estudios' ? 'Estudios'
+                   : p.rental_model === 'por_apartamentos' ? 'Apartamentos'
+                   : p.rental_model === 'mixta' ? 'Mixta'
+                   : 'Mixto';
   // REGLA DE UNIDADES (única en toda la app): habitaciones de la casa juntas = 1.
   // El label de "unidades" y la ocupación usan el conteo RENTABLE; las habitaciones
   // físicas se muestran como detalle entre paréntesis. Los badges de abajo siguen
@@ -1458,17 +1458,17 @@ function pmRenderPropertyCardInline(p) {
       <!-- Header colapsado -->
       <div class="px-4 py-3 cursor-pointer hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap" onclick="pmToggleExpandProperty('${p.id}')">
         <div class="flex items-center gap-3 flex-1 min-w-0">
-          <span class="text-slate-400 text-sm">${expanded?'▼':'▶'}</span>
-          <span class="text-2xl">🏠</span>
+          <span class="text-slate-400 text-sm">${expanded?'▼':osIcon('play')}</span>
+          <span class="text-2xl">${osIcon('house')}</span>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <strong class="text-sm text-slate-900 pm-clamp2 pm-property-name" title="${(p.name||'').replace(/"/g,'&quot;')}">${(p.name||'').replace(/</g,'&lt;')}</strong>
-              <span class="text-[10px] px-2 py-0.5 rounded uppercase font-bold ${p.active===false?(p.archived_manual?'bg-amber-100 text-amber-700':'bg-red-100 text-red-700'):'bg-emerald-100 text-emerald-800'}">${p.active===false?(p.archived_manual?'📦 ARCHIVADA':'INACTIVA'):'ACTIVA'}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded uppercase font-bold ${p.active===false?(p.archived_manual?'bg-amber-100 text-amber-700':'bg-red-100 text-red-700'):'bg-emerald-100 text-emerald-800'}">${p.active===false?(p.archived_manual?'ARCHIVADA':'INACTIVA'):'ACTIVA'}</span>
             </div>
             <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
-              <span>📍 ${(p.address||'').replace(/</g,'&lt;')}</span>
+              <span>${osIcon('map-pin')} ${(p.address||'').replace(/</g,'&lt;')}</span>
               ${p.zone ? `<span>· ${p.zone}</span>` : ''}
-              <span>· 🏘 ${physLabel}${rentNote?`<span class="text-slate-400">${rentNote}</span>`:''}</span>
+              <span>· ${osIcon('building')} ${physLabel}${rentNote?`<span class="text-slate-400">${rentNote}</span>`:''}</span>
               ${p.sqft ? `<span>· ${p.sqft} sqft</span>` : ''}
             </div>
           </div>
@@ -1480,11 +1480,11 @@ function pmRenderPropertyCardInline(p) {
               ${physLabel} · ${rentOcc} ocup · ${rentFree} disp · $${potentialMo.toLocaleString()}/mes
             </div>
           </div>
-          <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded" title="Generar la Guía de Bienvenida / Check-in en PDF">📄 Guía Check-in</button>
-          <button onclick="event.stopPropagation();pmEditProperty('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1" title="Editar">✏️</button>
+          <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2.5 py-1.5 rounded" title="Generar la Guía de Bienvenida / Check-in en PDF">${osIcon('file')} Guía Check-in</button>
+          <button onclick="event.stopPropagation();pmEditProperty('${p.id}')" class="text-slate-400 hover:text-slate-700 p-1" title="Editar">${osIcon('pencil')}</button>
           ${p.active === false
             ? `<button onclick="event.stopPropagation();pmArchiveProperty('${p.id}', false)" class="text-emerald-600 hover:text-emerald-700 text-[11px] font-bold px-2 py-1 rounded bg-emerald-50" title="Reactivar: vuelve a contar en ocupación y KPIs">↩ Reactivar</button>`
-            : `<button onclick="event.stopPropagation();pmArchiveProperty('${p.id}', true)" class="text-slate-400 hover:text-amber-600 p-1" title="Archivar (reversible): deja de contar en ocupación y KPIs; el sync la respeta">📦</button>`}
+            : `<button onclick="event.stopPropagation();pmArchiveProperty('${p.id}', true)" class="text-slate-400 hover:text-amber-600 p-1" title="Archivar (reversible): deja de contar en ocupación y KPIs; el sync la respeta">${osIcon('package')}</button>`}
         </div>
       </div>
 
@@ -1492,8 +1492,8 @@ function pmRenderPropertyCardInline(p) {
         <div class="border-t border-slate-200 bg-slate-50/50 p-4 space-y-3">
           <!-- ACCIONES: Guía de Bienvenida / Check-in -->
           <div class="flex items-center gap-2 flex-wrap bg-white border border-slate-200 rounded-lg p-2">
-            <span class="text-[11px] font-bold text-slate-500 px-1">🏡 Check-in</span>
-            <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-3 py-1.5 rounded" title="Generar la Guía de Bienvenida en PDF (WiFi, acceso, reglas)">📄 Generar Guía de Bienvenida</button>
+            <span class="text-[11px] font-bold text-slate-500 px-1">${osIcon('house')} Check-in</span>
+            <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-3 py-1.5 rounded" title="Generar la Guía de Bienvenida en PDF (WiFi, acceso, reglas)">${osIcon('file')} Generar Guía de Bienvenida</button>
             <button onclick="pmSendWelcomeGuide('${p.id}')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded" title="Compartir al huésped por correo o WhatsApp">Compartir ›</button>
             ${(p.wifi_name || p.access_code) ? `<span class="text-[10px] text-slate-400 ml-auto">WiFi: ${(p.wifi_name||'—')} · Acceso: ${(p.access_code||'—')}</span>` : ''}
           </div>
@@ -1508,7 +1508,7 @@ function pmRenderPropertyCardInline(p) {
                 // Badge = Estado EXACTO de Airtable (pmUnitState). Nada de lógica de reservas acá.
                 const st = pmUnitState(u);
                 const meta = PM_UNIT_STATE[st] || PM_UNIT_STATE.inactiva;
-                const icon = u.unit_type==='casa_completa'?'🏠':u.unit_type==='estudio'?'🎨':u.unit_type==='apartamento'?'🏢':'🛏';
+                const icon = u.unit_type==='casa_completa'?osIcon('house'):u.unit_type==='estudio'?osIcon('palette'):u.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
                 return `<span class="inline-flex items-center gap-1.5 ${meta.chip} text-[11px] font-bold px-2 py-1 rounded" title="${meta.label}">
                   <span class="${meta.dotc} w-1.5 h-1.5 rounded-full"></span>
                   <span>${icon} ${(u.name||u.code||'').replace(/</g,'&lt;')}</span>
@@ -1521,7 +1521,7 @@ function pmRenderPropertyCardInline(p) {
           <!-- LISTA UNIDADES con detalle -->
           <div>
             <div class="flex items-center justify-between mb-2">
-              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">⚙️ Unidades y habitaciones (${units.length})</div>
+              <div class="text-[10px] uppercase font-bold text-slate-700 tracking-wider">${osIcon('settings')} Unidades y habitaciones (${units.length})</div>
               <button onclick="pmEditUnit(null,'${p.id}')" class="text-[11px] text-emerald-700 hover:text-emerald-900 font-bold">+ Agregar Unidad</button>
             </div>
             <div class="space-y-1.5">
@@ -1554,7 +1554,7 @@ function pmRenderUnitRow(u, p) {
   const stateLabel = meta.label;
   const stateColor = meta.chip;
   const borderColor = meta.border;
-  const icon = u.unit_type==='casa_completa'?'🏠':u.unit_type==='estudio'?'🎨':u.unit_type==='apartamento'?'🏢':'🛏';
+  const icon = u.unit_type==='casa_completa'?osIcon('house'):u.unit_type==='estudio'?osIcon('palette'):u.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
   const typeLabel = u.unit_type==='casa_completa'?'Casa Completa':u.unit_type==='estudio'?'Estudio':u.unit_type==='apartamento'?'Apartamento':'Habitación';
   const isOn = u.is_active !== false;
   // Mini-cards: reserva actual + próximas (N bookings por unidad física agrupada)
@@ -1586,10 +1586,10 @@ function pmRenderUnitRow(u, p) {
           </div>
           <div class="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap mt-0.5">
             ${u.bath_type ? `<span>${u.bath_type === 'compartido'?'Compartido':u.bath_type==='privado'?'Privado':u.bath_type==='privado_compartido'?'Privado+Compartido':u.bath_type} baño</span>` : ''}
-            ${active ? `<span>· 👤 ${pmTenantName(active.tenant_id)}</span>` : ''}
+            ${active ? `<span>· ${osIcon('user')} ${pmTenantName(active.tenant_id)}</span>` : ''}
             ${active && active.end_date ? `<span>· vence ${active.end_date}</span>` : ''}
           </div>
-          ${u.access_codes ? `<div class="text-[11px] text-slate-600 mt-0.5 whitespace-pre-line" title="Accesos y códigos (🚪 Unidades en Airtable)">🔑 ${String(u.access_codes).replace(/</g,'&lt;').slice(0,140)}</div>` : ''}
+          ${u.access_codes ? `<div class="text-[11px] text-slate-600 mt-0.5 whitespace-pre-line" title="Accesos y códigos (Unidades en Airtable)">${osIcon('key')} ${String(u.access_codes).replace(/</g,'&lt;').slice(0,140)}</div>` : ''}
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           <div class="text-right">
@@ -1599,9 +1599,9 @@ function pmRenderUnitRow(u, p) {
           <button onclick="pmToggleUnitActive('${u.id}', ${!isOn})" class="relative inline-flex h-5 w-9 rounded-full transition ${isOn?'bg-emerald-500':'bg-slate-300'}" title="${isOn?'Desactivar':'Activar'}">
             <span class="absolute ${isOn?'right-0.5':'left-0.5'} top-0.5 h-4 w-4 rounded-full bg-white shadow transition"></span>
           </button>
-          <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}','${u.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded" title="Guía de Bienvenida / Check-in de ESTA unidad (usa su código de acceso)">📄 Check-in</button>
+          <button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${p.id}','${u.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded" title="Guía de Bienvenida / Check-in de ESTA unidad (usa su código de acceso)">${osIcon('file')} Check-in</button>
           <button onclick="pmEditBooking(null,'${u.id}')" class="bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold px-2 py-1 rounded" title="Nueva reserva">+ Reserva</button>
-          <button onclick="pmEditUnit('${u.id}','${p.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+          <button onclick="pmEditUnit('${u.id}','${p.id}')" class="text-slate-400 hover:text-slate-700 p-1">${osIcon('pencil')}</button>
         </div>
       </div>
       ${unitBookings.length ? `<div class="mt-2 pl-9 flex flex-wrap gap-1.5">${unitBookings.slice(0,6).map(bookingChip).join('')}${unitBookings.length>6?`<span class="text-[10px] text-slate-400 self-center">+${unitBookings.length-6}</span>`:''}</div>` : ''}
@@ -1676,12 +1676,12 @@ function pmRenderPropertyDetail() {
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between">
         <button onclick="pmaState.selectedPropertyId=null;pmRender()" class="text-xs text-slate-500 hover:text-slate-900">← Volver a propiedades</button>
-        ${window.osOpenFicha ? `<button onclick="osOpenFicha('${window.osSlug ? osSlug(p.name) : ''}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">🏠 Ver ficha de casa (ciclo completo) →</button>` : ''}
+        ${window.osOpenFicha ? `<button onclick="osOpenFicha('${window.osSlug ? osSlug(p.name) : ''}')" class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">${osIcon('house')} Ver ficha de casa (ciclo completo) →</button>` : ''}
       </div>
 
       ${p.active === false ? `
         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 text-amber-900 text-xs">
-          📦 <strong>Propiedad archivada${p.archived_at?' el '+new Date(p.archived_at).toLocaleDateString('es-MX'):''}</strong> porque ya no está en Airtable "Datos x Casa".
+          ${osIcon('package')} <strong>Propiedad archivada${p.archived_at?' el '+new Date(p.archived_at).toLocaleDateString('es-MX'):''}</strong> porque ya no está en Airtable "Datos x Casa".
           Sus bookings y pagos históricos se preservan. Para reactivarla, agregala de vuelta en Airtable y corré el sync.
         </div>` : ''}
 
@@ -1696,9 +1696,9 @@ function pmRenderPropertyDetail() {
           <div class="text-[11px] text-blue-200">${(p.address||'').replace(/</g,'&lt;')}</div>
         </div>
         <div class="flex gap-2">
-          <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-3 py-1.5 rounded" title="Generar PDF de la guía de check-in">📄 Guía de Bienvenida</button>
+          <button onclick="pmGenerateWelcomeGuide('${p.id}')" class="bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-3 py-1.5 rounded" title="Generar PDF de la guía de check-in">${osIcon('file')} Guía de Bienvenida</button>
           <button onclick="pmSendWelcomeGuide('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded" title="Compartir al huésped por correo o WhatsApp (mailto/wa.me)">Compartir ›</button>
-          <button onclick="pmEditProperty('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">✏️ Editar</button>
+          <button onclick="pmEditProperty('${p.id}')" class="bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('pencil')} Editar</button>
           <button onclick="pmEditUnit(null,'${p.id}')" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-3 py-1.5 rounded">+ Unidad</button>
         </div>
       </div>
@@ -1741,7 +1741,7 @@ function pmPdUnits(p, units){
     <div class="space-y-3">
       <div class="bg-white border-2 border-slate-200 rounded-xl overflow-hidden">
         <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-2">
-          <div><div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">📅 Calendario de ocupación</div><div class="text-sm font-bold mt-0.5">${pmaState.calendarYear}</div></div>
+          <div><div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">${osIcon('calendar')} Calendario de ocupación</div><div class="text-sm font-bold mt-0.5">${pmaState.calendarYear}</div></div>
           <div class="flex gap-1">
             <button onclick="pmaState.calendarYear--;pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-xs">←</button>
             <button onclick="pmaState.calendarYear=new Date().getFullYear();pmRender()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded text-xs">Hoy</button>
@@ -1782,7 +1782,7 @@ function pmPdUnits(p, units){
 function pmPdCreds(p){
   const creds = (pmaState.credentials||[]).filter(c=>c.property_id===p.id);
   const wifis = (pmaState.wifi||[]).filter(w=>w.property_id===p.id);
-  const iconFor = (cat)=>{ const c=(cat||'').toLowerCase(); if(/electr|energy|amigo|luz/.test(c))return'⚡'; if(/gas/.test(c))return'🔥'; if(/internet|spectrum|wifi|web/.test(c))return'🌐'; if(/bank|banco/.test(c))return'🏦'; if(/agua|water/.test(c))return'💧'; return'🔑'; };
+  const iconFor = (cat)=>{ const c=(cat||'').toLowerCase(); if(/electr|energy|amigo|luz/.test(c))returnosIcon('zap'); if(/gas/.test(c))returnosIcon('flame'); if(/internet|spectrum|wifi|web/.test(c))returnosIcon('globe'); if(/bank|banco/.test(c))returnosIcon('landmark'); if(/agua|water/.test(c))returnosIcon('wrench'); returnosIcon('key'); };
   const pwCell = (id, pw)=> pw ? `
     <span id="cred-pw-${id}" data-pw="${encodeURIComponent(pw)}" data-shown="0" class="font-mono text-slate-700">••••••••</span>
     <button onclick="pmCredToggle('${id}')" class="text-[10px] text-blue-600 hover:underline ml-1">Ver</button>
@@ -1792,7 +1792,7 @@ function pmPdCreds(p){
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       ${wifis.map(w=>`
         <div class="bg-gradient-to-br from-sky-50 to-white border border-sky-200 rounded-xl p-3">
-          <div class="flex items-center gap-2 text-sm font-bold text-slate-900">📡 WiFi <span class="text-[10px] font-normal text-sky-600">red</span></div>
+          <div class="flex items-center gap-2 text-sm font-bold text-slate-900">${osIcon('globe')} WiFi <span class="text-[10px] font-normal text-sky-600">red</span></div>
           <div class="text-xs text-slate-600 mt-1">SSID: <span class="font-mono font-semibold">${(w.network_name||'—').replace(/</g,'&lt;')}</span></div>
           <div class="text-xs text-slate-600 mt-0.5">Clave: ${pwCell('wifi-'+w.id, w.password_encrypted)}</div>
         </div>`).join('')}
@@ -1801,11 +1801,11 @@ function pmPdCreds(p){
           <div class="flex items-center gap-2 text-sm font-bold text-slate-900">${iconFor(c.category)} ${(c.name||'Servicio').replace(/</g,'&lt;')} ${c.category?`<span class="text-[10px] font-normal text-slate-400">${c.category}</span>`:''}</div>
           ${c.username?`<div class="text-xs text-slate-600 mt-1">Usuario: <span class="font-mono">${(c.username||'').replace(/</g,'&lt;')}</span></div>`:''}
           <div class="text-xs text-slate-600 mt-0.5">Clave: ${pwCell('cred-'+c.id, c.password_enc)}</div>
-          ${c.url?`<div class="text-xs mt-1"><a href="${c.url}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">🔗 Abrir portal</a></div>`:''}
+          ${c.url?`<div class="text-xs mt-1"><a href="${c.url}" target="_blank" rel="noopener" class="text-blue-600 hover:underline">${osIcon('link')} Abrir portal</a></div>`:''}
           ${c.notes?`<div class="text-[11px] text-slate-500 mt-1 italic">${(c.notes||'').replace(/</g,'&lt;')}</div>`:''}
         </div>`).join('')}
     </div>
-    <div class="text-[10px] text-amber-600 mt-3">⚠️ Las claves se muestran tal como vienen de Airtable (texto plano en DB). Encriptación real + audit log pendientes.</div>`;
+    <div class="text-[10px] text-amber-600 mt-3">${osIcon('alert')} Las claves se muestran tal como vienen de Airtable (texto plano en DB). Encriptación real + audit log pendientes.</div>`;
 }
 
 // ─── TAB C · Histórico P&L ─────────────────────────────────────
@@ -1860,7 +1860,7 @@ function pmPdTasks(p){
       <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-start justify-between gap-2">
         <div class="flex-1 min-w-0">
           <div class="text-sm font-bold text-slate-900">${(t.task_type||t.title||'Tarea').replace(/</g,'&lt;')}</div>
-          <div class="text-[11px] text-slate-500 mt-0.5">📅 ${t.scheduled_date||t.start_at?.slice(0,10)||'sin fecha'}${t.assigned_to||t.assignee?` · 👤 ${(t.assigned_to||t.assignee).replace(/</g,'&lt;')}`:''}</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">${osIcon('calendar')} ${t.scheduled_date||t.start_at?.slice(0,10)||'sin fecha'}${t.assigned_to||t.assignee?` · ${(t.assigned_to||t.assignee).replace(/</g,'&lt;')}`:''}</div>
           ${t.notes?`<div class="text-[11px] text-slate-400 mt-1 italic">${(t.notes||'').replace(/</g,'&lt;').slice(0,80)}</div>`:''}
         </div>
         <div class="flex flex-col gap-1 flex-shrink-0">
@@ -1951,11 +1951,11 @@ function pmRenderTimelineForUnits(units, year) {
     <div class="overflow-x-auto">
       <div style="min-width:1000px;">
         <!-- Header con columnas: UNIDAD | % | meses -->
-        <div class="flex items-center border-b border-slate-200 bg-slate-100" style="font-size:10px;font-weight:bold;color:#475569;text-transform:uppercase;">
+        <div class="flex items-center border-b border-slate-200 bg-slate-100" style="font-size:10px;font-weight:bold;color:#5a6270;text-transform:uppercase;">
           <div style="width:220px;padding:6px 8px;">Unidad</div>
           <div style="width:50px;text-align:center;padding:6px 0;">%</div>
           <div class="flex flex-1">
-            ${months.map(m => `<div style="flex:1;border-right:1px solid #e2e8f0;text-align:center;padding:6px 0;">${m}</div>`).join('')}
+            ${months.map(m => `<div style="flex:1;border-right:1px solid #dfe4ec;text-align:center;padding:6px 0;">${m}</div>`).join('')}
           </div>
         </div>
         ${rows.map(({unit, occPct, totalEmpty, lostRevenue, gaps, bookings}) => {
@@ -1970,7 +1970,7 @@ function pmRenderTimelineForUnits(units, year) {
                 </div>
               </div>
               <div style="width:50px;text-align:center;" class="${colorPct} font-bold text-sm">${occPct}%</div>
-              <div class="relative flex-1" style="height:34px;background:#fafafa;border-left:1px solid #e2e8f0;">
+              <div class="relative flex-1" style="height:34px;background:#fafafa;border-left:1px solid #dfe4ec;">
                 <!-- Background: bloques de huecos en rojo claro -->
                 ${gaps.map(g => {
                   const left = 100 * Math.floor((g.start - yearStart) / 86400000) / totalDays;
@@ -1989,14 +1989,14 @@ function pmRenderTimelineForUnits(units, year) {
                   const left = 100 * Math.floor((start - yearStart) / 86400000) / totalDays;
                   const width = Math.max(0.5, 100 * Math.floor((end - start) / 86400000) / totalDays);
                   const colorByType = {
-                    contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
+                    contrato_directo: 'background:linear-gradient(135deg,#059669,#059669);',
                     airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
-                    booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
+                    booking:           'background:linear-gradient(135deg,#3a5be0,#3a5be0);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#64748b,#475569);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -2011,7 +2011,7 @@ function pmRenderTimelineForUnits(units, year) {
             </div>
             ${(totalEmpty > 0 && unit.target_rent) ? `
               <div class="border-b border-slate-100 px-3 py-1 bg-red-50/30" style="padding-left:270px;">
-                <div class="text-[10px] text-red-700">⚠️ <strong>${totalEmpty} días vacíos</strong> — <strong>~$${lostRevenue.toLocaleString()} perdidos</strong></div>
+                <div class="text-[10px] text-red-700">${osIcon('alert')} <strong>${totalEmpty} días vacíos</strong> — <strong>~$${lostRevenue.toLocaleString()} perdidos</strong></div>
               </div>
             ` : ''}
           `;
@@ -2019,9 +2019,9 @@ function pmRenderTimelineForUnits(units, year) {
         <!-- Leyenda -->
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50">
           <span class="font-bold uppercase text-slate-500">Referencias:</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>👤 Contrato directo</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>🌐 Airbnb</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#059669,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>${osIcon('user')} Contrato directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>${osIcon('globe')} Airbnb</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3a5be0,#3a5be0);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:rgba(254,202,202,0.6);border:1px dashed #fca5a5;border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Hueco (sin ocupar)</span>
           <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
@@ -2131,12 +2131,12 @@ function pmRenderCalendar() {
       <div class="flex-1 flex flex-col overflow-hidden pm-split-main">
         ${pmRenderTimelineHeader()}
         ${pmRenderCalControlBar(timelineUnits)}
-        ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900 flex items-center justify-between"><span>⚠️ ${dupesHidden} ${dupesHidden===1?'registro duplicado':'registros duplicados'} fusionado${dupesHidden===1?'':'s'} (mismo código, tipo y renta)</span><span class="text-amber-700 italic">Si ves códigos como "ESTUDIO-1 (B)" son unidades distintas con mismo código en Airtable.</span></div>` : ''}
+        ${dupesHidden ? `<div class="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[10px] text-amber-900 flex items-center justify-between"><span>${osIcon('alert')} ${dupesHidden} ${dupesHidden===1?'registro duplicado':'registros duplicados'} fusionado${dupesHidden===1?'':'s'} (mismo código, tipo y renta)</span><span class="text-amber-700 italic">Si ves códigos como "ESTUDIO-1 (B)" son unidades distintas con mismo código en Airtable.</span></div>` : ''}
         <div class="flex-1 overflow-auto">${timelineUnits.length === 0 && pmaState.calendarGroupByProperty ? `
           <div class="p-12 text-center text-slate-400 text-sm">
-            <div class="text-5xl mb-3">📂</div>
+            <div class="text-5xl mb-3">${osIcon('folder-open')}</div>
             <div class="font-bold text-slate-600 mb-1">Todas las propiedades están colapsadas</div>
-            <div class="text-xs">Haz click en una propiedad del sidebar (▶) para ver sus unidades en el timeline</div>
+            <div class="text-xs">Haz click en una propiedad del sidebar (${osIcon('play')}) para ver sus unidades en el timeline</div>
             <button onclick="pmCalExpandAll()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Expandir todas</button>
           </div>
         ` : pmRenderTimelineGrid(timelineUnits)}</div>
@@ -2147,7 +2147,7 @@ function pmRenderCalendar() {
   if (fs) {
     return `<div class="fixed inset-0 z-[70] bg-white flex flex-col" style="padding:8px 12px;">
       <div class="flex items-center justify-between mb-1.5">
-        <div class="font-bold text-slate-800 text-sm">📅 Calendario · pantalla completa</div>
+        <div class="font-bold text-slate-800 text-sm">${osIcon('calendar')} Calendario · pantalla completa</div>
         <button onclick="pmCalToggleFullscreen()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded">✕ Salir de pantalla completa</button>
       </div>
       ${inner}
@@ -2191,9 +2191,9 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
     const p = pmaState.properties.find(x => x.id === u.property_id);
     const active = pmMergedActiveBooking(u);
     const tenant = active ? pmTenantName(active.tenant_id) : null;
-    const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
-    const platformColors = {contrato_directo:'#10b981',airbnb:'#ec4899',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
-    const dotColor = active ? (platformColors[active.booking_type] || '#10b981') : '#cbd5e1';
+    const icon = u.unit_type==='casa_completa'?osIcon('house') : u.unit_type==='estudio'?osIcon('palette') : u.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
+    const platformColors = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7'};
+    const dotColor = active ? (platformColors[active.booking_type] || '#059669') : '#d8d2c6';
     const statusLabel = active ? tenant : 'Libre';
     const statusClass = active ? 'text-emerald-700' : 'text-slate-400';
     const displayName = (u.name||u.code||'') + (u._displaySuffix || '');
@@ -2215,7 +2215,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
   // Body — agrupado o flat
   let bodyHtml;
   if (listingsToShow.length === 0) {
-    bodyHtml = '<div class="p-6 text-center text-xs text-slate-400"><div class="text-3xl mb-2">🔍</div>Sin resultados</div>';
+    bodyHtml = '<div class="p-6 text-center text-xs text-slate-400"><div class="text-3xl mb-2">' + osIcon('search') + '</div>Sin resultados</div>';
   } else if (groupBy && !search) {
     // Agrupar por propiedad — ordenado alfabéticamente
     const groups = {};
@@ -2239,7 +2239,7 @@ function pmRenderListingsSidebar(filteredUnits, totalCount) {
       return `<div>
         <button onclick="pmCalToggleGroup('${pid}')" class="w-full px-3 py-2.5 bg-slate-100 hover:bg-slate-200 border-b border-slate-200 flex items-center justify-between text-left transition group">
           <div class="flex items-center gap-2 min-w-0 flex-1">
-            <span class="text-slate-400 text-[10px] w-3 transition-transform" style="${collapsed?'':'transform:rotate(90deg);'}">▶</span>
+            <span class="text-slate-400 text-[10px] w-3 transition-transform" style="${collapsed?'':'transform:rotate(90deg);'}">${osIcon('play')}</span>
             <span class="${indicatorColor} w-2 h-2 rounded-full flex-shrink-0"></span>
             <strong class="text-[11px] uppercase tracking-wide text-slate-700 pm-clamp2" title="${(p?.name||'Sin propiedad').replace(/"/g,'&quot;')}">${(p?.name||'Sin propiedad').replace(/</g,'&lt;')}</strong>
           </div>
@@ -2377,14 +2377,14 @@ window.pmCalTimelineToday = pmCalTimelineToday;
 const PM_CAL_VENCE_DIAS = 30;   // umbral "por vencer"
 function pmBookingCalState(b, lateSet) {
   const today = new Date().toISOString().slice(0,10);
-  if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#94a3b8' };
-  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#3b82f6' };
+  if (b.end_date && b.end_date < today) return { key:'finalizado', label:'Finalizado', color:'#8b93a1' };
+  if (b.start_date && b.start_date > today) return { key:'entrante', label:'Entrante', color:'#3a5be0' };
   if (lateSet && lateSet.has(b.id)) return { key:'atrasado', label:'Atrasado', color:'#ef4444' };
   if (b.end_date) {
     const days = Math.floor((new Date(b.end_date + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000);
     if (days <= PM_CAL_VENCE_DIAS) return { key:'por_vencer', label:`Por vencer (${days}d)`, color:'#f97316', days };
   }
-  return { key:'activo', label:'Activo', color:'#10b981' };
+  return { key:'activo', label:'Activo', color:'#059669' };
 }
 // Iniciales para el avatar circular del inquilino.
 function pmAvatarInitials(name) {
@@ -2435,14 +2435,14 @@ function pmRenderCalControlBar(units) {
       <button onclick="pmCalSetColorBy('estado')" class="px-2 py-1 ${colorBy==='estado'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Estado</button>
       <button onclick="pmCalSetColorBy('plataforma')" class="px-2 py-1 ${colorBy==='plataforma'?'bg-slate-900 text-white':'text-slate-500 hover:bg-slate-100'}">Plataforma</button>
     </div>
-    ${pmFilterSelect('Estado','⚡', fS, [['','Todos'],['activo','Activo'],['por_vencer','Por vencer'],['entrante','Entrante'],['atrasado','Atrasado'],['finalizado','Finalizado']], "pmCalSetFilter('status', this.value||null)")}
-    ${pmFilterSelect('Plataforma','💳', fP, [['','Todas'],['contrato_directo','Directo'],['airbnb','Airbnb'],['padsplit','Padsplit'],['booking','Booking'],['vrbo','VRBO']], "pmCalSetFilter('platform', this.value||null)")}
-    ${pmFilterSelect('Tipo','🛏', fT, [['','Todos'],['casa_completa','Casa'],['apartamento','Apartamento'],['estudio','Estudio'],['habitacion','Habitación']], "pmCalSetFilter('type', this.value||null)")}
+    ${pmFilterSelect('Estado',osIcon('zap'), fS, [['','Todos'],['activo','Activo'],['por_vencer','Por vencer'],['entrante','Entrante'],['atrasado','Atrasado'],['finalizado','Finalizado']], "pmCalSetFilter('status', this.value||null)")}
+    ${pmFilterSelect('Plataforma',osIcon('credit-card'), fP, [['','Todas'],['contrato_directo','Directo'],['airbnb','Airbnb'],['padsplit','Padsplit'],['booking','Booking'],['vrbo','VRBO']], "pmCalSetFilter('platform', this.value||null)")}
+    ${pmFilterSelect('Tipo',osIcon('bed'), fT, [['','Todos'],['casa_completa','Casa'],['apartamento','Apartamento'],['estudio','Estudio'],['habitacion','Habitación']], "pmCalSetFilter('type', this.value||null)")}
     ${(fS||fP||fT)?`<button onclick="pmCalClearFilters()" class="text-[10px] text-amber-700 font-bold hover:underline">✕ Limpiar</button>`:''}
     <button onclick="pmCalToggleFullscreen()" class="ml-auto bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1" title="Ver el calendario más grande">${pmaState.calendarFullscreen?'✕ Salir':'⛶ Pantalla completa'}</button>
     <span class="flex items-center gap-2 text-[10px] text-slate-500">
       ${colorBy==='estado'
-        ? `<span>🟩 Activo</span><span>🟠 Por vencer ≤${PM_CAL_VENCE_DIAS}d</span><span>🔵 Entrante</span><span>🟥 Atrasado</span><span>⬜ Finalizado</span>`
+        ? `<span>${kitStatusDot('ok')} Activo</span><span>${kitStatusDot('warn')} Por vencer ≤${PM_CAL_VENCE_DIAS}d</span><span>Entrante</span><span>${kitStatusDot('bad')} Atrasado</span><span>⬜ Finalizado</span>`
         : `<span class="italic">colores por canal/plataforma</span>`}
     </span>
   </div>`;
@@ -2471,33 +2471,33 @@ function pmRenderTimelineGrid(units) {
   const totalW = labelW + gridW;
   const totalH = 60 + units.length * rowH;
   const platformLegend = [
-    {key:'contrato_directo', label:'Contrato directo', color:'#10b981'},
+    {key:'contrato_directo', label:'Contrato directo', color:'#059669'},
     {key:'airbnb', label:'Airbnb', color:'#ec4899'},
-    {key:'booking', label:'Booking', color:'#3b82f6'},
+    {key:'booking', label:'Booking', color:'#3a5be0'},
     {key:'vrbo', label:'VRBO', color:'#8b5cf6'},
     {key:'hospitable', label:'Hospitable', color:'#0ea5e9'},
     {key:'padsplit', label:'Padsplit', color:'#a855f7'},
     {key:'reserva_corta', label:'Reserva corta', color:'#f59e0b'},
-    {key:'otro', label:'Otro', color:'#64748b'}
+    {key:'otro', label:'Otro', color:'#6f7785'}
   ];
 
   return `
     <div style="position:relative;min-width:${totalW}px;">
       <!-- HEADER fila de fechas + label "Anuncio" izquierda -->
       <div class="flex sticky top-0 bg-white border-b-2 border-slate-200 z-20" style="height:60px;">
-        <div style="width:${labelW}px;flex-shrink:0;padding:8px 12px;border-right:1px solid #e2e8f0;background:white;position:sticky;left:0;z-index:21;">
-          <div style="font-size:9px;color:#94a3b8;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Anuncio</div>
-          <div style="font-size:11px;color:#475569;font-weight:bold;margin-top:2px;">${units.length} ${units.length===1?'unidad':'unidades'}</div>
+        <div style="width:${labelW}px;flex-shrink:0;padding:8px 12px;border-right:1px solid #dfe4ec;background:white;position:sticky;left:0;z-index:21;">
+          <div style="font-size:9px;color:#8b93a1;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">Anuncio</div>
+          <div style="font-size:11px;color:#5a6270;font-weight:bold;margin-top:2px;">${units.length} ${units.length===1?'unidad':'unidades'}</div>
         </div>
         <div class="flex">
           ${days.map((d, i) => {
             const isToday = i === todayIdx;
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
             const showMonth = i === 0 || d.getDate() === 1;
-            return `<div style="width:${colW}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
-              ${showMonth ? `<div style="font-size:9px;color:#64748b;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
-              <div style="font-size:10px;color:#94a3b8;">${dows[d.getDay()]}</div>
-              <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#334155;'}">${d.getDate()}</div>
+            return `<div style="width:${colW}px;border-right:1px solid #eef1f6;${isWeekend?'background:#fafafa;':''}${isToday?'background:#fee2e2;':''};padding:6px 0;text-align:center;">
+              ${showMonth ? `<div style="font-size:9px;color:#6f7785;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;">${monthLabels[d.getMonth()]}</div>` : '<div style="height:14px;"></div>'}
+              <div style="font-size:10px;color:#8b93a1;">${dows[d.getDay()]}</div>
+              <div style="font-size:13px;${isToday?'color:#dc2626;font-weight:bold;':'color:#3a4250;'}">${d.getDate()}</div>
             </div>`;
           }).join('')}
         </div>
@@ -2519,25 +2519,25 @@ function pmRenderTimelineGrid(units) {
           return true;
         });
         const hasBookings = bks.length > 0;
-        const icon = unit.unit_type==='casa_completa'?'🏡' : unit.unit_type==='estudio'?'🎨' : unit.unit_type==='apartamento'?'🏢':'🛏';
+        const icon = unit.unit_type==='casa_completa'?osIcon('house') : unit.unit_type==='estudio'?osIcon('palette') : unit.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
         const fullName = (unit.code||unit.name||'') + (unit._displaySuffix || '');
         const addrLine = (p?.name||'—') + (unit.target_rent ? ` · $${Number(unit.target_rent).toLocaleString()}` : '');
-        return `<div class="flex relative hover:bg-slate-50 transition group" style="border-bottom:1px solid #e2e8f0;height:${rowH}px;align-items:center;">
+        return `<div class="flex relative hover:bg-slate-50 transition group" style="border-bottom:1px solid #dfe4ec;height:${rowH}px;align-items:center;">
           <!-- Columna fija izquierda (nombre en 2 líneas) -->
-          <div onclick="pmaState.calendarSelectedUnitId='${unit.id}';pmRender()" title="${(fullName + ' — ' + (p?.name||'')).replace(/"/g,'&quot;')}" style="width:${labelW}px;flex-shrink:0;height:100%;padding:10px 12px;border-right:1px solid #e2e8f0;background:white;position:sticky;left:0;z-index:6;cursor:pointer;display:flex;align-items:center;gap:8px;" class="hover:bg-slate-50">
+          <div onclick="pmaState.calendarSelectedUnitId='${unit.id}';pmRender()" title="${(fullName + ' — ' + (p?.name||'')).replace(/"/g,'&quot;')}" style="width:${labelW}px;flex-shrink:0;height:100%;padding:10px 12px;border-right:1px solid #dfe4ec;background:white;position:sticky;left:0;z-index:6;cursor:pointer;display:flex;align-items:center;gap:8px;" class="hover:bg-slate-50">
             <div style="font-size:18px;flex-shrink:0;">${icon}</div>
             <div style="min-width:0;flex:1;">
-              <div class="pm-clamp2" style="font-size:13px;font-weight:600;color:#1e293b;">${fullName.replace(/</g,'&lt;')}</div>
-              <div class="pm-clamp1" style="font-size:11px;color:#94a3b8;opacity:0.85;margin-top:1px;">${addrLine.replace(/</g,'&lt;')}</div>
+              <div class="pm-clamp2" style="font-size:13px;font-weight:600;color:#1e2430;">${fullName.replace(/</g,'&lt;')}</div>
+              <div class="pm-clamp1" style="font-size:11px;color:#8b93a1;opacity:0.85;margin-top:1px;">${addrLine.replace(/</g,'&lt;')}</div>
             </div>
           </div>
           <!-- Celdas -->
           ${days.map((d, i) => {
             const isToday = i === todayIdx;
             const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-            return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" style="width:${colW}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#fafbfc;':''}${isToday?'background:rgba(254,226,226,0.4);':''};cursor:pointer;background-image:linear-gradient(135deg,transparent 49.5%,#e2e8f0 49.5%,#e2e8f0 50.5%,transparent 50.5%);"></div>`;
+            return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})" style="width:${colW}px;border-right:1px solid #eef1f6;${isWeekend?'background:#fafbfc;':''}${isToday?'background:rgba(254,226,226,0.4);':''};cursor:pointer;background-image:linear-gradient(135deg,transparent 49.5%,#dfe4ec 49.5%,#dfe4ec 50.5%,transparent 50.5%);"></div>`;
           }).join('')}
-          ${!hasBookings ? `<div style="position:absolute;left:${labelW + 12}px;top:50%;transform:translateY(-50%);font-size:10px;color:#cbd5e1;font-style:italic;pointer-events:none;">Sin reservas en este período</div>` : ''}
+          ${!hasBookings ? `<div style="position:absolute;left:${labelW + 12}px;top:50%;transform:translateY(-50%);font-size:10px;color:#d8d2c6;font-style:italic;pointer-events:none;">Sin reservas en este período</div>` : ''}
           ${bks.map(b => {
             const s = new Date(b.start_date + 'T00:00:00');
             const e = b.end_date ? new Date(b.end_date + 'T00:00:00') : new Date(s.getTime() + 365*86400000);
@@ -2545,20 +2545,20 @@ function pmRenderTimelineGrid(units) {
             const endIdx = Math.min(daysCount - 1, Math.floor((e - days[0]) / 86400000));
             const leftPx = labelW + startIdx * colW + 2;
             const widthPx = (endIdx - startIdx + 1) * colW - 4;
-            const colorByType = {contrato_directo:'#10b981',airbnb:'#ec4899',booking:'#3b82f6',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#64748b'};
+            const colorByType = {contrato_directo:'#059669',airbnb:'#ec4899',booking:'#3a5be0',vrbo:'#8b5cf6',hospitable:'#0ea5e9',padsplit:'#a855f7',reserva_corta:'#f59e0b',otro:'#6f7785'};
             const stState = pmBookingCalState(b, lateSet);
             const bg = colorBy === 'estado' ? stState.color : (colorByType[b.booking_type] || colorByType.otro);
             const opacity = stState.key === 'finalizado' ? 0.7 : 1;
             const tenant = pmTenantName(b.tenant_id);
             const isSelected = pmaState.calendarSelectedBookingId === b.id;
-            const platformIcon = {contrato_directo:'📝',airbnb:'🅰',booking:'🅱',vrbo:'V',hospitable:'H',padsplit:'P',reserva_corta:'⏱',otro:'•'}[b.booking_type] || '•';
+            const platformIcon = {contrato_directo:osIcon('pencil-line'),airbnb:osIcon('store'),booking:osIcon('store'),vrbo:'V',hospitable:'H',padsplit:'P',reserva_corta:osIcon('clock'),otro:'•'}[b.booking_type] || '•';
             const initials = pmAvatarInitials(tenant);
             const showAmount = widthPx > 150;
             const showTenant = widthPx > 64;
             const showPlat = widthPx > 110;
             // Lado derecho: si está "por vencer" (modo estado) → countdown ⏳Nd; si no → icono plataforma.
             const rightBadge = (colorBy === 'estado' && stState.key === 'por_vencer' && widthPx > 88)
-              ? `<span style="background:rgba(255,255,255,0.28);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:6px;flex-shrink:0;white-space:nowrap;" title="Vence en ${stState.days} días">⏳ ${stState.days}d</span>`
+              ? `<span style="background:rgba(255,255,255,0.28);color:white;font-size:9px;font-weight:800;padding:1px 5px;border-radius:6px;flex-shrink:0;white-space:nowrap;" title="Vence en ${stState.days} días">${stState.days}d</span>`
               : (showPlat ? `<span style="color:rgba(255,255,255,0.9);font-size:11px;flex-shrink:0;" title="${b.booking_type||''}">${platformIcon}</span>` : '');
             const tip = `${tenant}${b.reservation_code?` · ${b.reservation_code}`:''} · ${b.start_date||'?'} → ${b.end_date||'∞'} · $${Number(b.rent_amount||0).toLocaleString()} · ${stState.label}`;
             return `<div onclick="event.stopPropagation();pmaState.calendarSelectedBookingId='${b.id}';pmRender()" style="position:absolute;left:${leftPx}px;width:${widthPx}px;top:7px;bottom:7px;background:${bg};opacity:${opacity};border-radius:8px;padding:0 8px;display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;box-shadow:${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18);overflow:hidden;z-index:6;transition:transform 0.1s,box-shadow 0.1s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 4px 10px rgba(0,0,0,0.25)'" onmouseout="this.style.transform='';this.style.boxShadow='${isSelected?'0 0 0 3px #fbbf24,':''} 0 1px 3px rgba(0,0,0,0.18)'" title="${tip.replace(/"/g,'&quot;')}">
@@ -2575,7 +2575,7 @@ function pmRenderTimelineGrid(units) {
       <div class="border-t border-slate-200 bg-slate-50 px-3 py-2 flex items-center gap-3 flex-wrap text-[10px]" style="position:sticky;bottom:0;z-index:7;">
         <span class="text-slate-500 font-bold uppercase tracking-wide">Plataforma:</span>
         ${platformLegend.map(p => `<span class="flex items-center gap-1.5"><span style="background:${p.color};width:10px;height:10px;border-radius:3px;display:inline-block;"></span><span class="text-slate-600">${p.label}</span></span>`).join('')}
-        <span class="ml-auto text-slate-400">💡 Click en día vacío para nueva reserva · Click en barra para ver detalle</span>
+        <span class="ml-auto text-slate-400">${osIcon('lightbulb')} Click en día vacío para nueva reserva · Click en barra para ver detalle</span>
       </div>
     </div>
   `;
@@ -2620,8 +2620,8 @@ function pmRenderBookingSidePanel(bookingId) {
           <div class="flex-1 min-w-0">
             <div class="font-bold text-sm text-slate-900 truncate">${(tenant?.full_name || 'Sin inquilino').replace(/</g,'&lt;')}</div>
             <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-              ${tenant?.phone ? `<a href="https://wa.me/${tenant.phone.replace(/\D/g,'')}" target="_blank" class="text-emerald-600 hover:underline">💬 WhatsApp</a>` : ''}
-              ${tenant?.email ? `<a href="mailto:${tenant.email}" class="text-blue-600 hover:underline">📧 Email</a>` : ''}
+              ${tenant?.phone ? `<a href="https://wa.me/${tenant.phone.replace(/\D/g,'')}" target="_blank" class="text-emerald-600 hover:underline">${osIcon('message')} WhatsApp</a>` : ''}
+              ${tenant?.email ? `<a href="mailto:${tenant.email}" class="text-blue-600 hover:underline">${osIcon('mail')} Email</a>` : ''}
             </div>
           </div>
         </div>
@@ -2635,7 +2635,7 @@ function pmRenderBookingSidePanel(bookingId) {
         </div>
         ${b.notes ? `<div class="bg-slate-50 border border-slate-200 rounded p-2 text-xs"><div class="font-bold text-slate-700 mb-1">Notas</div><div class="text-slate-600 whitespace-pre-wrap">${(b.notes||'').replace(/</g,'&lt;')}</div></div>` : ''}
         <button onclick="pmaState.calendarSelectedBookingId=null;pmEditBooking('${b.id}')" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3 rounded-lg">Ver itinerario completo</button>
-        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="block text-center w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 font-bold text-sm py-2 rounded-lg">📄 Ver contrato</a>` : ''}
+        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="block text-center w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 font-bold text-sm py-2 rounded-lg">${osIcon('file')} Ver contrato</a>` : ''}
       </div>
     </div>
   `;
@@ -2652,7 +2652,7 @@ function pmRenderSingleListing(unit, allUnits) {
     <div class="flex bg-white" style="height: calc(75vh - 60px); margin: -4px;">
       <div class="border-r border-slate-200 bg-white flex flex-col" style="width:90px;flex-shrink:0;overflow-y:auto;">
         ${allUnits.map(u => {
-          const icon = u.unit_type==='casa_completa'?'🏡' : u.unit_type==='estudio'?'🎨' : u.unit_type==='apartamento'?'🏢':'🛏';
+          const icon = u.unit_type==='casa_completa'?osIcon('house') : u.unit_type==='estudio'?osIcon('palette') : u.unit_type==='apartamento'?osIcon('building'):osIcon('bed');
           const isSelected = u.id === unit.id;
           return `<button onclick="pmaState.calendarSelectedUnitId='${u.id}';pmRender()" class="w-full p-2 hover:bg-slate-50 border-b border-slate-100 flex flex-col items-center gap-1 transition ${isSelected?'bg-slate-100':''}">
             <div class="w-14 h-14 rounded-lg bg-gradient-to-br ${isSelected?'from-emerald-500 to-emerald-700 ring-2 ring-emerald-400':'from-slate-700 to-slate-900'} text-white flex items-center justify-center text-2xl flex-shrink-0">${icon}</div>
@@ -2685,13 +2685,13 @@ function pmRenderSingleListing(unit, allUnits) {
         <h3 class="text-lg font-bold text-slate-900 mb-3">${(unit.name||unit.code||'').replace(/</g,'&lt;')}</h3>
         <div class="space-y-2 text-sm">
           <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Renta objetivo</div><div class="text-emerald-700 font-bold text-lg">\$${Number(unit.target_rent||0).toLocaleString()}</div><div class="text-[10px] text-slate-500">por mes</div></div>
-          <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Tipo</div><div class="text-sm">${unit.unit_type==='casa_completa'?'🏡 Casa completa':unit.unit_type==='estudio'?'🎨 Estudio':unit.unit_type==='apartamento'?'🏢 Apartamento':'🛏 Habitación'}</div></div>
+          <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Tipo</div><div class="text-sm">${unit.unit_type==='casa_completa'?'Casa completa':unit.unit_type==='estudio'?'Estudio':unit.unit_type==='apartamento'?'Apartamento':'Habitación'}</div></div>
           ${unit.bath_type ? `<div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Baño</div><div class="text-sm capitalize">${unit.bath_type.replace(/_/g,' ')}</div></div>` : ''}
           <div class="border-b border-slate-100 pb-2"><div class="text-[10px] uppercase text-slate-500 font-bold">Código</div><div class="text-sm font-mono bg-slate-100 px-2 py-1 rounded inline-block">${(unit.code||'—').replace(/</g,'&lt;')}</div></div>
           <div><div class="text-[10px] uppercase text-slate-500 font-bold">Propiedad</div><div class="text-xs text-slate-700">${(property?.name||'—').replace(/</g,'&lt;')}</div><div class="text-[10px] text-slate-500">${(property?.address||'').replace(/</g,'&lt;')}</div></div>
         </div>
         <div class="mt-4 space-y-2">
-          <button onclick="pmEditUnit('${unit.id}','${unit.property_id}')" class="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 text-xs font-bold py-2 rounded">✏️ Editar unidad</button>
+          <button onclick="pmEditUnit('${unit.id}','${unit.property_id}')" class="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-900 text-xs font-bold py-2 rounded">${osIcon('pencil')} Editar unidad</button>
           <button onclick="pmEditBooking(null,'${unit.id}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded">+ Nueva reserva</button>
         </div>
       </div>
@@ -2843,7 +2843,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
     <div class="overflow-x-auto" style="background:white;">
       <div style="min-width:${280 + totalDays * colWidth}px;">
         <!-- Header con días -->
-        <div class="flex items-center border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style="font-size:10px;font-weight:bold;color:#475569;">
+        <div class="flex items-center border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style="font-size:10px;font-weight:bold;color:#5a6270;">
           <div style="width:240px;padding:8px 10px;">Unidad</div>
           <div style="width:40px;text-align:center;padding:8px 0;">%</div>
           <div class="flex">
@@ -2852,9 +2852,9 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
               const dow = ['D','L','M','M','J','V','S'][dt.getDay()];
               const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
               const isToday = d === todayDay;
-              return `<div style="width:${colWidth}px;text-align:center;padding:6px 0;${isWeekend?'background:#f8fafc;':''}${isToday?'background:#fee2e2;color:#991b1b;font-weight:bold;':''};border-right:1px solid #f1f5f9;">
-                <div style="font-size:9px;color:#94a3b8;">${dow}</div>
-                <div style="font-size:11px;${isToday?'color:#991b1b;':'color:#334155;'}">${d}</div>
+              return `<div style="width:${colWidth}px;text-align:center;padding:6px 0;${isWeekend?'background:#faf8f4;':''}${isToday?'background:#fee2e2;color:#991b1b;font-weight:bold;':''};border-right:1px solid #eef1f6;">
+                <div style="font-size:9px;color:#8b93a1;">${dow}</div>
+                <div style="font-size:11px;${isToday?'color:#991b1b;':'color:#3a4250;'}">${d}</div>
               </div>`;
             }).join('')}
           </div>
@@ -2894,7 +2894,7 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                   const dt = new Date(year, month, d);
                   const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
                   const isToday = d === todayDay;
-                  return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" style="width:${colWidth}px;border-right:1px solid #f1f5f9;${isWeekend?'background:#f8fafc;':''}${isToday?'border-left:2px solid #ef4444;border-right:2px solid #ef4444;':''}cursor:pointer;" title="${dt.toLocaleDateString('es')} — click para nueva reserva"></div>`;
+                  return `<div onclick="pmCreateBookingFromDay('${unit.id}', ${year}, ${month}, ${d})" style="width:${colWidth}px;border-right:1px solid #eef1f6;${isWeekend?'background:#faf8f4;':''}${isToday?'border-left:2px solid #ef4444;border-right:2px solid #ef4444;':''}cursor:pointer;" title="${dt.toLocaleDateString('es')} — click para nueva reserva"></div>`;
                 }).join('')}
                 <!-- Bookings encima -->
                 ${allBks.map(b => {
@@ -2905,14 +2905,14 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
                   const leftPx = startCol * colWidth + 2;
                   const widthPx = (endCol - startCol) * colWidth - 4;
                   const colorByType = {
-                    contrato_directo: 'background:linear-gradient(135deg,#10b981,#059669);',
+                    contrato_directo: 'background:linear-gradient(135deg,#059669,#059669);',
                     airbnb:            'background:linear-gradient(135deg,#ec4899,#db2777);',
-                    booking:           'background:linear-gradient(135deg,#3b82f6,#2563eb);',
+                    booking:           'background:linear-gradient(135deg,#3a5be0,#3a5be0);',
                     vrbo:              'background:linear-gradient(135deg,#8b5cf6,#7c3aed);',
                     hospitable:        'background:linear-gradient(135deg,#0ea5e9,#0284c7);',
                     padsplit:          'background:linear-gradient(135deg,#a855f7,#9333ea);',
                     reserva_corta:     'background:linear-gradient(135deg,#f59e0b,#d97706);',
-                    otro:              'background:linear-gradient(135deg,#64748b,#475569);'
+                    otro:              'background:linear-gradient(135deg,#6f7785,#5a6270);'
                   };
                   const bg = colorByType[b.booking_type] || colorByType.otro;
                   const opacity = b.status === 'finalizado' || b.status === 'vencido' ? 0.55 : 1;
@@ -2928,9 +2928,9 @@ function pmRenderMonthTimelineForUnits(units, year, month) {
         <!-- Leyenda -->
         <div class="flex gap-3 px-3 py-2 text-[10px] text-slate-600 flex-wrap border-t border-slate-200 bg-slate-50 sticky bottom-0">
           <span class="font-bold uppercase text-slate-500">Click reserva → detalles · Click día vacío → nueva reserva</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#10b981,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#059669,#059669);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Directo</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#ec4899,#db2777);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Airbnb</span>
-          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#3a5be0,#3a5be0);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Booking</span>
           <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(135deg,#a855f7,#9333ea);border-radius:2px;margin-right:3px;vertical-align:middle;"></span>Padsplit</span>
           <span><span style="display:inline-block;width:2px;height:10px;background:#ef4444;margin-right:3px;vertical-align:middle;"></span>Hoy</span>
         </div>
@@ -2953,10 +2953,10 @@ function pmShowBookingDetail(bookingId) {
     ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1
     : null;
   const platformLabel = {
-    contrato_directo: '📄 Contrato directo',
-    airbnb: '🌐 Airbnb', vrbo: '🌐 VRBO', booking: '🌐 Booking',
-    hospitable: '🌐 Hospitable', padsplit: '🌐 Padsplit',
-    reserva_corta: '⏱ Reserva corta', otro: '• Otro'
+    contrato_directo: 'Contrato directo',
+    airbnb: 'Airbnb', vrbo: 'VRBO', booking: 'Booking',
+    hospitable: 'Hospitable', padsplit: 'Padsplit',
+    reserva_corta: 'Reserva corta', otro: '• Otro'
   }[b.booking_type] || b.booking_type;
   const statusColor = {
     activo: 'bg-emerald-100 text-emerald-800',
@@ -2968,7 +2968,7 @@ function pmShowBookingDetail(bookingId) {
     finalizado: 'bg-slate-200 text-slate-700'
   }[b.status] || 'bg-slate-100 text-slate-700';
 
-  openModal('📋 Detalle de Reserva', `
+  openModal('Detalle de Reserva', `
     <div class="space-y-3">
       <!-- Header con plataforma y estado -->
       <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-lg p-4 -m-2 mb-3">
@@ -2976,8 +2976,8 @@ function pmShowBookingDetail(bookingId) {
           <div>
             <div class="text-[10px] uppercase font-bold text-slate-300 tracking-wider">${platformLabel}</div>
             <div class="text-xl font-bold mt-1">${(tenant?.full_name || 'Sin inquilino asignado').replace(/</g,'&lt;')}</div>
-            ${tenant?.phone ? `<div class="text-xs text-slate-300 mt-1">📞 ${tenant.phone}</div>` : ''}
-            ${tenant?.email ? `<div class="text-xs text-slate-300">📧 ${tenant.email}</div>` : ''}
+            ${tenant?.phone ? `<div class="text-xs text-slate-300 mt-1">${osIcon('phone')} ${tenant.phone}</div>` : ''}
+            ${tenant?.email ? `<div class="text-xs text-slate-300">${osIcon('mail')} ${tenant.email}</div>` : ''}
           </div>
           <span class="text-[10px] ${statusColor} px-2 py-1 rounded font-bold uppercase">${b.status||'—'}</span>
         </div>
@@ -2985,7 +2985,7 @@ function pmShowBookingDetail(bookingId) {
 
       <!-- Propiedad y unidad -->
       <div class="bg-slate-50 border border-slate-200 rounded p-3">
-        <div class="text-[10px] uppercase font-bold text-slate-500">📍 Propiedad / Unidad</div>
+        <div class="text-[10px] uppercase font-bold text-slate-500">${osIcon('map-pin')} Propiedad / Unidad</div>
         <div class="font-bold text-sm text-slate-900 mt-1">${(property?.name||'—').replace(/</g,'&lt;')}</div>
         <div class="text-xs text-slate-600 mt-0.5">
           <span class="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-mono font-bold">${(unit?.code||'').replace(/</g,'&lt;')}</span>
@@ -3034,7 +3034,7 @@ function pmShowBookingDetail(bookingId) {
       ` : ''}
       ${b.notes ? `
         <div class="bg-slate-50 border border-slate-200 rounded p-2 text-xs">
-          <div class="font-bold text-slate-700 mb-1">📝 Notas</div>
+          <div class="font-bold text-slate-700 mb-1">${osIcon('pencil-line')} Notas</div>
           <div class="text-slate-600 whitespace-pre-wrap">${(b.notes||'').replace(/</g,'&lt;')}</div>
         </div>
       ` : ''}
@@ -3042,9 +3042,9 @@ function pmShowBookingDetail(bookingId) {
       <!-- Acciones -->
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="pmBackToPm()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">↩ Volver al calendario</button>
-        ${tenant?.phone ? `<a href="https://wa.me/${(tenant.phone||'').replace(/\\D/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 py-2 rounded text-center">💬 WhatsApp</a>` : ''}
-        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded text-center">📄 Contrato</a>` : ''}
-        <button onclick="closeModal();pmEditBooking('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✏️ Editar reserva</button>
+        ${tenant?.phone ? `<a href="https://wa.me/${(tenant.phone||'').replace(/\\D/g,'')}" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 py-2 rounded text-center">${osIcon('message')} WhatsApp</a>` : ''}
+        ${b.contract_url ? `<a href="${b.contract_url}" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded text-center">${osIcon('file')} Contrato</a>` : ''}
+        <button onclick="closeModal();pmEditBooking('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('pencil')} Editar reserva</button>
       </div>
     </div>
   `);
@@ -3102,14 +3102,14 @@ function pmUnitTypeLabel(t) {
 // ── Recurrencia de pago (deriva de booking.payment_day) ──
 function pmRecurrenceOf(paymentDay) {
   const s = (paymentDay || '').toLowerCase();
-  if (!s) return { kind: 'mensual', label: '🗓 Mensual' };
-  if (/estad|airbnb|noche/.test(s)) return { kind: 'airbnb', label: '🏖 Airbnb' };
-  if (/dos\s*seman|quincen|biweek|cada.?2.?seman|2\s*seman/.test(s)) return { kind: 'quincenal', label: '⏱ Quincenal' };
-  if (/primeros?\s*3|1\s*-\s*3|3\s*primeros/.test(s)) return { kind: 'mensual', label: '🗓 Mensual (1-3)' };
-  if (/primeros?\s*5|1\s*-\s*5|5\s*primeros/.test(s)) return { kind: 'mensual', label: '🗓 Mensual (1-5)' };
+  if (!s) return { kind: 'mensual', label: 'Mensual' };
+  if (/estad|airbnb|noche/.test(s)) return { kind: 'airbnb', label: 'Airbnb' };
+  if (/dos\s*seman|quincen|biweek|cada.?2.?seman|2\s*seman/.test(s)) return { kind: 'quincenal', label: 'Quincenal' };
+  if (/primeros?\s*3|1\s*-\s*3|3\s*primeros/.test(s)) return { kind: 'mensual', label: 'Mensual (1-3)' };
+  if (/primeros?\s*5|1\s*-\s*5|5\s*primeros/.test(s)) return { kind: 'mensual', label: 'Mensual (1-5)' };
   const dayM = s.match(/(\d{1,2})\s*de\s*cada\s*mes/) || s.match(/d[ií]a\s*(\d{1,2})/) || s.match(/^\s*(\d{1,2})\s*$/);
-  if (dayM) return { kind: 'mensual', label: `🗓 Mensual día ${dayM[1]}` };
-  return { kind: 'mensual', label: '🗓 Mensual' };
+  if (dayM) return { kind: 'mensual', label: `Mensual día ${dayM[1]}` };
+  return { kind: 'mensual', label: 'Mensual' };
 }
 function pmRecurrenceDay(paymentDay) {
   const s = (paymentDay || '').toLowerCase();
@@ -3122,26 +3122,26 @@ function pmRecurrenceDay(paymentDay) {
 // "Atrasado" SOLO por deuda de balance en períodos cerrados (pmTenantDebt) — el
 // día de vencimiento solo informa "próximo cobro", nunca mete a nadie en atrasados.
 function pmTenantPayStatus(booking) {
-  if (!booking) return { key: 'sincontrato', label: '💤 Sin contrato', cls: 'text-slate-400 bg-slate-50' };
+  if (!booking) return { key: 'sincontrato', label: 'Sin contrato', cls: 'text-slate-400 bg-slate-50' };
   const rec = pmRecurrenceOf(booking.payment_day);
-  if (rec.kind === 'airbnb') return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  if (rec.kind === 'airbnb') return { key: 'aldia', label: 'Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const debe = pmTenantDebt(booking.tenant_id);
-  if (debe > 0) return { key: 'atrasado', label: `🔴 Atrasado · debe $${debe.toLocaleString()}`, cls: 'text-red-700 bg-red-50' };
+  if (debe > 0) return { key: 'atrasado', label: `Atrasado · debe $${debe.toLocaleString()}`, cls: 'text-red-700 bg-red-50' };
   // ¿El período del mes en curso ya quedó cubierto (balance ≤ 0)? → al día.
   const ymNow = pmHoyYm();
   const cubierto = pmaState.payments.some(p => p.type === 'ingreso' && pmBillYm(p) === ymNow &&
     (p.booking_id === booking.id || (booking.tenant_id && p.tenant_id === booking.tenant_id)) &&
     (pmPayBalance(p) == null || pmPayBalance(p) <= 0));
-  if (cubierto) return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  if (cubierto) return { key: 'aldia', label: 'Al día', cls: 'text-emerald-700 bg-emerald-50' };
   const today = new Date();
   const tIn = pmaState.tenants.find(x => x.id === booking.tenant_id);
   const day = (tIn && tIn.vencimiento_pago) ? pmDiaVenc(tIn.vencimiento_pago) : pmRecurrenceDay(booking.payment_day);
   const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const due = new Date(today.getFullYear(), today.getMonth(), Math.min(day, 28));
   const diff = Math.round((due - t0) / 86400000);
-  if (diff < 0) return { key: 'pendiente', label: '⏳ Pendiente del mes', cls: 'text-amber-700 bg-amber-50' };
-  if (diff <= 7) return { key: 'proximo', label: `⏰ Próximo (${diff}d)`, cls: 'text-amber-700 bg-amber-50' };
-  return { key: 'aldia', label: '✅ Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  if (diff < 0) return { key: 'pendiente', label: 'Pendiente del mes', cls: 'text-amber-700 bg-amber-50' };
+  if (diff <= 7) return { key: 'proximo', label: `Próximo (${diff}d)`, cls: 'text-amber-700 bg-amber-50' };
+  return { key: 'aldia', label: 'Al día', cls: 'text-emerald-700 bg-emerald-50' };
 }
 // Fecha esperada del próximo cobro de una reserva activa (para "Próximos cobros")
 function pmNextDueDate(booking) {
@@ -3235,9 +3235,9 @@ function pmRenderBookingRow(b) {
   const col = colorByType[b.booking_type] || 'slate';
   const daysLeft = b.end_date ? Math.floor((new Date(b.end_date) - todayDate) / 86400000) : null;
   const venceBadge = (daysLeft != null && daysLeft >= 0 && daysLeft <= 30)
-    ? `<span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold animate-pulse">⏰ Vence en ${daysLeft}d</span>`
+    ? `<span class="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold animate-pulse">${osIcon('clock')} Vence en ${daysLeft}d</span>`
     : (daysLeft != null && daysLeft < 0 && b.status !== 'finalizado')
-      ? `<span class="text-[10px] bg-red-100 text-red-900 px-1.5 py-0.5 rounded font-bold">⚠ Vencida hace ${-daysLeft}d</span>` : '';
+      ? `<span class="text-[10px] bg-red-100 text-red-900 px-1.5 py-0.5 rounded font-bold">${osIcon('alert')} Vencida hace ${-daysLeft}d</span>` : '';
   const durDays = (b.start_date && b.end_date) ? Math.floor((new Date(b.end_date) - new Date(b.start_date)) / 86400000) + 1 : null;
   const durLabel = durDays ? (durDays >= 30 ? `${Math.round(durDays/30)} ${Math.round(durDays/30)===1?'mes':'meses'}` : `${durDays}d`) : '';
   const code = b.reservation_code || null;
@@ -3255,16 +3255,16 @@ function pmRenderBookingRow(b) {
             <strong class="text-sm text-slate-900 pm-tenant-name" title="${pmTenantName(b.tenant_id).replace(/"/g,'&quot;')}">${pmTenantName(b.tenant_id)}</strong>
           </div>
           <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap cursor-pointer" onclick="pmEditBooking('${b.id}')">
-            <span>📅 ${b.start_date||'?'} → ${b.end_date||'∞'}${durLabel?` <span class="text-slate-400">(${durLabel})</span>`:''}</span>
+            <span>${osIcon('calendar')} ${b.start_date||'?'} → ${b.end_date||'∞'}${durLabel?` <span class="text-slate-400">(${durLabel})</span>`:''}</span>
             <span>·</span>
-            <span>🏠 ${(p?.name||'').replace(/</g,'&lt;').slice(0,30)}</span>
+            <span>${osIcon('house')} ${(p?.name||'').replace(/</g,'&lt;').slice(0,30)}</span>
             <span>·</span>
-            <span>🛏 ${((u?.code||u?.name||'')).replace(/</g,'&lt;')}</span>
+            <span>${osIcon('bed')} ${((u?.code||u?.name||'')).replace(/</g,'&lt;')}</span>
           </div>
         </div>
         <div class="text-right flex items-center gap-1.5 flex-shrink-0">
-          ${(b.status !== 'finalizado' && b.status !== 'cancelado') ? `<button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${b.property_id}'${b.unit_id ? `,'${b.unit_id}'` : ''})" title="Generar Guía de Bienvenida (PDF) para esta reserva" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1.5 rounded">📄 Guía</button>` : ''}
-          ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
+          ${(b.status !== 'finalizado' && b.status !== 'cancelado') ? `<button onclick="event.stopPropagation();pmGenerateWelcomeGuide('${b.property_id}'${b.unit_id ? `,'${b.unit_id}'` : ''})" title="Generar Guía de Bienvenida (PDF) para esta reserva" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1.5 rounded">${osIcon('file')} Guía</button>` : ''}
+          ${t?.phone ? `<a href="https://wa.me/${t.phone.replace(/\D/g,'')}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">${osIcon('message')}</a>` : ''}
           <button onclick="event.stopPropagation();pmMoveBooking('${b.id}')" title="Mover de unidad" class="bg-slate-50 hover:bg-slate-100 text-slate-600 p-1.5 rounded text-sm">↔</button>
           <div class="cursor-pointer" onclick="pmEditBooking('${b.id}')">
             <div class="text-sm font-bold text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</div>
@@ -3369,9 +3369,9 @@ function pmRenderBookings() {
 
       <!-- Filtros (dropdowns) -->
       <div class="pm-filters-bar">
-        ${pmFilterSelect('Casa', '🏠', propF, [['','Todas'], ...propsWithBookings.map(p=>[p.id, p.name||''])], "pmBookingsSetFilter('property', this.value||null)")}
-        ${pmFilterSelect('Fuente', '📡', platF, [['',`Todas (${all.length})`], ...platforms.map(pl=>[pl, `${PM_PLATFORM_LABEL[pl]||pl} (${platformCounts[pl]})`])], "pmBookingsSetFilter('platform', this.value||null)")}
-        ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, statuses.map(([k,l])=>[k==='all'?'':k, l]), "pmBookingsSetFilter('status', this.value||'all')")}
+        ${pmFilterSelect('Casa', osIcon('house'), propF, [['','Todas'], ...propsWithBookings.map(p=>[p.id, p.name||''])], "pmBookingsSetFilter('property', this.value||null)")}
+        ${pmFilterSelect('Fuente', osIcon('globe'), platF, [['',`Todas (${all.length})`], ...platforms.map(pl=>[pl, `${PM_PLATFORM_LABEL[pl]||pl} (${platformCounts[pl]})`])], "pmBookingsSetFilter('platform', this.value||null)")}
+        ${pmFilterSelect('Estatus', osIcon('zap'), statF==='all'?'':statF, statuses.map(([k,l])=>[k==='all'?'':k, l]), "pmBookingsSetFilter('status', this.value||'all')")}
         ${pmBookingsHasFilters()?`<button class="pm-clear-filters" onclick="pmBookingsClearFilters()">✕ Limpiar</button>`:''}
       </div>
 
@@ -3403,12 +3403,12 @@ async function pmMoveBooking(id) {
     .map(pid => `<optgroup label="${pmPropertyName(pid).replace(/"/g,'&quot;')}">${
       byProp[pid].filter(u => u.id !== b.unit_id).map(u => `<option value="${u.id}">${(u.code||u.name||'').replace(/</g,'&lt;')}${u.target_rent?` · $${Number(u.target_rent).toLocaleString()}`:''}</option>`).join('')
     }</optgroup>`).join('');
-  openModal('↔ Mover reserva de unidad', `
+  openModal('Mover reserva de unidad', `
     <div class="space-y-3">
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
         <div class="text-[10px] uppercase font-bold text-slate-400">Reserva actual</div>
         <div class="font-bold text-slate-800">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}${b.reservation_code?` <span class="text-[10px] font-mono text-slate-400">${b.reservation_code}</span>`:''}</div>
-        <div class="text-[11px] text-slate-500">🛏 ${pmUnitLabel(b.unit_id).replace(/</g,'&lt;')}</div>
+        <div class="text-[11px] text-slate-500">${osIcon('bed')} ${pmUnitLabel(b.unit_id).replace(/</g,'&lt;')}</div>
       </div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Mover a *</label>
         <select id="pm-mv-unit" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
@@ -3600,7 +3600,7 @@ function pmRenderTenants() {
 
     <!-- Tabs de estado (chips) -->
     <div class="flex flex-wrap gap-1.5">
-      ${[['todos','TODOS',null],['activos','🟢 ACTIVOS',counters.activos],['historico','⚪ PASADOS',counters.historico],['upcoming','🔵 ENTRANTES',counters.upcoming],['expiring','🟡 PRÓXIMOS A SALIR',counters.expiring]].map(([k,l,c])=>{
+      ${[['todos','TODOS',null],['activos','ACTIVOS',counters.activos],['historico','⚪ PASADOS',counters.historico],['upcoming','ENTRANTES',counters.upcoming],['expiring','PRÓXIMOS A SALIR',counters.expiring]].map(([k,l,c])=>{
         const active = filter===k;
         return `<button onclick="pmTenantsSetFilter('status','${k}')" class="text-[11px] font-bold px-3 py-1.5 rounded-full border transition ${active?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}">${l}${c!=null?` <span class="opacity-70">${c}</span>`:''}</button>`;
       }).join('')}
@@ -3615,9 +3615,9 @@ function pmRenderTenants() {
 
     <!-- Filtros (dropdowns) -->
     <div class="pm-filters-bar">
-      ${pmFilterSelect('Estado', '⚡', filter==='activos'?'':filter, statusChips.map(([k,l,c])=>[k==='activos'?'':k, l+(c!=null?` (${c})`:'')]), "pmTenantsSetFilter('status', this.value||'activos')")}
-      ${pmFilterSelect('Casa', '🏠', propF, [['','Todas'], ...propsWithT.map(p=>[p.id, p.name||''])], "pmTenantsSetFilter('property', this.value||null)")}
-      ${pmFilterSelect('Tipo', '🛏', typeF, [['','Todos'], ...types.map(tp=>[tp, pmUnitTypeLabel(tp)])], "pmTenantsSetFilter('type', this.value||null)")}
+      ${pmFilterSelect('Estado', osIcon('zap'), filter==='activos'?'':filter, statusChips.map(([k,l,c])=>[k==='activos'?'':k, l+(c!=null?` (${c})`:'')]), "pmTenantsSetFilter('status', this.value||'activos')")}
+      ${pmFilterSelect('Casa', osIcon('house'), propF, [['','Todas'], ...propsWithT.map(p=>[p.id, p.name||''])], "pmTenantsSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Tipo', osIcon('bed'), typeF, [['','Todos'], ...types.map(tp=>[tp, pmUnitTypeLabel(tp)])], "pmTenantsSetFilter('type', this.value||null)")}
       ${pmTenantsHasFilters()?`<button class="pm-clear-filters" onclick="pmTenantsClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
@@ -3644,7 +3644,7 @@ function pmRenderTenantCard({ tenant, booking }) {
     : (booking ? `<span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">indefinido</span>` : '');
 
   return `
-    <div class="bg-white border border-slate-200 border-l-4 rounded-lg p-3 hover:shadow-sm transition" style="border-left-color:${st.key==='late'?'#ef4444':st.key==='expiring'?'#f59e0b':st.key==='aldia'?'#10b981':'#94a3b8'}">
+    <div class="bg-white border border-slate-200 border-l-4 rounded-lg p-3 hover:shadow-sm transition" style="border-left-color:${st.key==='late'?'#ef4444':st.key==='expiring'?'#f59e0b':st.key==='aldia'?'#059669':'#8b93a1'}">
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="flex-1 min-w-0 cursor-pointer" onclick="pmOpenTenantDetail('${t.id}')">
           <div class="flex items-center gap-2 flex-wrap">
@@ -3657,25 +3657,25 @@ function pmRenderTenantCard({ tenant, booking }) {
           </div>
           ${booking ? `
             <div class="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
-              <span>🏠 ${(p?.name||'—').replace(/</g,'&lt;').slice(0,28)}</span>
-              <span>· 🛏 ${((u?.code||u?.name||'—')).replace(/</g,'&lt;')}</span>
-              <span>· 📅 ${booking.start_date||'?'} → ${booking.end_date||'∞'}</span>
+              <span>${osIcon('house')} ${(p?.name||'—').replace(/</g,'&lt;').slice(0,28)}</span>
+              <span>· ${osIcon('bed')} ${((u?.code||u?.name||'—')).replace(/</g,'&lt;')}</span>
+              <span>· ${osIcon('calendar')} ${booking.start_date||'?'} → ${booking.end_date||'∞'}</span>
             </div>
             <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
               <span class="font-bold text-emerald-700">$${Number(booking.rent_amount||0).toLocaleString()}/${booking.rent_period||'mes'}</span>
-              ${platform ? `<span>· 💳 ${(platform||'').replace(/</g,'&lt;')}</span>` : ''}
+              ${platform ? `<span>· ${osIcon('credit-card')} ${(platform||'').replace(/</g,'&lt;')}</span>` : ''}
               ${lastPay ? `<span>· últ. pago ${lastPay.paid_at} ($${Number(lastPay.amount||0).toLocaleString()})</span>` : `<span class="text-red-500">· sin pagos registrados</span>`}
             </div>
           ` : `<div class="text-[11px] text-slate-400 mt-1">Sin contrato activo${t.email?` · ${t.email}`:''}</div>`}
-          ${followup ? `<div class="text-[11px] text-slate-500 mt-1 italic truncate">📝 ${(followup||'').replace(/</g,'&lt;').slice(0,120)}</div>` : ''}
+          ${followup ? `<div class="text-[11px] text-slate-500 mt-1 italic truncate">${osIcon('pencil-line')} ${(followup||'').replace(/</g,'&lt;').slice(0,120)}</div>` : ''}
         </div>
         <div class="flex items-center gap-1.5 flex-shrink-0">
-          ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">💬</a>` : ''}
-          ${t.email ? `<a href="mailto:${t.email}" onclick="event.stopPropagation()" title="${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📧</a>` : ''}
-          ${booking ? `<button onclick="event.stopPropagation();pmMarkPayment('${booking.id}')" title="Marcar pago" class="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded text-sm">💵</button>` : ''}
-          ${booking ? `<button onclick="event.stopPropagation();pmGoBookingFromTenant('${booking.id}')" title="Ver reserva" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">📅</button>` : ''}
-          <button onclick="event.stopPropagation();pmGoPaymentsForTenant('${t.id}')" title="Ver pagos" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">📑</button>
-          <button onclick="event.stopPropagation();pmEditTenant('${t.id}')" title="Editar inquilino" class="text-slate-400 hover:text-slate-700 p-1.5 rounded text-sm">✏️</button>
+          ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}" target="_blank" onclick="event.stopPropagation()" title="WhatsApp ${t.phone}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">${osIcon('message')}</a>` : ''}
+          ${t.email ? `<a href="mailto:${t.email}" onclick="event.stopPropagation()" title="${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">${osIcon('mail')}</a>` : ''}
+          ${booking ? `<button onclick="event.stopPropagation();pmMarkPayment('${booking.id}')" title="Marcar pago" class="bg-amber-50 hover:bg-amber-100 text-amber-700 p-1.5 rounded text-sm">${osIcon('banknote')}</button>` : ''}
+          ${booking ? `<button onclick="event.stopPropagation();pmGoBookingFromTenant('${booking.id}')" title="Ver reserva" class="bg-blue-50 hover:bg-blue-100 text-blue-700 p-1.5 rounded text-sm">${osIcon('calendar')}</button>` : ''}
+          <button onclick="event.stopPropagation();pmGoPaymentsForTenant('${t.id}')" title="Ver pagos" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-1.5 rounded text-sm">${osIcon('file')}</button>
+          <button onclick="event.stopPropagation();pmEditTenant('${t.id}')" title="Editar inquilino" class="text-slate-400 hover:text-slate-700 p-1.5 rounded text-sm">${osIcon('pencil')}</button>
           <button onclick="event.stopPropagation();pmOpenTenantDetail('${t.id}')" title="Ver detalle" class="bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold px-2 py-1 rounded">Detalle</button>
         </div>
       </div>
@@ -3735,9 +3735,9 @@ function pmRenderTenantDetail() {
         <span class="text-[10px] ${st.bg} ${st.txt} px-1.5 py-0.5 rounded font-bold uppercase">${st.label}</span>
       </div>
       <div class="flex items-center gap-1.5">
-        ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded text-xs font-bold">💬 WhatsApp</a>` : ''}
-        ${t.email ? `<a href="mailto:${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1.5 rounded text-xs font-bold">📧 Email</a>` : ''}
-        <button onclick="pmEditTenant('${t.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded text-xs font-bold">✏️ Editar</button>
+        ${phoneDigits ? `<a href="https://wa.me/${phoneDigits}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded text-xs font-bold">${osIcon('message')} WhatsApp</a>` : ''}
+        ${t.email ? `<a href="mailto:${t.email}" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1.5 rounded text-xs font-bold">${osIcon('mail')} Email</a>` : ''}
+        <button onclick="pmEditTenant('${t.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded text-xs font-bold">${osIcon('pencil')} Editar</button>
       </div>
     </div>
 
@@ -3755,7 +3755,7 @@ function pmRenderTenantDetail() {
           ${field('Estado cliente', t.client_state)}
         </div>
         ${t.notes ? `<div class="mt-3 text-[11px] text-slate-500 whitespace-pre-wrap border-t border-slate-100 pt-2">${(t.notes||'').replace(/</g,'&lt;')}</div>` : ''}
-        ${t.ai_summary ? `<div class="mt-2 text-[11px] text-slate-500 bg-slate-50 rounded p-2"><span class="font-bold text-[#b8941f]">🤖 AI:</span> ${(t.ai_summary||'').replace(/</g,'&lt;')}</div>` : ''}
+        ${t.ai_summary ? `<div class="mt-2 text-[11px] text-slate-500 bg-slate-50 rounded p-2"><span class="font-bold text-[#b8941f]">${osIcon('bot')} AI:</span> ${(t.ai_summary||'').replace(/</g,'&lt;')}</div>` : ''}
       </div>
 
       <!-- Contrato activo -->
@@ -3775,7 +3775,7 @@ function pmRenderTenantDetail() {
             ${field('Depósito', activeB.deposit ? '$'+Number(activeB.deposit).toLocaleString() : '')}
           </div>
           ${days != null ? `<div class="mt-3 text-sm font-bold ${days<0?'text-red-600':days<=30?'text-amber-600':'text-emerald-700'}">${days<0?`Vencido hace ${-days} días`:`${days} días restantes`}</div>` : '<div class="mt-3 text-sm text-slate-500">Contrato indefinido</div>'}
-          <button onclick="pmMarkPayment('${activeB.id}')" class="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded">💵 Marcar pago</button>
+          <button onclick="pmMarkPayment('${activeB.id}')" class="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-2 rounded">${osIcon('banknote')} Marcar pago</button>
         ` : `<div class="text-sm text-slate-400 italic py-6 text-center">Sin contrato activo.</div>`}
       </div>
     </div>
@@ -3805,7 +3805,7 @@ function pmRenderTenantDetail() {
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             <span class="font-bold text-emerald-700">$${Number(p.amount||0).toLocaleString()}</span>
-            ${url ? `<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>` : ''}
+            ${url ? `<a href="${url}" target="_blank" class="text-blue-600 hover:underline">${osIcon('paperclip')}</a>` : ''}
           </div>
         </div>`;
       }).join('')}</div>` : `<div class="text-xs text-slate-400 italic py-4 text-center">Sin pagos registrados.</div>`}
@@ -3817,7 +3817,7 @@ function pmRenderTenantDetail() {
       <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Contratos anteriores (${pastBs.length})</div>
       <div class="space-y-1 mt-2">${pastBs.map(b => `
         <div class="flex items-center justify-between gap-2 text-[11px] border-b border-slate-50 py-1.5 cursor-pointer hover:bg-slate-50" onclick="pmEditBooking('${b.id}')">
-          <span class="text-slate-700 truncate">🏠 ${propOf(b)} · 🛏 ${unitOf(b)}</span>
+          <span class="text-slate-700 truncate">${osIcon('house')} ${propOf(b)} · ${unitOf(b)}</span>
           <span class="text-slate-500 whitespace-nowrap">${b.start_date||'?'} → ${b.end_date||'∞'} · <span class="text-[9px] uppercase bg-slate-100 px-1 rounded">${b.status}</span></span>
         </div>`).join('')}</div>
     </div>` : ''}
@@ -3829,7 +3829,7 @@ async function pmEditTenant(id) {
   const t = id ? pmaState.tenants.find(x => x.id === id) : {};
   const isNew = !id;
   const sources = ['directo','airbnb','booking','vrbo','hospitable','referido','walk-in','redes','otro'];
-  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Inquilino', `
+  openModal((isNew?'+ Nuevo':'Editar')+' Inquilino', `
     <div class="space-y-3">
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre completo *</label>
         <input id="pm-tf-name" value="${(t.full_name||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -3857,7 +3857,7 @@ async function pmEditTenant(id) {
         <textarea id="pm-tf-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(t.notes||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteTenant('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteTenant('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button onclick="pmSaveTenant('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>
@@ -3900,7 +3900,7 @@ async function pmMarkPayment(bookingId) {
   if (!b) return alert('Reserva no encontrada.');
   const t = pmaState.tenants.find(x => x.id === b.tenant_id);
   const today = new Date().toISOString().slice(0,10);
-  openModal('💵 Marcar pago — ' + (t?.full_name||'Inquilino'), `
+  openModal('Marcar pago — ' + (t?.full_name||'Inquilino'), `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto * $</label>
@@ -3954,7 +3954,7 @@ async function pmSaveMarkPayment(bookingId) {
     if (statusEl) statusEl.textContent = 'Subiendo comprobante…';
     const up = await pmUploadFile('payment-proofs', b.id, file);
     if (up.url) proof_url = up.url;
-    else if (statusEl) statusEl.textContent = '⚠️ Comprobante no subido: ' + up.error + ' (se registra el pago sin adjunto)';
+    else if (statusEl) statusEl.textContent = 'Comprobante no subido: ' + up.error + ' (se registra el pago sin adjunto)';
   }
 
   const payload = {
@@ -4005,7 +4005,7 @@ async function pmSaveMarkPayment(bookingId) {
       if (wb?.ok && wb.record_id && newId) {
         await sb.from('pm_payments').update({ external_id: 'pay-' + wb.record_id }).eq('id', newId);
       } else if (!wb?.ok && statusEl) {
-        statusEl.textContent = '⚠️ Pago guardado, pero no se sincronizó a Airtable: ' + (wb?.error || 'error');
+        statusEl.textContent = 'Pago guardado, pero no se sincronizó a Airtable: ' + (wb?.error || 'error');
       }
     }
   } catch (e) { /* best-effort: el pago local ya está */ }
@@ -4261,14 +4261,14 @@ function pmPaymentsTableHtml() {
             <td class="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">${p.month ? `${p.month} ${p.year||''}` : '<span class="text-amber-600" title="Sin tag Mes/Año en Airtable">sin mes</span>'}</td>
             <td class="px-3 py-2 whitespace-nowrap text-slate-500">${p.paid_at||'<span class="text-amber-600">—</span>'}</td>
             <td class="px-3 py-2 text-slate-800">${(p.tenant_id?pmTenantName(p.tenant_id):(p.concept||'—')).replace(/</g,'&lt;').slice(0,24)}</td>
-            <td class="px-3 py-2 ${orphan?'text-amber-700':'text-slate-600'}">${orphan ? `<span class="inline-flex items-center gap-1"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="Este pago no tiene casa asignada. ¿Vincular manualmente o archivar?">⚠️ Sin vincular</span>${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-[10px] text-blue-700 hover:underline font-bold">Vincular a casa…</button> <button onclick="pmArchivePaymentLegacy('${p.id}')" class="text-[10px] text-slate-500 hover:underline">Archivar</button>`}</span>` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
+            <td class="px-3 py-2 ${orphan?'text-amber-700':'text-slate-600'}">${orphan ? `<span class="inline-flex items-center gap-1"><span class="text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded" title="Este pago no tiene casa asignada. ¿Vincular manualmente o archivar?">${osIcon('alert')} Sin vincular</span>${p._src==='expense'?'':`<button onclick="pmEditPayment('${p.id}')" class="text-[10px] text-blue-700 hover:underline font-bold">Vincular a casa…</button> <button onclick="pmArchivePaymentLegacy('${p.id}')" class="text-[10px] text-slate-500 hover:underline">Archivar</button>`}</span>` : (prop?.name||'—').replace(/</g,'&lt;').slice(0,18)}</td>
             <td class="px-3 py-2 text-slate-600">${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-right font-bold ${st.debe > 0 ? 'text-red-700' : 'text-slate-500'}" title="Lo que debe (balance del período) · pagado: $${Number(p.amount||0).toLocaleString()}">$${Number(st.debe||0).toLocaleString()}</td>
             <td class="px-3 py-2 text-slate-600">${(p.platform||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-slate-600 whitespace-nowrap">${rec}</td>
             <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
-            <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
-            <td class="px-3 py-2 text-center whitespace-nowrap">${p._src==='expense'?'':`${bk?`<button onclick="pmMarkPayment('${bk.id}')" title="Marcar pago" class="text-amber-600 hover:text-amber-800 mr-1">💵</button>`:''}<button onclick="pmEditPayment('${p.id}')" title="Editar" class="text-slate-400 hover:text-slate-700">✏️</button>`}</td>
+            <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">${osIcon('paperclip')}</a>`:'<span class="text-slate-300">—</span>'}</td>
+            <td class="px-3 py-2 text-center whitespace-nowrap">${p._src==='expense'?'':`${bk?`<button onclick="pmMarkPayment('${bk.id}')" title="Marcar pago" class="text-amber-600 hover:text-amber-800 mr-1">${osIcon('banknote')}</button>`:''}<button onclick="pmEditPayment('${p.id}')" title="Editar" class="text-slate-400 hover:text-slate-700">${osIcon('pencil')}</button>`}</td>
           </tr>`;
         }).join('') : `<tr><td colspan="11" class="px-3 py-8 text-center text-slate-400 italic">Sin pagos con estos filtros.</td></tr>`}
       </tbody>
@@ -4279,6 +4279,41 @@ function pmPaymentsCountLabel() {
   const total = pmaState.payments.filter(p => p.type === 'ingreso').length;
   return pmPaymentsHasFilters() ? `Mostrando <strong>${shown}</strong> de ${total} pagos` : `${shown} pagos`;
 }
+// Exporta EXACTAMENTE la tabla visible del tab Pagos a CSV (para Excel):
+// mismas filas (pmPaymentsFiltered = filtros + orden activos) y mismas columnas/valores.
+function pmPagosExportCSV() {
+  const pays = pmPaymentsFiltered();
+  const rows = [['Mes renta','Cobrado','Inquilino','Casa','Unit','Monto','Plataforma','Recurrencia','Estatus','Comprobante']];
+  pays.forEach(p => {
+    const prop = pmaState.properties.find(x => x.id === p.property_id);
+    const unit = pmaState.units.find(x => x.id === p.unit_id);
+    const bk = pmPaymentBooking(p);
+    const st = pmPayStatus(p);
+    rows.push([
+      p.month ? `${p.month} ${p.year||''}`.trim() : 'sin mes',
+      p.paid_at || '—',
+      p.tenant_id ? pmTenantName(p.tenant_id) : (p.concept || '—'),
+      p.property_id ? (prop?.name || '—') : 'Sin vincular',
+      unit?.code || unit?.name || '—',
+      `$${Number(st.debe||0).toLocaleString()}`,
+      p.platform || '—',
+      bk ? pmRecurrenceOf(bk.payment_day).label : '—',
+      st.label,
+      p.proof_url || p.attachment_url || ''
+    ]);
+  });
+  // BOM UTF-8 para que Excel muestre bien los acentos
+  const csv = '\ufeff' + rows.map(r => r.map(c => /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g,'""')}"` : c).join(',')).join('\n');
+  const period = pmaState.payPeriod || 'month';
+  const ym = period === 'month' ? pmCurrentYM() : String(period);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `pagos_${ym.replace(/[^0-9A-Za-z_-]/g, '')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+window.pmPagosExportCSV = pmPagosExportCSV;
 function pmPaymentsSearchInput(value) {
   pmaState.paySearch = value;
   try { localStorage.setItem('pm_pagos_filter_search', value || ''); } catch (e) {}
@@ -4357,6 +4392,7 @@ function pmRenderPayments() {
       </div>
       <div class="flex items-center gap-2">
         ${pmPaymentsHasFilters() ? `<button onclick="pmPaymentsClearFilters()" class="text-[11px] text-[#b8941f] hover:underline font-bold">✕ Limpiar filtros</button>` : ''}
+        <button onclick="pmPagosExportCSV()" title="Descargar la tabla visible (filtros aplicados) como CSV para Excel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">⬇ Descargar</button>
         <button onclick="pmPickLeaseForPayment()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm" style="border:1px solid #d4af37">+ Registrar pago</button>
       </div>
     </div>
@@ -4364,7 +4400,7 @@ function pmRenderPayments() {
     <!-- Próximos cobros (7 días) -->
     ${proximosList.length ? `
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-        <div class="text-[11px] uppercase font-bold text-amber-700 tracking-wider mb-2">⏰ Próximos cobros (7 días) · ${proximosList.length}</div>
+        <div class="text-[11px] uppercase font-bold text-amber-700 tracking-wider mb-2">${osIcon('clock')} Próximos cobros (7 días) · ${proximosList.length}</div>
         <div class="flex gap-2 overflow-x-auto pb-1">
           ${proximosList.map(b => {
             const prop = pmaState.properties.find(x => x.id === b.property_id);
@@ -4374,11 +4410,11 @@ function pmRenderPayments() {
             const phone = (t?.phone||'').replace(/\D/g,'');
             return `<div class="bg-white border border-amber-200 rounded-lg p-2.5 min-w-[210px] flex-shrink-0">
               <div class="text-sm font-bold text-slate-800 truncate">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}</div>
-              <div class="text-[10px] text-slate-500 truncate">🏠 ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,20)} · 🛏 ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
-              <div class="text-[11px] text-slate-600 mt-1">📅 ${due.toISOString().slice(0,10)} · <strong class="text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</strong> · ${pmRecurrenceOf(b.payment_day).label}</div>
+              <div class="text-[10px] text-slate-500 truncate">${osIcon('house')} ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,20)} · ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
+              <div class="text-[11px] text-slate-600 mt-1">${osIcon('calendar')} ${due.toISOString().slice(0,10)} · <strong class="text-emerald-700">$${Number(b.rent_amount||0).toLocaleString()}</strong> · ${pmRecurrenceOf(b.payment_day).label}</div>
               <div class="flex gap-1.5 mt-1.5">
                 <button onclick="pmMarkPayment('${b.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold py-1 rounded">Marcar pagado</button>
-                ${phone ? `<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs">💬</a>` : ''}
+                ${phone ? `<a href="https://wa.me/${phone}" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs">${osIcon('message')}</a>` : ''}
               </div>
             </div>`;
           }).join('')}
@@ -4397,11 +4433,11 @@ function pmRenderPayments() {
 
     <!-- Filtros (dropdowns) -->
     <div class="pm-filters-bar">
-      ${pmFilterSelect('Mes', '📅', periodF==='month'?pmCurrentYM():periodF, pmMonthOptions(), "pmPaymentsSetFilter('period', this.value)")}
-      ${pmFilterSelect('Estatus', '⚡', statF==='all'?'':statF, [['','Todos'],['aldia','Al día'],['pendiente','Pendiente del mes'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['revisar','Revisar'],['sincontrato','Sin contrato']], "pmPaymentsSetFilter('status', this.value||'all')")}
-      ${pmFilterSelect('Casa', '🏠', propFilter, [['','Todas'], ...propsWithPay.map(p=>[p.id, p.name||''])], "pmPaymentsSetFilter('property', this.value||null)")}
-      ${pmFilterSelect('Recurrencia', '🔁', recF, [['','Todas'],['mensual','🗓 Mensual'],['quincenal','⏱ Quincenal'],['airbnb','🏖 Airbnb']], "pmPaymentsSetFilter('recurrence', this.value||null)")}
-      ${pmFilterSelect('Plataforma', '💳', pmaState.payFilterPlatform, [['','Todas'], ...platforms.map(pl=>[pl, pl])], "pmPaymentsSetFilter('platform', this.value||null)")}
+      ${pmFilterSelect('Mes', osIcon('calendar'), periodF==='month'?pmCurrentYM():periodF, pmMonthOptions(), "pmPaymentsSetFilter('period', this.value)")}
+      ${pmFilterSelect('Estatus', osIcon('zap'), statF==='all'?'':statF, [['','Todos'],['aldia','Al día'],['pendiente','Pendiente del mes'],['proximo','Próximos 7d'],['atrasado','Atrasados'],['revisar','Revisar'],['sincontrato','Sin contrato']], "pmPaymentsSetFilter('status', this.value||'all')")}
+      ${pmFilterSelect('Casa', osIcon('house'), propFilter, [['','Todas'], ...propsWithPay.map(p=>[p.id, p.name||''])], "pmPaymentsSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Recurrencia', osIcon('refresh'), recF, [['','Todas'],['mensual','Mensual'],['quincenal','Quincenal'],['airbnb','Airbnb']], "pmPaymentsSetFilter('recurrence', this.value||null)")}
+      ${pmFilterSelect('Plataforma', osIcon('credit-card'), pmaState.payFilterPlatform, [['','Todas'], ...platforms.map(pl=>[pl, pl])], "pmPaymentsSetFilter('platform', this.value||null)")}
       ${pmPaymentsHasFilters()?`<button class="pm-clear-filters" onclick="pmPaymentsClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
@@ -4415,7 +4451,7 @@ window.pmSetPayMonth = pmSetPayMonth;
 // Picker de lease para "Registrar pago" → reusa el modal de pmMarkPayment
 function pmPickLeaseForPayment() {
   const act = pmActiveBookings().slice().sort((a,b) => pmTenantName(a.tenant_id).localeCompare(pmTenantName(b.tenant_id)));
-  openModal('💵 Registrar pago — elegí el lease', `
+  openModal('Registrar pago — elegí el lease', `
     <div class="space-y-1 max-h-[60vh] overflow-y-auto">
       ${act.length ? act.map(b => {
         const prop = pmaState.properties.find(x => x.id === b.property_id);
@@ -4423,7 +4459,7 @@ function pmPickLeaseForPayment() {
         return `<button onclick="closeModal();setTimeout(()=>pmMarkPayment('${b.id}'),60)" class="w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded hover:bg-slate-50 border border-slate-100">
           <div class="min-w-0">
             <div class="text-sm font-bold text-slate-800 truncate">${pmTenantName(b.tenant_id).replace(/</g,'&lt;')}</div>
-            <div class="text-[11px] text-slate-500 truncate">🏠 ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,24)} · 🛏 ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
+            <div class="text-[11px] text-slate-500 truncate">${osIcon('house')} ${(prop?.name||'—').replace(/</g,'&lt;').slice(0,24)} · ${(unit?.code||unit?.name||'—').replace(/</g,'&lt;')}</div>
           </div>
           <span class="text-sm font-bold text-emerald-700 whitespace-nowrap">$${Number(b.rent_amount||0).toLocaleString()}</span>
         </button>`;
@@ -4439,7 +4475,7 @@ const PM_TEAM = ['Nicolás Lara','Daniel Lara','Lucas Lara','Juan Felipe','Nicol
 
 function pmRenderExpenses() {
   const sub = pmaState.expSubTab || 'house';
-  const tabs = [['house','🏠 Por Casa'],['operational','🏢 Operativos'],['payroll','👔 Nómina']];
+  const tabs = [['house','Por Casa'],['operational','Operativos'],['payroll','Nómina']];
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
@@ -4455,7 +4491,7 @@ function pmRenderExpenses() {
 // Gráfico de torta SVG por categoría
 function pmPieChart(entries, size = 150) {
   const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
-  const colors = ['#d4af37','#10b981','#3b82f6','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#64748b','#a855f7','#14b8a6'];
+  const colors = ['#d4af37','#059669','#3a5be0','#f43f5e','#8b5cf6','#0ea5e9','#f59e0b','#6f7785','#a855f7','#14b8a6'];
   let acc = 0; const cx = size/2, cy = size/2, r = size/2 - 2;
   const arcs = entries.map(([cat, val], i) => {
     const a0 = acc/total*2*Math.PI - Math.PI/2; acc += val; const a1 = acc/total*2*Math.PI - Math.PI/2;
@@ -4563,7 +4599,7 @@ function pmRenderHouseExpenses() {
     </div>
 
     ${sinMes.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800">
-      ⚠️ <strong>${sinMes.length}</strong> gasto${sinMes.length>1?'s':''} sin mes (ni tag Mes/Año ni Fecha) · ${pmMoney(sinMesMonto)} — no entran a ningún período · <strong>completar en Airtable</strong>: ${sinMes.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,26)).join(' · ')}${sinMes.length>4?' · …':''}
+      ${osIcon('alert')} <strong>${sinMes.length}</strong> gasto${sinMes.length>1?'s':''} sin mes (ni tag Mes/Año ni Fecha) · ${pmMoney(sinMesMonto)} — no entran a ningún período · <strong>completar en Airtable</strong>: ${sinMes.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,26)).join(' · ')}${sinMes.length>4?' · …':''}
     </div>` : ''}
 
     <div class="grid lg:grid-cols-3 gap-3">
@@ -4593,10 +4629,10 @@ function pmRenderHouseExpenses() {
 
     <!-- Filtros (dropdowns) -->
     <div class="pm-filters-bar">
-      ${pmFilterSelect('Mes', '📅', ym, pmMonthOptions(false), "pmSetExpMonth(this.value)")}
-      ${pmFilterSelect('Casa', '🏠', propFilter, [['','Todas'], ...pmaState.properties.filter(p=>houseExp.some(e=>e.property_id===p.id)).map(p=>[p.id, p.name||''])], "pmExpensesSetFilter('property', this.value||null)")}
-      ${pmFilterSelect('Categoría', '📂', subcatFilter, [['','Todas'], ...subcats.map(s=>[s, s])], "pmExpensesSetFilter('subcat', this.value||null)")}
-      ${pmFilterSelect('Estatus', '⚡', statusFilter==='all'?'':statusFilter, [['','Todos'],['paid','Pagado'],['pending','Pendiente']], "pmExpensesSetFilter('status', this.value||'all')")}
+      ${pmFilterSelect('Mes', osIcon('calendar'), ym, pmMonthOptions(false), "pmSetExpMonth(this.value)")}
+      ${pmFilterSelect('Casa', osIcon('house'), propFilter, [['','Todas'], ...pmaState.properties.filter(p=>houseExp.some(e=>e.property_id===p.id)).map(p=>[p.id, p.name||''])], "pmExpensesSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Categoría', osIcon('folder-open'), subcatFilter, [['','Todas'], ...subcats.map(s=>[s, s])], "pmExpensesSetFilter('subcat', this.value||null)")}
+      ${pmFilterSelect('Estatus', osIcon('zap'), statusFilter==='all'?'':statusFilter, [['','Todos'],['paid','Pagado'],['pending','Pendiente']], "pmExpensesSetFilter('status', this.value||'all')")}
       ${hasF?`<button class="pm-clear-filters" onclick="pmExpensesClearFilters()">✕ Limpiar</button>`:''}
     </div>
 
@@ -4664,7 +4700,7 @@ function pmRenderOperationalExpenses() {
 
     <div class="bg-white border border-slate-200 rounded-lg p-2 flex flex-wrap items-center gap-2">
       <select onchange="pmaState.expFilterSubcat=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1.5 text-xs">
-        <option value="">📂 Todas las categorías</option>
+        <option value="">${osIcon('folder-open')} Todas las categorías</option>
         ${subcats.map(s => `<option value="${s}" ${subcatFilter===s?'selected':''}>${(s||'').replace(/</g,'&lt;')}</option>`).join('')}
       </select>
     </div>
@@ -4685,7 +4721,7 @@ function pmLineChart(series) {
   return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:160px">
     <path d="${area}" fill="rgba(212,175,55,.08)"/>
     <path d="${path}" fill="none" stroke="#d4af37" stroke-width="2"/>${dots}
-    ${series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#94a3b8" text-anchor="middle">${s.label}</text>`).join('')}
+    ${series.map((s,i)=>`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="9" fill="#8b93a1" text-anchor="middle">${s.label}</text>`).join('')}
   </svg>`;
 }
 
@@ -4754,13 +4790,13 @@ function pmExpenseTable(rows, withHouse, flagOrphans) {
             return `<tr class="border-t border-slate-100 ${orphan?'bg-red-50':'hover:bg-slate-50'}">
               <td class="px-3 py-2 whitespace-nowrap font-semibold text-slate-800">${mesTag || (ymE ? `${pmYmLabel(ymE)} <span class="text-[10px] text-slate-400 font-normal" title="Sin tag Mes/Año: período tomado de la fecha">· fecha</span>` : '<span class="text-amber-600" title="Sin Mes/Año ni Fecha en Airtable">sin mes</span>')}</td>
               <td class="px-3 py-2 whitespace-nowrap text-slate-500">${e.expense_date||'—'}</td>
-              ${withHouse?`<td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan?`⚠️ Sin casa${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir'}`:(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
+              ${withHouse?`<td class="px-3 py-2 ${orphan?'text-red-700 font-bold':'text-slate-600'}">${orphan?`Sin casa${atLink?` · <a href="${atLink}" target="_blank" class="underline">Abrir en Airtable</a>`:' — corregir'}`:(e.property_id?pmPropertyName(e.property_id):'—').replace(/</g,'&lt;').slice(0,18)}</td>`:''}
               <td class="px-3 py-2 text-slate-700">${(e.subcategory||e.category||'—').replace(/</g,'&lt;')}</td>
               <td class="px-3 py-2 text-right font-bold text-red-600">$${Number(e.amount||0).toLocaleString()}</td>
-              <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'<span class="text-slate-300">—</span>'}</td>
-              <td class="px-3 py-2 text-center"><button onclick="pmToggleExpensePaid('${e.id}',${!e.paid})" title="${e.paid?'Pagado':'Pendiente'}">${e.paid?'✅':'⏳'}</button></td>
+              <td class="px-3 py-2 text-center">${url?`<a href="${url}" target="_blank" class="text-blue-600 hover:underline">${osIcon('paperclip')}</a>`:'<span class="text-slate-300">—</span>'}</td>
+              <td class="px-3 py-2 text-center"><button onclick="pmToggleExpensePaid('${e.id}',${!e.paid})" title="${e.paid?'Pagado':'Pendiente'}">${e.paid?osIcon('check-circle'):osIcon('loader')}</button></td>
               <td class="px-3 py-2 text-slate-500 max-w-[160px] truncate" title="${String(note).replace(/"/g,'&quot;')}">${String(note).replace(/</g,'&lt;').slice(0,40)}</td>
-              <td class="px-3 py-2 text-center"><button onclick="pmEditExpense('${e.id}')" class="text-slate-400 hover:text-slate-700">✏️</button></td>
+              <td class="px-3 py-2 text-center"><button onclick="pmEditExpense('${e.id}')" class="text-slate-400 hover:text-slate-700">${osIcon('pencil')}</button></td>
             </tr>`;
           }).join('') : `<tr><td colspan="${withHouse?8:7}" class="px-3 py-8 text-center text-slate-400 italic">Sin gastos en este período.</td></tr>`}
         </tbody>
@@ -4823,11 +4859,11 @@ function pmRenderPayrollTab() {
           const paid = !!row?.paid;
           const initial = name.trim().charAt(0).toUpperCase();
           return `<div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style="background:#1e293b;border:2px solid #d4af37">${initial}</div>
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0" style="background:#1e2430;border:2px solid #d4af37">${initial}</div>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-bold text-slate-900 truncate">${name.replace(/</g,'&lt;')}</div>
               <div class="text-[11px] text-slate-500">${salary?pmMoney(salary)+'/mes':'sin salario'}</div>
-              <div class="text-[11px] font-bold ${paid?'text-emerald-600':'text-amber-600'}">${paid?'✅ Pagado':'⏳ Pendiente'}</div>
+              <div class="text-[11px] font-bold ${paid?'text-emerald-600':'text-amber-600'}">${paid?'Pagado':'Pendiente'}</div>
             </div>
             ${!paid ? `<button onclick="pmPayrollMarkPaid('${ym}','${name.replace(/'/g,"\\'")}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-2 py-1 rounded whitespace-nowrap">Marcar pagado</button>`
                     : `<button onclick="pmPayrollMarkPaid('${ym}','${name.replace(/'/g,"\\'")}',false)" class="text-[11px] text-slate-400 hover:text-slate-600 whitespace-nowrap">Revertir</button>`}
@@ -4855,9 +4891,9 @@ function pmRenderPayrollTab() {
           ${sorted.length ? sorted.map(p => `<tr class="border-t border-slate-100 hover:bg-slate-50">
             <td class="px-3 py-2 text-slate-800 font-semibold">${(p.employee_name||'—').replace(/</g,'&lt;')}</td>
             <td class="px-3 py-2 text-right font-bold text-slate-700">$${Number(p.salary||0).toLocaleString()}</td>
-            <td class="px-3 py-2 text-center">${p.paid?'<span class="text-emerald-600 font-bold">✅ Pagado</span>':'<span class="text-amber-600 font-bold">⏳ Pendiente</span>'}</td>
-            <td class="px-3 py-2 text-center">${p.invoice_url?`<a href="${p.invoice_url}" target="_blank" class="text-blue-600 hover:underline">📎</a>`:'—'}</td>
-            <td class="px-3 py-2 text-center"><button onclick="pmPayrollMarkPaid('${ym}','${(p.employee_name||'').replace(/'/g,"\\'")}',${!p.paid})" class="text-slate-400 hover:text-slate-700">${p.paid?'↩️':'✅'}</button></td>
+            <td class="px-3 py-2 text-center">${p.paid?'<span class="text-emerald-600 font-bold">' + osIcon('check-circle') + ' Pagado</span>':'<span class="text-amber-600 font-bold">' + osIcon('loader') + ' Pendiente</span>'}</td>
+            <td class="px-3 py-2 text-center">${p.invoice_url?`<a href="${p.invoice_url}" target="_blank" class="text-blue-600 hover:underline">${osIcon('paperclip')}</a>`:'—'}</td>
+            <td class="px-3 py-2 text-center"><button onclick="pmPayrollMarkPaid('${ym}','${(p.employee_name||'').replace(/'/g,"\\'")}',${!p.paid})" class="text-slate-400 hover:text-slate-700">${p.paid?'↩️':osIcon('check-circle')}</button></td>
           </tr>`).join('') : '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400 italic">Sin nómina generada para este mes. Usá «Generar nómina del mes».</td></tr>'}
         </tbody>
       </table>
@@ -4913,12 +4949,12 @@ async function pmEditExpense(id, defaultCat) {
   const isNew = !id;
   const cat = e.category || 'house';
   const allSub = [...new Set(pmaState.expenses.map(x => x.subcategory).filter(Boolean))].sort();
-  openModal((isNew?'+ Registrar':'✏️ Editar')+' Gasto', `
+  openModal((isNew?'+ Registrar':'Editar')+' Gasto', `
     <div class="space-y-3">
       <div>
         <label class="text-[10px] font-bold uppercase text-slate-600">Categoría *</label>
         <div class="flex gap-2 mt-1" id="pm-ef-catwrap">
-          ${[['house','🏠 Por casa'],['cleaning','🧹 Limpieza'],['operational','🏢 Operativo']].map(([v,l]) => `
+          ${[['house','Por casa'],['cleaning','Limpieza'],['operational','Operativo']].map(([v,l]) => `
             <label class="flex items-center gap-1 text-xs cursor-pointer border border-slate-300 rounded px-2 py-1.5 ${cat===v?'bg-slate-900 text-white':''}">
               <input type="radio" name="pm-ef-cat" value="${v}" ${cat===v?'checked':''} onchange="pmEfToggleCat()" class="hidden"/>${l}
             </label>`).join('')}
@@ -4945,13 +4981,13 @@ async function pmEditExpense(id, defaultCat) {
       </div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Factura (imagen/PDF)</label>
         <input id="pm-ef-file" type="file" accept="image/*,application/pdf" class="w-full border border-slate-300 rounded px-2 py-1.5 text-xs"/>
-        ${e.invoice_url?`<a href="${e.invoice_url}" target="_blank" class="text-[11px] text-blue-600 hover:underline">📎 Factura actual</a>`:''}</div>
+        ${e.invoice_url?`<a href="${e.invoice_url}" target="_blank" class="text-[11px] text-blue-600 hover:underline">${osIcon('paperclip')} Factura actual</a>`:''}</div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Descripción / notas</label>
         <textarea id="pm-ef-desc" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(e.description||e.notes||'').replace(/</g,'&lt;')}</textarea></div>
       <div id="pm-ef-status" class="text-[11px] text-slate-500"></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteExpense('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteExpense('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button id="pm-ef-save" onclick="pmSaveExpense('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Registrar':'Guardar'}</button>
       </div>
     </div>
@@ -4988,7 +5024,7 @@ async function pmSaveExpense(id) {
     if (statusEl) statusEl.textContent = 'Subiendo factura…';
     const up = await pmUploadFile('invoices', property_id || cat, file);
     if (up.url) invoice_url = up.url;
-    else if (statusEl) statusEl.textContent = '⚠️ Factura no subida: ' + up.error + ' (se guarda sin adjunto)';
+    else if (statusEl) statusEl.textContent = 'Factura no subida: ' + up.error + ' (se guarda sin adjunto)';
   }
 
   const ymd = expense_date;
@@ -5125,14 +5161,14 @@ function pmFinAgg(r) {
     const model = prop?.rental_model || 'sin_modelo';
     incomeByModel[model] = (incomeByModel[model]||0) + Number(p.amount||0);
   });
-  expenseByCategory['🏦 Hipoteca'] = hipoteca;
-  expenseByCategory['💡 Servicios/Casa'] = house;
-  expenseByCategory['🧹 Aseo & Podada'] = cleaning;
-  expenseByCategory['⚙️ Operativos/Plataforma'] = operational;
-  expenseByCategory['🔧 Mantenimiento'] = maintenance;
-  expenseByCategory['👥 Nómina'] = payroll;
-  expenseByCategory['🏢 Gastos de empresa'] = empresa;
-  expenseByCategory['📦 Otros'] = otros;
+  expenseByCategory['Hipoteca'] = hipoteca;
+  expenseByCategory['Servicios/Casa'] = house;
+  expenseByCategory['Aseo & Podada'] = cleaning;
+  expenseByCategory['Operativos/Plataforma'] = operational;
+  expenseByCategory['Mantenimiento'] = maintenance;
+  expenseByCategory['Nómina'] = payroll;
+  expenseByCategory['Gastos de empresa'] = empresa;
+  expenseByCategory['Otros'] = otros;
 
   const activeProps = scopeProps;   // ya filtrado por casa/modelo
   const payrollPerProp = activeProps.length ? payroll / activeProps.length : 0;
@@ -5184,7 +5220,7 @@ function pmMultiLineChart(labels, series) {
   const path = vals => vals.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="height:210px">
     ${series.map(s=>`<path d="${path(s.values)}" fill="none" stroke="${s.color}" stroke-width="2"/>`).join('')}
-    ${labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#94a3b8" text-anchor="middle">${l}</text>`).join('')}
+    ${labels.map((l,i)=>`<text x="${x(i).toFixed(1)}" y="${H-7}" font-size="9" fill="#8b93a1" text-anchor="middle">${l}</text>`).join('')}
   </svg>
   <div class="flex gap-3 justify-center text-[11px] mt-1">${series.map(s=>`<span style="color:${s.color}" class="font-bold">● ${s.label}</span>`).join('')}</div>`;
 }
@@ -5330,7 +5366,7 @@ function pmRenderFinance() {
   <div class="space-y-4 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
 
     ${gSinPeriodo.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[11px] text-amber-800">
-      ⚠️ <strong>${gSinPeriodo.length}</strong> gasto${gSinPeriodo.length>1?'s':''} sin fecha ni Mes/Año (${pmMoney(gSinPeriodoMonto)}) — no entran a ningún período · <strong>revisar en Airtable</strong>: ${gSinPeriodo.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,28)).join(' · ')}${gSinPeriodo.length>4?' · …':''}
+      ${osIcon('alert')} <strong>${gSinPeriodo.length}</strong> gasto${gSinPeriodo.length>1?'s':''} sin fecha ni Mes/Año (${pmMoney(gSinPeriodoMonto)}) — no entran a ningún período · <strong>revisar en Airtable</strong>: ${gSinPeriodo.slice(0,4).map(e => (e.description||'—').replace(/</g,'&lt;').slice(0,28)).join(' · ')}${gSinPeriodo.length>4?' · …':''}
     </div>` : ''}
 
     <!-- Header + período -->
@@ -5344,9 +5380,9 @@ function pmRenderFinance() {
       </div>
     </div>
 
-    <!-- 📄 Reportes PDF (chromium headless) -->
+    <!-- Reportes PDF (chromium headless) -->
     <div class="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-xl p-2">
-      <span class="text-[11px] font-bold text-slate-500 px-1">📄 Reportes PDF</span>
+      <span class="text-[11px] font-bold text-slate-500 px-1">${osIcon('file')} Reportes PDF</span>
       <button onclick="pmOpenReport('weekly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded">Generar semanal (operación)</button>
       <button onclick="pmSendReport('weekly')" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded" title="Compartir por correo o WhatsApp (mailto/wa.me)">Compartir ›</button>
       <span class="text-slate-300">·</span>
@@ -5356,10 +5392,10 @@ function pmRenderFinance() {
 
     <!-- Filtros del dashboard (dropdowns) -->
     <div class="pm-filters-bar">
-      ${pmFilterSelect('Período', '📅', pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
-      ${pmFilterSelect('Casa', '🏠', pmaState.finFilterProperty, [['','Todas'], ...pmaState.properties.filter(p=>p.active!==false).map(p=>[p.id, p.name||''])], "pmFinSetFilter('property', this.value||null)")}
-      ${pmFilterSelect('Plataforma', '💳', pmaState.finFilterPlatform, [['','Todas'], ...Object.entries(PM_PLATFORM_LABEL).map(([k,l])=>[k,l])], "pmFinSetFilter('platform', this.value||null)")}
-      ${pmFilterSelect('Modelo', '🏗', pmaState.finFilterModel, [['','Todos'],['casa_completa','Casa Completa'],['por_habitaciones','Por Habitaciones'],['mixta','Mixta'],['por_unidades','Por Unidades']], "pmFinSetFilter('model', this.value||null)")}
+      ${pmFilterSelect('Período', osIcon('calendar'), pmaState.finMonthSel||pmCurrentYM(), [...pmMonthOptions(), ['custom','Custom (rango)']], "pmFinSetMonth(this.value)")}
+      ${pmFilterSelect('Casa', osIcon('house'), pmaState.finFilterProperty, [['','Todas'], ...pmaState.properties.filter(p=>p.active!==false).map(p=>[p.id, p.name||''])], "pmFinSetFilter('property', this.value||null)")}
+      ${pmFilterSelect('Plataforma', osIcon('credit-card'), pmaState.finFilterPlatform, [['','Todas'], ...Object.entries(PM_PLATFORM_LABEL).map(([k,l])=>[k,l])], "pmFinSetFilter('platform', this.value||null)")}
+      ${pmFilterSelect('Modelo', osIcon('construction'), pmaState.finFilterModel, [['','Todos'],['casa_completa','Casa Completa'],['por_habitaciones','Por Habitaciones'],['mixta','Mixta'],['por_unidades','Por Unidades']], "pmFinSetFilter('model', this.value||null)")}
       ${pmFinHasFilters()?`<button class="pm-clear-filters" onclick="pmFinClearFilters()">✕ Limpiar</button>`:''}
       ${(pmaState.finMonthSel==='custom'||period==='custom')?`<div class="pm-filter-dropdown"><label>Rango</label><div class="flex items-center gap-1">
         <input type="date" value="${pmaState.finCustomFrom||''}" onchange="pmaState.finCustomFrom=this.value;pmRender()" class="border border-slate-300 rounded px-1.5 py-1 text-xs"/>
@@ -5392,7 +5428,7 @@ function pmRenderFinance() {
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
         <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Casas por ingresos (todas)</div>
-        ${pmBarChart([...agg.props].sort((a,b)=>b.income-a.income).slice(0,18).map(x=>[x.property.name, x.income]), '#10b981')}
+        ${pmBarChart([...agg.props].sort((a,b)=>b.income-a.income).slice(0,18).map(x=>[x.property.name, x.income]), '#059669')}
       </div>
     </div>
 
@@ -5418,7 +5454,7 @@ function pmRenderFinance() {
     <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div class="text-sm font-bold text-slate-800 mb-1">Tendencia 12 meses · Ingresos / Gastos / NOI</div>
       ${pmMultiLineChart(trend.map(t=>t.label), [
-        { label:'Ingresos', color:'#10b981', values: trend.map(t=>t.income) },
+        { label:'Ingresos', color:'#059669', values: trend.map(t=>t.income) },
         { label:'Gastos', color:'#ef4444', values: trend.map(t=>t.gastos) },
         { label:'Cash flow neto', color:'#8b5cf6', values: trend.map(t=>t.net) }
       ])}
@@ -5427,7 +5463,7 @@ function pmRenderFinance() {
 
     <!-- B · P&L por casa -->
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      <div class="px-4 py-2 flex items-center justify-between" style="background:#1e293b">
+      <div class="px-4 py-2 flex items-center justify-between" style="background:#1e2430">
         <span class="text-xs font-bold uppercase tracking-wider text-white">P&L por casa</span>
         <span class="text-[10px] font-bold" style="color:#d4af37">nómina prorrateada entre ${agg.activePropsCount} casas</span>
       </div>
@@ -5481,15 +5517,15 @@ function pmRenderFinance() {
     <!-- SECCIÓN 6 · Rankings -->
     <div class="grid lg:grid-cols-3 gap-3">
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-[11px] uppercase font-bold text-emerald-700 tracking-wider mb-2">🏆 Top 5 más rentables</div>
+        <div class="text-[11px] uppercase font-bold text-emerald-700 tracking-wider mb-2">${osIcon('trophy')} Top 5 más rentables</div>
         ${[...agg.props].filter(x=>x.income>0).sort((a,b)=>b.noi-a.noi).slice(0,5).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold ${x.noi>=0?'text-emerald-700':'text-red-600'}">${pmMoney(x.noi)} · ${Math.round(x.margin*100)}%</span></div>`).join('')||'<div class="text-xs text-slate-400 italic">Sin datos.</div>'}
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-[11px] uppercase font-bold text-red-600 tracking-wider mb-2">⚠️ Bottom 5 menos rentables</div>
+        <div class="text-[11px] uppercase font-bold text-red-600 tracking-wider mb-2">${osIcon('alert')} Bottom 5 menos rentables</div>
         ${[...agg.props].filter(x=>x.income>0).sort((a,b)=>a.noi-b.noi).slice(0,5).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold ${x.noi>=0?'text-amber-600':'text-red-600'}">${pmMoney(x.noi)} · ${Math.round(x.margin*100)}%</span></div>`).join('')||'<div class="text-xs text-slate-400 italic">Sin datos.</div>'}
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-[11px] uppercase font-bold text-amber-600 tracking-wider mb-2">🔥 Casas en alerta</div>
+        <div class="text-[11px] uppercase font-bold text-amber-600 tracking-wider mb-2">${osIcon('flame')} Casas en alerta</div>
         ${(() => { const al = agg.props.filter(x => (x.income>0 && x.margin<0.20) || (pmOccupiedRentableUnitsOf(x.property.id)/Math.max(1,pmRentableUnitsOf(x.property.id)) < 0.7)); return al.length ? al.slice(0,8).map(x=>`<div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-50"><span class="text-slate-700 truncate">${(x.property.name||'').replace(/</g,'&lt;').slice(0,22)}</span><span class="font-bold text-red-600">${x.income>0?Math.round(x.margin*100)+'%':'sin ingr.'}</span></div>`).join('') : '<div class="text-xs text-emerald-600">✓ Ninguna en alerta.</div>'; })()}
       </div>
     </div>
@@ -5530,10 +5566,10 @@ function pmRenderFinance() {
     <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <div class="text-[11px] uppercase font-bold text-slate-700 tracking-wider mb-2" style="border-bottom:2px solid #d4af37;display:inline-block;padding-bottom:2px">Reportes exportables</div>
       <div class="flex flex-wrap gap-2">
-        <button onclick="pmFinReport('monthly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg" style="border:1px solid #d4af37">📄 Reporte mensual (PDF)</button>
-        <button onclick="pmFinReport('investor')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">📊 Reporte por inversionista (PDF)</button>
-        <button onclick="pmFinReport('fiscal')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">💼 Reporte fiscal anual (PDF)</button>
-        <button onclick="pmFinExportCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">📈 Tendencias 12 meses (CSV)</button>
+        <button onclick="pmFinReport('monthly')" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg" style="border:1px solid #d4af37">${osIcon('file')} Reporte mensual (PDF)</button>
+        <button onclick="pmFinReport('investor')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">${osIcon('chart')} Reporte por inversionista (PDF)</button>
+        <button onclick="pmFinReport('fiscal')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">${osIcon('briefcase')} Reporte fiscal anual (PDF)</button>
+        <button onclick="pmFinExportCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg">${osIcon('trending-up')} Tendencias 12 meses (CSV)</button>
       </div>
     </div>
   </div>`;
@@ -5545,19 +5581,19 @@ function pmOpenPrintReport(title, bodyHtml) {
   if (!w) return alert('Habilitá pop-ups para generar el reporte.');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
     <style>
-      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e293b;margin:32px;font-size:12px}
+      *{box-sizing:border-box} body{font-family:Inter,Arial,sans-serif;color:#1e2430;margin:32px;font-size:12px}
       h1{font-size:20px;margin:0 0 4px} h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #d4af37;padding-bottom:3px;margin:22px 0 10px}
-      .sub{color:#64748b;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
-      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #e2e8f0} th{background:#f1f5f9;text-transform:uppercase;font-size:10px;color:#64748b}
+      .sub{color:#6f7785;margin-bottom:18px} table{width:100%;border-collapse:collapse;margin:6px 0}
+      th,td{padding:6px 8px;text-align:right;border-bottom:1px solid #dfe4ec} th{background:#eef1f6;text-transform:uppercase;font-size:10px;color:#6f7785}
       th:first-child,td:first-child{text-align:left} .kpis{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0}
-      .kpi{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#94a3b8;font-weight:bold}
+      .kpi{border:1px solid #dfe4ec;border-radius:8px;padding:10px 14px;min-width:130px} .kpi .l{font-size:9px;text-transform:uppercase;color:#8b93a1;font-weight:bold}
       .kpi .v{font-size:18px;font-weight:800;margin-top:2px} .pos{color:#047857} .neg{color:#dc2626}
-      .foot{margin-top:30px;color:#94a3b8;font-size:10px;border-top:1px solid #e2e8f0;padding-top:8px}
+      .foot{margin-top:30px;color:#8b93a1;font-size:10px;border-top:1px solid #dfe4ec;padding-top:8px}
       @media print{body{margin:14px}button{display:none}}
     </style></head><body>
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div><h1>Rental Profits</h1><div class="sub">${title}</div></div>
-      <button onclick="window.print()" style="background:#1e293b;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer">🖨️ Imprimir / PDF</button>
+      <button onclick="window.print()" style="background:#1e2430;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:8px 14px;font-weight:bold;cursor:pointer">${osIcon('printer')} Imprimir / PDF</button>
     </div>
     ${bodyHtml}
     <div class="foot">Generado por Empresa OS · Property Management — ${new Date().toLocaleString()}</div>
@@ -5571,7 +5607,7 @@ function pmFinReport(kind) {
   const agg = pmFinAgg(r);
   const kpiRow = `<div class="kpis">
     <div class="kpi"><div class="l">Ingresos</div><div class="v pos">${pmMoney(agg.income)}</div></div>
-    <div class="kpi"><div class="l">🏦 Hipoteca</div><div class="v neg">${pmMoney(agg.hipoteca)}</div></div>
+    <div class="kpi"><div class="l">${osIcon('landmark')} Hipoteca</div><div class="v neg">${pmMoney(agg.hipoteca)}</div></div>
     <div class="kpi"><div class="l">Servicios/Casa</div><div class="v neg">${pmMoney(agg.house)}</div></div>
     <div class="kpi"><div class="l">Aseo</div><div class="v neg">${pmMoney(agg.cleaning)}</div></div>
     <div class="kpi"><div class="l">Nómina</div><div class="v neg">${pmMoney(agg.payroll)}</div></div>
@@ -5587,7 +5623,7 @@ function pmFinReport(kind) {
   if (kind === 'investor') {
     const body = `<h2>Reporte por inversionista · ${r.label}</h2>${kpiRow}
       <h2>Rendimiento por propiedad</h2>${pnlTable(sorted)}
-      <p style="margin-top:14px;color:#64748b">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
+      <p style="margin-top:14px;color:#6f7785">Margen promedio del portafolio: <strong>${agg.income>0?Math.round(agg.net/agg.income*100):0}%</strong> · ${agg.activePropsCount} propiedades activas.</p>`;
     return pmOpenPrintReport('Reporte por inversionista', body);
   }
   if (kind === 'fiscal') {
@@ -5606,7 +5642,7 @@ function pmFinReport(kind) {
       <table><thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Neto</th></tr></thead>
       <tbody>${months.map(m=>`<tr><td>${m.label}</td><td>${pmMoney(m.income)}</td><td>${pmMoney(m.gastos)}</td><td class="${m.net>=0?'pos':'neg'}">${pmMoney(m.net)}</td></tr>`).join('')}</tbody></table>
       <h2>P&L por propiedad ${year}</h2>${pnlTable([...a.props].sort((x,y)=>y.net-x.net))}
-      <p style="margin-top:10px;color:#94a3b8">Para Excel: usá el botón «Tendencias 12 meses (CSV)» y abrilo en tu hoja de cálculo.</p>`;
+      <p style="margin-top:10px;color:#8b93a1">Para Excel: usá el botón «Tendencias 12 meses (CSV)» y abrilo en tu hoja de cálculo.</p>`;
     return pmOpenPrintReport(`Reporte fiscal ${year}`, body);
   }
   // monthly (default)
@@ -5636,14 +5672,14 @@ window.pmFinExportCSV = pmFinExportCSV;
 async function pmEditProperty(id) {
   const p = id ? pmaState.properties.find(x => x.id === id) : {};
   const isNew = !id;
-  openModal((isNew?'+ Nueva':'✏️ Editar')+' Propiedad', `
+  openModal((isNew?'+ Nueva':'Editar')+' Propiedad', `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre *</label>
           <input id="pm-pf-name" value="${(p.name||'').replace(/"/g,'&quot;')}" placeholder="Ej. 4916 Barkbridge Trail" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Modelo de renta</label>
           <select id="pm-pf-model" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            ${[['casa_completa','🏡 Casa completa'],['por_habitaciones','🛏 Por habitaciones'],['por_estudios','🎨 Por estudios'],['por_apartamentos','🏢 Por apartamentos'],['mixto','🔀 Mixto']].map(([v,l])=>`<option value="${v}" ${(p.rental_model||'mixto')===v?'selected':''}>${l}</option>`).join('')}
+            ${[['casa_completa','Casa completa'],['por_habitaciones','Por habitaciones'],['por_estudios','Por estudios'],['por_apartamentos','Por apartamentos'],['mixto','Mixto']].map(([v,l])=>`<option value="${v}" ${(p.rental_model||'mixto')===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
       </div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Dirección</label>
@@ -5666,7 +5702,7 @@ async function pmEditProperty(id) {
         <textarea id="pm-pf-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(p.notes||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteProperty('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑 Eliminar</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteProperty('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')} Eliminar</button>` : ''}
         <button onclick="pmSaveProperty('${id||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>
@@ -5699,7 +5735,7 @@ async function pmExecQuery(qPromise, opLabel) {
         try { table = String(qPromise.url?.pathname || qPromise.url || '').split('/rest/v1/')[1].split(/[?\/]/)[0]; } catch (e) {}
         if (PM_RO_MIRROR_TABLES.has(table)) {
           console.warn('[pm] escritura BLOQUEADA (solo-lectura):', m, table, '·', opLabel);
-          if (window.toast) toast('📖 Solo lectura: cargá o editá estos datos en Airtable. La app solo muestra y reporta.', 'info');
+          if (window.toast) toast('Solo lectura: cargá o editá estos datos en Airtable. La app solo muestra y reporta.', 'info');
           return null;
         }
       }
@@ -5709,13 +5745,13 @@ async function pmExecQuery(qPromise, opLabel) {
     const r = await qPromise;
     if (r && r.error) {
       console.error('[pm]', opLabel, 'error:', r.error);
-      alert('⚠️ ' + opLabel + ' falló:\n\n' + (r.error.message || JSON.stringify(r.error)) + '\n\nVerificá: sesión activa, RLS, datos válidos.');
+      alert(opLabel + ' falló:\n\n' + (r.error.message || JSON.stringify(r.error)) + '\n\nVerificá: sesión activa, RLS, datos válidos.');
       return null;
     }
     return r;
   } catch (e) {
     console.error('[pm]', opLabel, 'exception:', e);
-    alert('⚠️ ' + opLabel + ' excepción:\n\n' + (e.message || String(e)));
+    alert(opLabel + ' excepción:\n\n' + (e.message || String(e)));
     return null;
   }
 }
@@ -5748,11 +5784,11 @@ async function pmArchiveProperty(id, on) {
   const p = pmaState.properties.find(x => x.id === id) || ((pmaState._raw||{}).properties || []).find(x => x.id === id) || {};
   const nombre = p.name || p.address || 'esta propiedad';
   if (!confirm(on
-    ? `📦 ¿Archivar "${nombre}"?
+    ? `¿Archivar "${nombre}"?
 
 · Deja de contar en propiedades, unidades y ocupación
 · El sync de Airtable NO la reactiva (marca manual)
-· Reversible: ↩ Reactivar (visible con 📦 Mostrar archivados)`
+· Reversible: ↩ Reactivar (visible con Mostrar archivados)`
     : `↩ ¿Reactivar "${nombre}"? Vuelve a contar en ocupación y KPIs.`)) return;
   const { data, error } = await sb.rpc('pm_archive_property', { p_id: id, p_on: on });
   if (error || !(data && data.ok)) { alert('Error: ' + (error ? error.message : ((data && data.error) || 'desconocido'))); return; }
@@ -5774,14 +5810,14 @@ window.pmDeleteProperty = pmDeleteProperty;
 async function pmEditUnit(id, propertyId) {
   const u = id ? pmaState.units.find(x => x.id === id) : { property_id: propertyId };
   const isNew = !id;
-  openModal((isNew?'+ Nueva':'✏️ Editar')+' Unidad', `
+  openModal((isNew?'+ Nueva':'Editar')+' Unidad', `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Código *</label>
           <input id="pm-uf-code" value="${(u.code||'').replace(/"/g,'&quot;')}" placeholder="Ej. CHILD-HB3" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-mono"/></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Tipo</label>
           <select id="pm-uf-type" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            ${[['habitacion','🛏 Habitación'],['estudio','🎨 Estudio'],['apartamento','🏢 Apartamento'],['casa_completa','🏡 Casa completa']].map(([v,l])=>`<option value="${v}" ${(u.unit_type||'habitacion')===v?'selected':''}>${l}</option>`).join('')}
+            ${[['habitacion','Habitación'],['estudio','Estudio'],['apartamento','Apartamento'],['casa_completa','Casa completa']].map(([v,l])=>`<option value="${v}" ${(u.unit_type||'habitacion')===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
       </div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre descriptivo</label>
@@ -5790,7 +5826,7 @@ async function pmEditUnit(id, propertyId) {
         <input id="pm-uf-rent" type="number" value="${u.target_rent||''}" placeholder="800" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteUnit('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteUnit('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button onclick="pmSaveUnit('${id||''}','${u.property_id||propertyId||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>
@@ -5838,7 +5874,7 @@ async function pmEditBooking(id, unitId) {
           ${hist.map(h => `<div class="text-[11px] text-slate-600">↔ De <strong>${pmUnitLabel(h.moved_from_unit_id).replace(/</g,'&lt;')}</strong> a <strong>${pmUnitLabel(h.moved_to_unit_id).replace(/</g,'&lt;')}</strong> · ${(h.moved_at||'').slice(0,10)}${h.moved_by?` · ${(h.moved_by||'').replace(/</g,'&lt;')}`:''}${h.reason?`<span class="text-slate-400"> — ${(h.reason||'').replace(/</g,'&lt;')}</span>`:''}</div>`).join('')}
         </div>` : ''}
       </div>` : '';
-  openModal((isNew?'+ Nueva':'✏️ Editar')+' Reserva', `
+  openModal((isNew?'+ Nueva':'Editar')+' Reserva', `
     <div class="space-y-3">
       ${histHtml}
       <div class="grid grid-cols-2 gap-2">
@@ -5849,7 +5885,7 @@ async function pmEditBooking(id, unitId) {
           </select></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Tipo</label>
           <select id="pm-bf-type" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            ${[['contrato_directo','📄 Contrato directo'],['airbnb','🌐 Airbnb'],['booking','🌐 Booking'],['vrbo','🌐 VRBO'],['hospitable','🌐 Hospitable'],['reserva_corta','⏱ Reserva corta'],['otro','• Otro']].map(([v,l])=>`<option value="${v}" ${(b.booking_type||'contrato_directo')===v?'selected':''}>${l}</option>`).join('')}
+            ${[['contrato_directo','Contrato directo'],['airbnb','Airbnb'],['booking','Booking'],['vrbo','VRBO'],['hospitable','Hospitable'],['reserva_corta','Reserva corta'],['otro','• Otro']].map(([v,l])=>`<option value="${v}" ${(b.booking_type||'contrato_directo')===v?'selected':''}>${l}</option>`).join('')}
           </select></div>
       </div>
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Inquilino</label>
@@ -5882,7 +5918,7 @@ async function pmEditBooking(id, unitId) {
         <textarea id="pm-bf-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(b.notes||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteBooking('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteBooking('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button onclick="pmSaveBooking('${id||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>
@@ -5948,13 +5984,13 @@ window.pmQuickAddTenant = pmQuickAddTenant;
 async function pmEditPayment(id, defaultType) {
   const pay = id ? pmaState.payments.find(x => x.id === id) : { type: defaultType || 'ingreso', status: 'pendiente' };
   const isNew = !id;
-  openModal((isNew?'+ Nuevo':'✏️ Editar')+(pay.type==='gasto'?' Gasto':' Ingreso'), `
+  openModal((isNew?'+ Nuevo':'Editar')+(pay.type==='gasto'?' Gasto':' Ingreso'), `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Tipo</label>
           <select id="pm-yf-type" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            <option value="ingreso" ${pay.type==='ingreso'?'selected':''}>🟢 Ingreso</option>
-            <option value="gasto" ${pay.type==='gasto'?'selected':''}>🔴 Gasto</option>
+            <option value="ingreso" ${pay.type==='ingreso'?'selected':''}>${kitStatusDot('ok')} Ingreso</option>
+            <option value="gasto" ${pay.type==='gasto'?'selected':''}>${kitStatusDot('bad')} Gasto</option>
           </select></div>
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Categoría</label>
           <input id="pm-yf-cat" value="${(pay.category||'').replace(/"/g,'&quot;')}" placeholder="renta / limpieza / servicios" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -5980,7 +6016,7 @@ async function pmEditPayment(id, defaultType) {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeletePayment('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeletePayment('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button onclick="pmSavePayment('${id||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>
@@ -6042,18 +6078,18 @@ function pmRenderAlertsBar() {
   return `
   <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
     <div class="text-[11px] text-slate-600">
-      ${c.total ? `🔔 <strong>${c.total}</strong> alertas activas: <span class="text-red-600 font-bold">${c.critical} críticas</span> · <span class="text-amber-600 font-bold">${c.warning} advertencias</span> · <span class="text-blue-600 font-bold">${c.info} informativas</span>`
-                : '<span class="text-slate-400">🔔 Sin alertas activas</span>'}
+      ${c.total ? `${osIcon('bell')} <strong>${c.total}</strong> alertas activas: <span class="text-red-600 font-bold">${c.critical} críticas</span> · <span class="text-amber-600 font-bold">${c.warning} advertencias</span> · <span class="text-blue-600 font-bold">${c.info} informativas</span>`
+                : '<span class="text-slate-400">' + osIcon('bell') + ' Sin alertas activas</span>'}
     </div>
     <div class="flex items-center gap-2 relative">
       <button onclick="pmRunAlertChecks(this)" title="Generar alertas ahora" class="text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">↻ Revisar</button>
       <button onclick="pmaState.alertsDropdownOpen=${open?'false':'true'};pmRender()" class="relative bg-white border border-slate-200 hover:bg-slate-50 rounded-lg px-2.5 py-1.5">
-        <span class="text-base leading-none">🔔</span>
+        <span class="text-base leading-none">${osIcon('bell')}</span>
         ${c.unread ? `<span class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">${c.unread}</span>` : ''}
       </button>
       ${open ? `
         <div class="absolute right-0 top-full mt-1 w-[340px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#1e293b">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-slate-100" style="background:#1e2430">
             <span class="text-xs font-bold text-white">Alertas recientes</span>
             <button onclick="pmAlertMarkAllRead()" class="text-[10px] font-bold" style="color:#d4af37">Marcar todas leídas</button>
           </div>
@@ -6136,17 +6172,17 @@ window.pmAlertAssign = pmAlertAssign;
 // TAB · OPERACIÓN (3 sub-tabs + panel de alertas)
 // ════════════════════════════════════════════════════════════════
 const PM_TASK_TYPES = {
-  cleaning:             { label: '🧹 Limpieza',  color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
-  recepcion:            { label: '🛎️ Recepción', color: '#0ea5e9', chip: 'bg-sky-100 text-sky-800' },
-  aseo:                 { label: '🧹 Aseo',      color: '#3b82f6', chip: 'bg-blue-100 text-blue-800' },
-  mantenimiento:        { label: '🔧 Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
-  podada:               { label: '🌱 Podada',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
-  cesped:               { label: '🌱 Césped',    color: '#10b981', chip: 'bg-emerald-100 text-emerald-800' },
-  plagas:               { label: '🐛 Plagas',    color: '#a855f7', chip: 'bg-purple-100 text-purple-800' },
-  inspeccion:           { label: '🚪 Inspección',color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
-  renovacion_contrato:  { label: '📄 Renovación',color: '#ef4444', chip: 'bg-red-100 text-red-800' }
+  cleaning:             { label: 'Limpieza',  color: '#3a5be0', chip: 'bg-blue-100 text-blue-800' },
+  recepcion:            { label: 'Recepción', color: '#0ea5e9', chip: 'bg-sky-100 text-sky-800' },
+  aseo:                 { label: 'Aseo',      color: '#3a5be0', chip: 'bg-blue-100 text-blue-800' },
+  mantenimiento:        { label: 'Manten.',   color: '#f97316', chip: 'bg-orange-100 text-orange-800' },
+  podada:               { label: 'Podada',    color: '#059669', chip: 'bg-emerald-100 text-emerald-800' },
+  cesped:               { label: 'Césped',    color: '#059669', chip: 'bg-emerald-100 text-emerald-800' },
+  plagas:               { label: 'Plagas',    color: '#a855f7', chip: 'bg-purple-100 text-purple-800' },
+  inspeccion:           { label: 'Inspección',color: '#f59e0b', chip: 'bg-amber-100 text-amber-800' },
+  renovacion_contrato:  { label: 'Renovación',color: '#ef4444', chip: 'bg-red-100 text-red-800' }
 };
-function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#94a3b8', chip: 'bg-slate-100 text-slate-700' }; }
+function pmTaskMeta(t) { return PM_TASK_TYPES[t] || { label: 'Tarea', color: '#8b93a1', chip: 'bg-slate-100 text-slate-700' }; }
 function pmTaskDate(t) { return t.scheduled_date || (t.start_at ? String(t.start_at).slice(0,10) : null); }
 
 function pmOpsTaskOpen(t) { return !['completado','cancelado'].includes(t.status); }
@@ -6179,7 +6215,7 @@ function pmOpsGlobalFilters() {
   const pF = pmaState.opsFilterProperty, tF = pmaState.opsFilterType, aF = pmaState.opsFilterAssignee;
   const hasF = pF || tF || aF;
   return `<div class="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
-    <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">🏠 Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+    <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">${osIcon('house')} Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
     <select onchange="pmaState.opsFilterType=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Todo tipo</option>${Object.entries(PM_TASK_TYPES).map(([k,m])=>`<option value="${k}" ${tF===k?'selected':''}>${m.label}</option>`).join('')}</select>
     <select onchange="pmaState.opsFilterAssignee=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">Todos</option>${PM_TEAM.concat(assignees.filter(a=>!PM_TEAM.includes(a))).map(a=>`<option value="${a}" ${aF===a?'selected':''}>${(a||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
     ${hasF?`<button onclick="pmaState.opsFilterProperty=null;pmaState.opsFilterType=null;pmaState.opsFilterAssignee=null;pmRender()" class="text-[#b8941f] hover:underline">✕ Limpiar</button>`:''}
@@ -6190,7 +6226,7 @@ function pmRenderOperations() {
   const sub = pmaState.opsSubTab || 'tasks';
   const c = pmAlertCounts();
   const dwN = (pmaState.dataWarnings||[]).length;
-  const tabs = [['tasks','📋 Cronograma'],['utilities','💡 Utilities'],['datawarn',`🔎 Datos${dwN?` (${dwN})`:''}`],['services','⚡ Servicios'],['comms','💬 Comunicación'],['alerts',`🔔 Alertas${c.total?` (${c.total})`:''}`]];
+  const tabs = [['tasks','Cronograma'],['utilities','Utilities'],['datawarn',`Datos${dwN?` (${dwN})`:''}`],['services','Servicios'],['comms','Comunicación'],['alerts',`Alertas${c.total?` (${c.total})`:''}`]];
   return `
   <style>@keyframes pmfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.pm-fade{animation:pmfade .4s ease both}</style>
   <div class="space-y-3 p-1 pm-fade" style="font-family:Inter,system-ui,sans-serif">
@@ -6221,7 +6257,7 @@ function pmRenderTasksSection() {
   <div class="space-y-3">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center bg-slate-100 rounded-full p-0.5 text-[10px] font-bold">
-        ${vb('calendar','📅 Mes')}${vb('weekly','🗓 Semana')}${vb('list','📋 Lista')}${vb('byassignee','👥 Encargado')}
+        ${vb('calendar','Mes')}${vb('weekly','Semana')}${vb('list','Lista')}${vb('byassignee','Encargado')}
       </div>
       <div class="flex items-center gap-2">
         ${pmOpsGlobalFilters()}
@@ -6230,7 +6266,7 @@ function pmRenderTasksSection() {
     </div>
 
     ${needVisitEntries.length ? `<div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-      <div class="text-[11px] uppercase font-bold text-amber-700 mb-1">🏠 Casas que necesitan visita esta semana</div>
+      <div class="text-[11px] uppercase font-bold text-amber-700 mb-1">${osIcon('house')} Casas que necesitan visita esta semana</div>
       <div class="flex gap-1.5 flex-wrap">${needVisitEntries.map(([pid,n])=>`<button onclick="pmaState.opsFilterProperty='${pid}';pmaState.tasksView='list';pmRender()" class="text-[11px] bg-white border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100">${pmPropertyName(pid).replace(/</g,'&lt;').slice(0,20)} <strong>${n}</strong></button>`).join('')}</div>
     </div>` : ''}
 
@@ -6288,11 +6324,11 @@ function pmRenderTasksByAssignee() {
     const week = ts.filter(t => { const d=pmTaskDate(t); if(!d||!pmOpsTaskOpen(t))return false; const in7=new Date();in7.setDate(in7.getDate()+7); return d>=today && d<=in7.toISOString().slice(0,10); });
     return `<div class="bg-white border border-slate-200 rounded-xl p-3">
       <div class="flex items-center gap-2 mb-2">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:#1e293b;border:2px solid #d4af37">${name.charAt(0).toUpperCase()}</div>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm" style="background:#1e2430;border:2px solid #d4af37">${name.charAt(0).toUpperCase()}</div>
         <div class="font-bold text-sm text-slate-800">${name.replace(/</g,'&lt;')}</div>
       </div>
       <div class="flex gap-2 text-[11px] mb-2">
-        <span class="text-emerald-600 font-bold">✓ ${done}</span><span class="text-amber-600 font-bold">⏳ ${pend}</span><span class="text-red-600 font-bold">⚠ ${late}</span>
+        <span class="text-emerald-600 font-bold">✓ ${done}</span><span class="text-amber-600 font-bold">${osIcon('loader')} ${pend}</span><span class="text-red-600 font-bold">${osIcon('alert')} ${late}</span>
       </div>
       <div class="text-[10px] uppercase font-bold text-slate-400 mb-1">Esta semana (${week.length})</div>
       <div class="space-y-1">${week.slice(0,6).map(pmAssigneeTaskBtn).join('') || '<div class="text-[10px] text-slate-400 italic">Sin tareas.</div>'}</div>
@@ -6376,16 +6412,16 @@ function pmRenderTaskRow(t) {
           ${t.status==='completado'?'<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">Completada</span>':''}
         </div>
         <div class="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-          <span>📅 ${d||'sin fecha'}</span>
-          ${t.property_id?`<span>· 🏠 ${pmPropertyName(t.property_id).replace(/</g,'&lt;').slice(0,22)}</span>`:''}
-          ${t.assignee?`<span>· 👤 ${(t.assignee||'').replace(/</g,'&lt;')}</span>`:''}
+          <span>${osIcon('calendar')} ${d||'sin fecha'}</span>
+          ${t.property_id?`<span>· ${osIcon('house')} ${pmPropertyName(t.property_id).replace(/</g,'&lt;').slice(0,22)}</span>`:''}
+          ${t.assignee?`<span>· ${osIcon('user')} ${(t.assignee||'').replace(/</g,'&lt;')}</span>`:''}
         </div>
       </div>
       <div class="flex items-center gap-1 flex-shrink-0">
         ${t.status!=='completado'?`<button onclick="pmTaskComplete('${t.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">✓ Completar</button>`:''}
         <button onclick="pmTaskReschedule('${t.id}')" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">↻ Reprogramar</button>
-        <button onclick="pmTaskReassign('${t.id}')" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">👤 Reasignar</button>
-        <button onclick="pmEditTask('${t.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+        <button onclick="pmTaskReassign('${t.id}')" class="bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">${osIcon('user')} Reasignar</button>
+        <button onclick="pmEditTask('${t.id}')" class="text-slate-400 hover:text-slate-700 p-1">${osIcon('pencil')}</button>
       </div>
     </div>`;
 }
@@ -6403,7 +6439,7 @@ window.pmTaskReassign = pmTaskReassign;
 async function pmEditTask(id) {
   const t = id ? (pmaState.tasks||[]).find(x => x.id === id) : { status: 'pendiente', priority: 'media', scheduled_date: new Date().toISOString().slice(0,10) };
   const isNew = !id;
-  openModal((isNew?'+ Nueva':'✏️ Editar')+' Tarea', `
+  openModal((isNew?'+ Nueva':'Editar')+' Tarea', `
     <div class="space-y-3">
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Título *</label>
         <input id="pm-kf-title" value="${(t.title||'').replace(/"/g,'&quot;')}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -6440,7 +6476,7 @@ async function pmEditTask(id) {
         <textarea id="pm-kf-notes" rows="2" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">${(t.notes||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew?`<button onclick="pmDeleteTask('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        ${!isNew?`<button onclick="pmDeleteTask('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>`:''}
         <button onclick="pmSaveTask('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>`);
@@ -6478,16 +6514,16 @@ window.pmDeleteTask = pmDeleteTask;
 // ── Sub-tab: Utilities (recibos públicos) ──
 function pmUtilityStatus(u) {
   const today = new Date(); const ym = today.toISOString().slice(0,7);
-  if (u.last_paid_date && String(u.last_paid_date).slice(0,7) === ym) return { key: 'paid', label: '✅ Pagado', cls: 'text-emerald-700 bg-emerald-50' };
+  if (u.last_paid_date && String(u.last_paid_date).slice(0,7) === ym) return { key: 'paid', label: 'Pagado', cls: 'text-emerald-700 bg-emerald-50' };
   // FIX11: sin historial real (seeded) → no contar como "por vencer"
   if (!u.last_paid_date) return { key: 'sin_info', label: '— sin datos', cls: 'text-slate-400 bg-slate-50' };
   const cut = u.cutoff_day ? new Date(today.getFullYear(), today.getMonth(), Math.min(u.cutoff_day, 28)) : null;
   if (!cut) return { key: 'unknown', label: '—', cls: 'text-slate-400 bg-slate-50' };
   const days = Math.floor((cut - today) / 86400000);
-  if (days < -14) return { key: 'cut', label: '❌ Cortado', cls: 'text-white bg-red-600' };
-  if (days < 0) return { key: 'overdue', label: `🔴 Vencido ${Math.abs(days)}d`, cls: 'text-red-700 bg-red-50' };
-  if (days <= 7) return { key: 'due_soon', label: `⏰ Por vencer (${days}d)`, cls: 'text-amber-700 bg-amber-50' };
-  return { key: 'ok', label: '🟢 Al día', cls: 'text-emerald-700 bg-emerald-50' };
+  if (days < -14) return { key: 'cut', label: 'Cortado', cls: 'text-white bg-red-600' };
+  if (days < 0) return { key: 'overdue', label: `Vencido ${Math.abs(days)}d`, cls: 'text-red-700 bg-red-50' };
+  if (days <= 7) return { key: 'due_soon', label: `Por vencer (${days}d)`, cls: 'text-amber-700 bg-amber-50' };
+  return { key: 'ok', label: 'Al día', cls: 'text-emerald-700 bg-emerald-50' };
 }
 function pmRenderUtilities() {
   const utils = pmaState.utilities || [];
@@ -6510,7 +6546,7 @@ function pmRenderUtilities() {
         <div class="text-xs text-slate-500">${pmMoney(totalMonth)}/mes estimado${overdue?` · <span class="text-red-600 font-bold">${overdue} vencidos</span>`:''}</div>
       </div>
       <div class="flex items-center gap-2">
-        <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">🏠 Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
+        <select onchange="pmaState.opsFilterProperty=this.value||null;pmRender()" class="border border-slate-300 rounded px-2 py-1 text-xs"><option value="">${osIcon('house')} Todas</option>${props.map(p=>`<option value="${p.id}" ${pF===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select>
         <button onclick="pmEditUtility(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Servicio</button>
       </div>
     </div>
@@ -6526,16 +6562,16 @@ function pmRenderUtilities() {
           <td class="px-3 py-2 font-semibold text-slate-800">${(u.service_name||'').replace(/</g,'&lt;')}</td>
           <td class="px-3 py-2 text-slate-500 font-mono">${(u.account_number||'—').replace(/</g,'&lt;')}</td>
           <td class="px-3 py-2 text-right font-bold text-slate-700">${u.monthly_amount?'$'+Number(u.monthly_amount).toLocaleString():'—'}</td>
-          <td class="px-3 py-2 text-slate-600">${u.last_paid_date||'—'}${u.last_paid_amount?` · $${Number(u.last_paid_amount).toLocaleString()}`:''}${u.proof_url?` <a href="${u.proof_url}" target="_blank" class="text-blue-600">📎</a>`:''}</td>
+          <td class="px-3 py-2 text-slate-600">${u.last_paid_date||'—'}${u.last_paid_amount?` · $${Number(u.last_paid_amount).toLocaleString()}`:''}${u.proof_url?` <a href="${u.proof_url}" target="_blank" class="text-blue-600">${osIcon('paperclip')}</a>`:''}</td>
           <td class="px-3 py-2 text-slate-600">${cut}</td>
           <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${st.cls}">${st.label}</span></td>
-          <td class="px-3 py-2 text-center whitespace-nowrap"><button onclick="pmMarkUtilityPaid('${u.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">Marcar pagado</button> <button onclick="pmEditUtility('${u.id}')" class="text-slate-400 hover:text-slate-700">✏️</button></td>
+          <td class="px-3 py-2 text-center whitespace-nowrap"><button onclick="pmMarkUtilityPaid('${u.id}')" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">Marcar pagado</button> <button onclick="pmEditUtility('${u.id}')" class="text-slate-400 hover:text-slate-700">${osIcon('pencil')}</button></td>
         </tr>`; }).join('')}</tbody>
       </table>
     </div>` : '<div class="text-xs text-slate-400 italic px-3 py-10 text-center bg-slate-50 rounded-lg">Todavía no hay utilities configurados (monto + cuenta). Agregá uno con "+ Servicio" o esperá la tabla de utilities en Airtable.</div>'}
     ${pending.length ? `<div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
-      ⚠️ <b>${pending.length} servicios pendientes de configurar</b> (sin monto ni número de cuenta — hoy NO existe tabla de utilities en la base Modelo Nuevo, son placeholders del seed).
-      Para activarlos: completalos acá con ✏️ (monto mensual + cuenta + día de corte) o definí la fuente en Airtable (tabla de utilities nueva, o 🔑 Accesos con Categoría=servicio) y se sincronizan.
+      ${osIcon('alert')} <b>${pending.length} servicios pendientes de configurar</b> (sin monto ni número de cuenta — hoy NO existe tabla de utilities en la base Modelo Nuevo, son placeholders del seed).
+      Para activarlos: completalos acá con ${osIcon('pencil')} (monto mensual + cuenta + día de corte) o definí la fuente en Airtable (tabla de utilities nueva, o ${osIcon('key')} Accesos con Categoría=servicio) y se sincronizan.
       <button onclick="pmaState._showPendingUtils=!pmaState._showPendingUtils;pmRender()" class="ml-2 text-amber-900 underline font-bold">${pmaState._showPendingUtils?'Ocultar':'Ver lista'}</button>
       ${pmaState._showPendingUtils ? `<div class="mt-2 flex flex-wrap gap-1.5">${pending.map(u => `<button onclick="pmEditUtility('${u.id}')" class="bg-white border border-amber-200 rounded px-2 py-0.5 text-[10px] hover:bg-amber-100" title="Configurar">${pmPropertyName(u.property_id).replace(/</g,'&lt;').slice(0,14)} · ${(u.service_name||'').replace(/</g,'&lt;')}</button>`).join('')}</div>` : ''}
     </div>` : ''}
@@ -6545,7 +6581,7 @@ async function pmMarkUtilityPaid(id) {
   const u = (pmaState.utilities||[]).find(x => x.id == id);
   if (!u) return;
   const today = new Date().toISOString().slice(0,10);
-  openModal('💡 Marcar pagado — ' + (u.service_name||''), `
+  openModal('Marcar pagado — ' + (u.service_name||''), `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Monto $</label><input id="pm-ut-amount" type="number" step="0.01" value="${u.monthly_amount||''}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -6567,7 +6603,7 @@ async function pmSaveUtilityPaid(id) {
   if (!date) return alert('La fecha es obligatoria.');
   let proof_url = null;
   const file = fileEl?.files?.[0];
-  if (file) { if (statusEl) statusEl.textContent = 'Subiendo…'; const up = await pmUploadFile('invoices', 'utility-'+id, file); if (up.url) proof_url = up.url; else if (statusEl) statusEl.textContent = '⚠️ ' + up.error; }
+  if (file) { if (statusEl) statusEl.textContent = 'Subiendo…'; const up = await pmUploadFile('invoices', 'utility-'+id, file); if (up.url) proof_url = up.url; else if (statusEl) statusEl.textContent = osIcon('alert') + up.error; }
   const payload = { last_paid_date: date, last_paid_amount: amount };
   if (proof_url) payload.proof_url = proof_url;
   const r = await pmExecQuery(sb.from('pm_utilities').update(payload).eq('id', id).select(), 'Marcar utility pagado');
@@ -6578,7 +6614,7 @@ window.pmSaveUtilityPaid = pmSaveUtilityPaid;
 async function pmEditUtility(id) {
   const u = id ? (pmaState.utilities||[]).find(x => x.id == id) : { status: 'active', billing_day: 1, cutoff_day: 20 };
   const isNew = !id;
-  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Servicio (utility)', `
+  openModal((isNew?'+ Nuevo':'Editar')+' Servicio (utility)', `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Casa</label><select id="pm-uy-prop" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"><option value="">—</option>${pmaState.properties.map(p=>`<option value="${p.id}" ${u.property_id===p.id?'selected':''}>${(p.name||'').replace(/</g,'&lt;')}</option>`).join('')}</select></div>
@@ -6591,7 +6627,7 @@ async function pmEditUtility(id) {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew?`<button onclick="pmDeleteUtility('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        ${!isNew?`<button onclick="pmDeleteUtility('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>`:''}
         <button onclick="pmSaveUtility('${id||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>`);
@@ -6620,22 +6656,22 @@ window.pmDeleteUtility = pmDeleteUtility;
 
 // ── Sub-tab: Alertas de Datos (pm_data_warnings) ──
 const PM_WARN_META = {
-  contrato_vencido_activo: { label: 'Contrato vencido marcado Activo', icon: '🔴', table: 'tblzz3fokkBprEpIm' },
-  ocupada_sin_inquilino:   { label: 'Unidad Ocupada sin inquilino',     icon: '🟠', table: 'tblisRfa2IW02ltCL' },
-  pago_link_faltante:      { label: 'Pago sin vínculo (Casa/Inquilino)',icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
-  pago_sin_casa:           { label: 'Pago sin casa válida',             icon: '💸', table: 'tbl5p63dUEhrzgHVJ' },
-  reserva_sin_casa:        { label: 'Reserva sin casa enlazada',        icon: '🏚️', table: 'tblzz3fokkBprEpIm' },
-  unidad_sin_casa:         { label: 'Unidad sin casa enlazada',         icon: '🚪', table: 'tblItO7iMZT9QS87y' },
-  reserva_sin_fecha:       { label: 'Reserva sin Fecha de Entrada',     icon: '📅', table: 'tblzz3fokkBprEpIm' },
-  booking_sin_tenant:      { label: 'Reserva sin inquilino enlazado',   icon: '👤', table: 'tblzz3fokkBprEpIm' },
-  inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: '📅', table: 'tblXuFC9azHTZGjmE' },
-  direccion_no_matchea:    { label: 'Dirección no matchea entre tablas',icon: '🏠', table: 'tblXuFC9azHTZGjmE' },
-  gasto_sin_casa:          { label: 'Gasto sin casa',                   icon: '🧾', table: 'tblGBQ5xn9Zp6YrTN' },
+  contrato_vencido_activo: { label: 'Contrato vencido marcado Activo', icon: kitStatusDot('bad'), table: 'tblzz3fokkBprEpIm' },
+  ocupada_sin_inquilino:   { label: 'Unidad Ocupada sin inquilino',     icon: kitStatusDot('warn'), table: 'tblisRfa2IW02ltCL' },
+  pago_link_faltante:      { label: 'Pago sin vínculo (Casa/Inquilino)',icon: osIcon('banknote'), table: 'tbl5p63dUEhrzgHVJ' },
+  pago_sin_casa:           { label: 'Pago sin casa válida',             icon: osIcon('banknote'), table: 'tbl5p63dUEhrzgHVJ' },
+  reserva_sin_casa:        { label: 'Reserva sin casa enlazada',        icon: osIcon('construction'), table: 'tblzz3fokkBprEpIm' },
+  unidad_sin_casa:         { label: 'Unidad sin casa enlazada',         icon: osIcon('door'), table: 'tblItO7iMZT9QS87y' },
+  reserva_sin_fecha:       { label: 'Reserva sin Fecha de Entrada',     icon: osIcon('calendar'), table: 'tblzz3fokkBprEpIm' },
+  booking_sin_tenant:      { label: 'Reserva sin inquilino enlazado',   icon: osIcon('user'), table: 'tblzz3fokkBprEpIm' },
+  inquilino_sin_fecha_fin: { label: 'Inquilino activo sin Fecha Fin',   icon: osIcon('calendar'), table: 'tblXuFC9azHTZGjmE' },
+  direccion_no_matchea:    { label: 'Dirección no matchea entre tablas',icon: osIcon('house'), table: 'tblXuFC9azHTZGjmE' },
+  gasto_sin_casa:          { label: 'Gasto sin casa',                   icon: osIcon('receipt'), table: 'tblGBQ5xn9Zp6YrTN' },
   fechas_invertidas:       { label: 'check_in posterior a check_out',   icon: '🔀', table: 'tblzz3fokkBprEpIm' },
   renta_cero:              { label: 'Renta = 0',                        icon: '0️⃣', table: 'tblisRfa2IW02ltCL' },
-  inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: '👥', table: 'tblzz3fokkBprEpIm' }
+  inquilino_duplicado:     { label: 'Inquilino duplicado (solapado)',   icon: osIcon('users'), table: 'tblzz3fokkBprEpIm' }
 };
-function pmWarnMeta(t) { return PM_WARN_META[t] || { label: t, icon: '⚠️', table: null }; }
+function pmWarnMeta(t) { return PM_WARN_META[t] || { label: t, icon: osIcon('alert'), table: null }; }
 function pmRenderDataWarnings() {
   const warns = pmaState.dataWarnings || [];
   const byType = {};
@@ -6648,7 +6684,7 @@ function pmRenderDataWarnings() {
         <div class="text-sm font-bold text-slate-900">Alertas de Datos · ${warns.length} sin resolver</div>
         <div class="text-xs text-slate-500">Inconsistencias detectadas en la última sync de Airtable</div>
       </div>
-      <button onclick="pmRunAlertChecks && pmOpenAirtableImport && pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">🔄 Re-sync</button>
+      <button onclick="pmRunAlertChecks && pmOpenAirtableImport && pmOpenAirtableImport()" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1.5 rounded">${osIcon('refresh')} Re-sync</button>
     </div>
     ${warns.length ? types.map(t => { const meta = pmWarnMeta(t); const items = byType[t]; return `
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -6692,10 +6728,10 @@ function pmRenderServices() {
       <div class="text-sm font-bold text-slate-900">Servicios automáticos · ${services.length}</div>
       <button onclick="pmEditService(null)" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg" style="border:1px solid #d4af37">+ Servicio</button>
     </div>
-    ${failed.length ? `<div class="bg-red-50 border border-red-300 rounded-lg p-3 text-xs text-red-800"><strong>⚠️ ${failed.length} servicio(s) con pago fallido:</strong> ${failed.map(s=>(s.name||'').replace(/</g,'&lt;')).join(', ')} — revisar.</div>` : ''}
+    ${failed.length ? `<div class="bg-red-50 border border-red-300 rounded-lg p-3 text-xs text-red-800"><strong>${osIcon('alert')} ${failed.length} servicio(s) con pago fallido:</strong> ${failed.map(s=>(s.name||'').replace(/</g,'&lt;')).join(', ')} — revisar.</div>` : ''}
     ${Object.keys(byProp).length ? Object.entries(byProp).map(([pid, list]) => `
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-slate-50">🏠 ${pid==='_none'?'Sin casa asignada':pmPropertyName(pid).replace(/</g,'&lt;')}</div>
+        <div class="px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-slate-50">${osIcon('house')} ${pid==='_none'?'Sin casa asignada':pmPropertyName(pid).replace(/</g,'&lt;')}</div>
         <div class="divide-y divide-slate-100">
           ${list.map(s => {
             const due = s.next_payment_date;
@@ -6710,15 +6746,15 @@ function pmRenderServices() {
               </div>
               <div class="flex items-center gap-1 flex-shrink-0">
                 <button onclick="pmToggleServiceFailed('${s.id}',${!s.payment_failed})" class="text-[10px] font-bold px-2 py-1 rounded ${s.payment_failed?'bg-emerald-50 text-emerald-700':'bg-red-50 text-red-700'}">${s.payment_failed?'Marcar OK':'Marcar fallo'}</button>
-                <button onclick="pmEditService('${s.id}')" class="text-slate-400 hover:text-slate-700 p-1">✏️</button>
+                <button onclick="pmEditService('${s.id}')" class="text-slate-400 hover:text-slate-700 p-1">${osIcon('pencil')}</button>
               </div>
             </div>`;
           }).join('')}
         </div>
       </div>`).join('') : `<div class="text-xs text-slate-500 px-3 py-8 text-center bg-slate-50 rounded-lg">
         <div class="font-bold text-slate-700 mb-1">Sin servicios automáticos todavía</div>
-        Esta vista lee la tabla <b>🔑 Accesos</b> de Airtable filtrando <b>Categoría = «servicio»</b> — hoy ningún acceso está marcado así.<br/>
-        Para que aparezcan: en Airtable → 🔑 Accesos, poné Categoría «servicio» a los accesos de luz/agua/internet/etc. (el sync los trae solo), o agregá uno acá con «+ Servicio».
+        Esta vista lee la tabla <b>${osIcon('key')} Accesos</b> de Airtable filtrando <b>Categoría = «servicio»</b> — hoy ningún acceso está marcado así.<br/>
+        Para que aparezcan: en Airtable → ${osIcon('key')} Accesos, poné Categoría «servicio» a los accesos de luz/agua/internet/etc. (el sync los trae solo), o agregá uno acá con «+ Servicio».
       </div>`}
   </div>`;
 }
@@ -6734,7 +6770,7 @@ window.pmToggleServiceFailed = pmToggleServiceFailed;
 async function pmEditService(id) {
   const s = id ? (pmaState.credentials||[]).find(x => x.id === id) : { category: 'servicio', auto_pay: true };
   const isNew = !id;
-  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Servicio', `
+  openModal((isNew?'+ Nuevo':'Editar')+' Servicio', `
     <div class="space-y-3">
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre *</label>
         <input id="pm-sv-name" value="${(s.name||'').replace(/"/g,'&quot;')}" placeholder="Spectrum / Texas Gas / Coa…" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/></div>
@@ -6805,7 +6841,7 @@ function pmRenderComms() {
   <div class="grid lg:grid-cols-3 gap-3">
     <!-- Plantillas -->
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="px-3 py-2 flex items-center justify-between" style="background:#1e293b">
+      <div class="px-3 py-2 flex items-center justify-between" style="background:#1e2430">
         <span class="text-xs font-bold text-white">Plantillas</span>
         <button onclick="pmEditTemplate(null)" class="text-[10px] font-bold" style="color:#d4af37">+ Nueva</button>
       </div>
@@ -6814,7 +6850,7 @@ function pmRenderComms() {
           <div class="px-3 py-2 flex items-center justify-between gap-2 cursor-pointer ${selKey===t.key?'bg-amber-50':''}" onclick="pmaState.commsTemplateKey='${t.key}';pmaState.commsCustomText=null;pmRender()">
             <div class="min-w-0"><div class="text-sm font-semibold text-slate-800 truncate">${(t.name||'').replace(/</g,'&lt;')}</div>
             <div class="text-[10px] text-slate-400">${(t.category||'').replace(/</g,'&lt;')}</div></div>
-            <button onclick="event.stopPropagation();pmEditTemplate('${t.key}')" class="text-slate-300 hover:text-slate-600 text-xs">✏️</button>
+            <button onclick="event.stopPropagation();pmEditTemplate('${t.key}')" class="text-slate-300 hover:text-slate-600 text-xs">${osIcon('pencil')}</button>
           </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400 italic">Sin plantillas. Corré pm-operations-alerts.sql para sembrarlas.</div>'}
       </div>
     </div>
@@ -6835,9 +6871,9 @@ function pmRenderComms() {
       ${tpl?.variables?.length ? `<div class="text-[10px] text-slate-400">Variables: ${tpl.variables.map(v=>`<code class="bg-slate-100 px-1 rounded">{{${v}}}</code>`).join(' ')}</div>` : ''}
       <div><label class="text-[10px] font-bold uppercase text-slate-600">Mensaje (editable)</label>
         <textarea id="pm-cm-text" oninput="pmaState.commsCustomText=this.value" rows="6" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">${(rendered||'').replace(/</g,'&lt;')}</textarea></div>
-      ${tenant && !((tenant.phone||'').replace(/\D/g,'')) ? '<div class="text-[11px] text-amber-600">⚠️ Este inquilino no tiene teléfono cargado.</div>' : ''}
+      ${tenant && !((tenant.phone||'').replace(/\D/g,'')) ? '<div class="text-[11px] text-amber-600">' + osIcon('alert') + ' Este inquilino no tiene teléfono cargado.</div>' : ''}
       <div class="flex gap-2">
-        <button onclick="pmCommsSend()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar por WhatsApp</button>
+        <button onclick="pmCommsSend()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('message')} Enviar por WhatsApp</button>
         <button onclick="pmCommsCopy()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold px-4 py-2 rounded">Copiar</button>
       </div>
     </div>
@@ -6870,7 +6906,7 @@ window.pmCommsCopy = pmCommsCopy;
 async function pmEditTemplate(key) {
   const t = key ? (pmaState.templates||[]).find(x => x.key === key) : { variables: [] };
   const isNew = !key;
-  openModal((isNew?'+ Nueva':'✏️ Editar')+' Plantilla', `
+  openModal((isNew?'+ Nueva':'Editar')+' Plantilla', `
     <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div><label class="text-[10px] font-bold uppercase text-slate-600">Nombre *</label>
@@ -6884,7 +6920,7 @@ async function pmEditTemplate(key) {
         <textarea id="pm-tp-body" rows="5" class="w-full border border-slate-300 rounded px-2 py-2 text-sm">${(t.body||'').replace(/</g,'&lt;')}</textarea></div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew?`<button onclick="pmDeleteTemplate('${key}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>`:''}
+        ${!isNew?`<button onclick="pmDeleteTemplate('${key}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>`:''}
         <button onclick="pmSaveTemplate('${key||''}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" style="border:1px solid #d4af37">${isNew?'Crear':'Guardar'}</button>
       </div>
     </div>`);
@@ -6952,7 +6988,7 @@ function pmRenderAlertsPanel() {
           <div class="flex items-center gap-2 flex-wrap">
             <span class="text-[9px] uppercase font-extrabold ${s.txt} tracking-wider">${s.label}</span>
             ${a.category?`<span class="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded">${a.category}</span>`:''}
-            ${a.assigned_to?`<span class="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">👤 ${(a.assigned_to||'').replace(/</g,'&lt;')}</span>`:''}
+            ${a.assigned_to?`<span class="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded">${osIcon('user')} ${(a.assigned_to||'').replace(/</g,'&lt;')}</span>`:''}
             ${a.read?'':'<span class="text-[9px] bg-red-500 text-white px-1 py-0.5 rounded">nuevo</span>'}
           </div>
           <div class="text-sm text-slate-800 leading-snug mt-0.5">${(a.message||'').replace(/</g,'&lt;')}</div>
@@ -6979,7 +7015,7 @@ function pmRenderFeeds() {
       <div class="space-y-3 p-1">
         <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-6">
           <div class="flex items-start gap-3">
-            <span class="text-3xl">⚠️</span>
+            <span class="text-3xl">${osIcon('alert')}</span>
             <div class="flex-1">
               <div class="font-bold text-amber-900 mb-1">Falta crear la tabla de feeds en Supabase</div>
               <div class="text-sm text-amber-800 mb-3">Para usar la sincronización con calendarios externos (Airbnb, VRBO, Booking) tenés que correr el schema SQL primero.</div>
@@ -6993,7 +7029,7 @@ function pmRenderFeeds() {
                 <li>Click <strong>Run</strong></li>
                 <li>Volvé acá y refrescá el módulo</li>
               </ol>
-              <button onclick="pmLoadAll()" class="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded">🔄 Reintentar (ya corrí el SQL)</button>
+              <button onclick="pmLoadAll()" class="mt-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('refresh')} Reintentar (ya corrí el SQL)</button>
             </div>
           </div>
         </div>
@@ -7011,32 +7047,32 @@ function pmRenderFeeds() {
     <div class="space-y-3 p-1">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <div class="text-base font-bold text-slate-900">📡 Calendarios externos · ${feeds.length} feeds</div>
+          <div class="text-base font-bold text-slate-900">${osIcon('globe')} Calendarios externos · ${feeds.length} feeds</div>
           <div class="text-xs text-slate-500">Sincronización iCal con Airbnb, VRBO, Booking. Trae reservas automático.</div>
         </div>
         <div class="flex gap-2">
-          ${feeds.length ? `<button onclick="pmSyncAllFeeds()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">🔄 Sync todos</button>` : ''}
+          ${feeds.length ? `<button onclick="pmSyncAllFeeds()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('refresh')} Sync todos</button>` : ''}
           <button onclick="pmEditFeed(null)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Nuevo feed</button>
         </div>
       </div>
 
       <!-- Guía rápida -->
       <details class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
-        <summary class="cursor-pointer font-bold">📖 Cómo sacar el iCal de Airbnb (paso a paso)</summary>
+        <summary class="cursor-pointer font-bold">${osIcon('book')} Cómo sacar el iCal de Airbnb (paso a paso)</summary>
         <ol class="list-decimal ml-5 mt-2 space-y-1">
           <li>Entrá a Airbnb (cuenta de host) → <strong>Today</strong> → <strong>Calendar</strong></li>
           <li>Elegí el listing que querés sincronizar (de la lista de propiedades)</li>
           <li>Arriba a la derecha: <strong>Availability</strong> → <strong>Connect another calendar</strong> (a veces "Sync calendars")</li>
           <li>En la sección <strong>"Export your calendar"</strong>, copiá el link <code>.ics</code> (empieza con <code>https://www.airbnb.com/calendar/ical/...</code>)</li>
           <li>Volvé acá → click <strong>+ Nuevo feed</strong> → elegí la unidad → pegá el link</li>
-          <li>Click <strong>🔄 Sync ahora</strong> → vas a ver las reservas en el calendario PM</li>
+          <li>Click <strong>${osIcon('refresh')} Sync ahora</strong> → vas a ver las reservas en el calendario PM</li>
         </ol>
-        <div class="mt-2 text-[11px] italic">⚠️ El iCal solo trae fechas+nombre del huésped (no monto). El monto $/noche lo configurás como "default" del feed.</div>
+        <div class="mt-2 text-[11px] italic">${osIcon('alert')} El iCal solo trae fechas+nombre del huésped (no monto). El monto $/noche lo configurás como "default" del feed.</div>
       </details>
 
       ${!feeds.length ? `
         <div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-10 text-center">
-          <div class="text-5xl mb-2">📡</div>
+          <div class="text-5xl mb-2">${osIcon('globe')}</div>
           <div class="font-bold text-slate-700">Sin feeds configurados</div>
           <div class="text-xs text-slate-500 mt-1">Agregá tu primer iCal de Airbnb para empezar a sincronizar.</div>
           <button onclick="pmEditFeed(null)" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded">+ Agregar primer feed</button>
@@ -7046,7 +7082,7 @@ function pmRenderFeeds() {
           ${Object.entries(groupedByPlatform).map(([platform, list]) => `
             <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <div class="bg-slate-100 px-4 py-2 flex items-center justify-between">
-                <div class="font-bold text-xs uppercase text-slate-700">${platform === 'airbnb' ? '🌐 Airbnb' : platform === 'vrbo' ? '🌐 VRBO' : platform === 'booking' ? '🌐 Booking' : platform === 'hospitable' ? '🌐 Hospitable' : '🔗 ' + platform} · ${list.length} feed${list.length===1?'':'s'}</div>
+                <div class="font-bold text-xs uppercase text-slate-700">${platform === 'airbnb' ? 'Airbnb' : platform === 'vrbo' ? 'VRBO' : platform === 'booking' ? 'Booking' : platform === 'hospitable' ? 'Hospitable' : osIcon('link') + platform} · ${list.length} feed${list.length===1?'':'s'}</div>
               </div>
               <div class="divide-y divide-slate-100">
                 ${list.map(f => pmRenderFeedRow(f)).join('')}
@@ -7063,7 +7099,7 @@ function pmRenderFeedRow(f) {
   const unit = pmaState.units.find(u => u.id === f.unit_id);
   const property = unit ? pmaState.properties.find(p => p.id === unit.property_id) : null;
   const statusColor = f.last_status === 'success' ? 'text-emerald-700' : f.last_status === 'error' ? 'text-red-700' : 'text-slate-500';
-  const statusIcon = f.last_status === 'success' ? '✅' : f.last_status === 'error' ? '❌' : '⏳';
+  const statusIcon = f.last_status === 'success' ? osIcon('check-circle') : f.last_status === 'error' ? osIcon('x-circle') : osIcon('loader');
   const lastSyncDate = f.last_synced_at ? new Date(f.last_synced_at).toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'nunca';
   return `
     <div class="px-4 py-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
@@ -7080,12 +7116,12 @@ function pmRenderFeedRow(f) {
           ${f.last_total ? `<span>· ${f.last_total} eventos</span>` : ''}
           ${f.default_rent ? `<span>· $${Number(f.default_rent).toLocaleString()}/${f.default_period||'noche'}</span>` : ''}
         </div>
-        ${f.last_error ? `<div class="text-[10px] text-red-700 mt-0.5 truncate" title="${(f.last_error||'').replace(/"/g,'&quot;')}">⚠️ ${(f.last_error||'').slice(0,120)}</div>` : ''}
+        ${f.last_error ? `<div class="text-[10px] text-red-700 mt-0.5 truncate" title="${(f.last_error||'').replace(/"/g,'&quot;')}">${(f.last_error||'').slice(0,120)}</div>` : ''}
       </div>
       <div class="flex items-center gap-1 flex-shrink-0">
-        <button onclick="pmSyncFeed('${f.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-[11px] font-bold px-2 py-1 rounded" title="Sync ahora">🔄</button>
-        <button onclick="pmEditFeed('${f.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-1 rounded">✏️</button>
-        <button onclick="pmDeleteFeed('${f.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold px-2 py-1 rounded">🗑</button>
+        <button onclick="pmSyncFeed('${f.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 text-[11px] font-bold px-2 py-1 rounded" title="Sync ahora">${osIcon('refresh')}</button>
+        <button onclick="pmEditFeed('${f.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-1 rounded">${osIcon('pencil')}</button>
+        <button onclick="pmDeleteFeed('${f.id}')" class="bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold px-2 py-1 rounded">${osIcon('trash')}</button>
       </div>
     </div>
   `;
@@ -7094,16 +7130,16 @@ function pmRenderFeedRow(f) {
 async function pmEditFeed(id) {
   const f = id ? pmaState.feeds.find(x => x.id === id) : { platform: 'airbnb', feed_type: 'ical', active: true, auto_sync: true, default_period: 'noche' };
   const isNew = !id;
-  openModal((isNew?'+ Nuevo':'✏️ Editar')+' Feed (iCal externo)', `
+  openModal((isNew?'+ Nuevo':'Editar')+' Feed (iCal externo)', `
     <div class="space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[11px] text-blue-900">
-        💡 Para Airbnb: <strong>Calendar → Availability → Export calendar</strong>. Copiá la URL <code>.ics</code>.
+        ${osIcon('lightbulb')} Para Airbnb: <strong>Calendar → Availability → Export calendar</strong>. Copiá la URL <code>.ics</code>.
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="text-[10px] font-bold uppercase text-slate-600">Plataforma *</label>
           <select id="pm-ff-platform" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm">
-            ${[['airbnb','🌐 Airbnb'],['vrbo','🌐 VRBO'],['booking','🌐 Booking'],['hospitable','🌐 Hospitable'],['custom','🔗 Custom iCal'],['otro','• Otro']].map(([v,l])=>`<option value="${v}" ${(f.platform||'airbnb')===v?'selected':''}>${l}</option>`).join('')}
+            ${[['airbnb','Airbnb'],['vrbo','VRBO'],['booking','Booking'],['hospitable','Hospitable'],['custom','Custom iCal'],['otro','• Otro']].map(([v,l])=>`<option value="${v}" ${(f.platform||'airbnb')===v?'selected':''}>${l}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -7147,7 +7183,7 @@ async function pmEditFeed(id) {
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        ${!isNew ? `<button onclick="pmDeleteFeed('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">🗑</button>` : ''}
+        ${!isNew ? `<button onclick="pmDeleteFeed('${id}')" class="bg-red-100 hover:bg-red-200 text-red-700 text-sm font-bold px-4 py-2 rounded">${osIcon('trash')}</button>` : ''}
         <button onclick="pmSaveFeed('${id||''}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${isNew?'Crear feed':'Guardar'}</button>
       </div>
     </div>
@@ -7200,9 +7236,9 @@ async function pmDeleteFeed(id) {
 window.pmDeleteFeed = pmDeleteFeed;
 
 async function pmSyncFeed(feedId) {
-  openModal('🔄 Sincronizando feed...', `
+  openModal('Sincronizando feed...', `
     <div class="text-center py-8">
-      <div class="text-5xl animate-pulse mb-3">📡</div>
+      <div class="text-5xl animate-pulse mb-3">${osIcon('globe')}</div>
       <div class="font-bold text-slate-900">Descargando iCal y procesando reservas...</div>
       <div class="text-xs text-slate-500 mt-2">Hasta 30 segundos.</div>
     </div>
@@ -7215,7 +7251,7 @@ async function pmSyncFeed(feedId) {
     if (!accessToken) throw new Error('Sin sesión');
   } catch (e) {
     closeModal();
-    return alert('⚠️ Sesión expirada.');
+    return alert('Sesión expirada.');
   }
 
   try {
@@ -7231,7 +7267,7 @@ async function pmSyncFeed(feedId) {
 
     closeModal();
     const s = r.stats || {};
-    openModal('✅ Sync completado', `
+    openModal('Sync completado', `
       <div class="space-y-3">
         <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-sm text-emerald-900">
           Feed sincronizado correctamente · ${Math.round((r.duration_ms||0)/1000)}s
@@ -7241,7 +7277,7 @@ async function pmSyncFeed(feedId) {
           <div class="bg-emerald-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-emerald-700">Eventos iCal</div><div class="text-2xl font-bold text-emerald-700">${s.total_events||0}</div></div>
           <div class="bg-blue-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-blue-700">Sincronizados</div><div class="text-2xl font-bold text-blue-700">${s.total_added||0}</div></div>
         </div>
-        ${(s.errors||[]).length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">⚠️ ${s.errors.length} warnings</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${s.errors.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
+        ${(s.errors||[]).length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">${osIcon('alert')} ${s.errors.length} warnings</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${s.errors.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
         <div class="flex gap-2 pt-2 border-t border-slate-200">
           <button onclick="closeModal();openPmSystem();" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Ver reservas</button>
         </div>
@@ -7249,16 +7285,16 @@ async function pmSyncFeed(feedId) {
     `);
   } catch (e) {
     closeModal();
-    alert('⚠️ Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• La URL es un .ics válido\n• El URL es accesible (probá pegarlo en otra pestaña)');
+    alert('Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• La URL es un .ics válido\n• El URL es accesible (probá pegarlo en otra pestaña)');
   }
 }
 window.pmSyncFeed = pmSyncFeed;
 
 async function pmSyncAllFeeds() {
   if (!confirm('¿Sincronizar TODOS los feeds activos? Puede tardar varios minutos.')) return;
-  openModal('🔄 Sincronizando todos los feeds...', `
+  openModal('Sincronizando todos los feeds...', `
     <div class="text-center py-8">
-      <div class="text-5xl animate-pulse mb-3">📡</div>
+      <div class="text-5xl animate-pulse mb-3">${osIcon('globe')}</div>
       <div class="font-bold text-slate-900">Procesando ${(pmaState.feeds||[]).filter(f=>f.active).length} feeds...</div>
       <div class="text-xs text-slate-500 mt-2">No cierres la ventana.</div>
     </div>
@@ -7271,7 +7307,7 @@ async function pmSyncAllFeeds() {
     if (!accessToken) throw new Error('Sin sesión');
   } catch (e) {
     closeModal();
-    return alert('⚠️ Sesión expirada.');
+    return alert('Sesión expirada.');
   }
 
   try {
@@ -7284,11 +7320,11 @@ async function pmSyncAllFeeds() {
     if (!r.ok) throw new Error(r.error || 'Falló');
     closeModal();
     const s = r.stats || {};
-    alert(`✅ Sync completo\n\n${s.feeds_processed||0} feeds procesados\n${s.total_events||0} eventos\n${s.total_added||0} sincronizados\n\n${(s.errors||[]).length} warnings`);
+    alert(`Sync completo\n\n${s.feeds_processed||0} feeds procesados\n${s.total_events||0} eventos\n${s.total_added||0} sincronizados\n\n${(s.errors||[]).length} warnings`);
     await pmLoadAll();
   } catch (e) {
     closeModal();
-    alert('⚠️ Falló: ' + (e?.message||String(e)));
+    alert('Falló: ' + (e?.message||String(e)));
   }
 }
 window.pmSyncAllFeeds = pmSyncAllFeeds;
@@ -7298,24 +7334,24 @@ window.pmSyncAllFeeds = pmSyncAllFeeds;
 // Token + Base ID en localStorage del navegador. Idempotente.
 // ════════════════════════════════════════════════════════════════
 function pmOpenAirtableImport() {
-  openModal('🔄 Sincronizar con Airtable', `
+  openModal('Sincronizar con Airtable', `
     <div class="space-y-3 text-sm">
       <div class="text-slate-600">
         Trae propiedades, unidades, inquilinos, reservas, pagos, gastos, accesos y tareas desde Airtable.
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
-        ⚠️ Primera sync: 30-90 segundos. <strong>No cierres la ventana.</strong>
+        ${osIcon('alert')} Primera sync: 30-90 segundos. <strong>No cierres la ventana.</strong>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="pmStartAirtableSync(true)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Prueba sin escribir a la DB">🧪 Dry run</button>
-        <button onclick="pmStartAirtableSync(false)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🔄 Sync ahora</button>
+        <button onclick="pmStartAirtableSync(true)" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Prueba sin escribir a la DB">${osIcon('flask')} Dry run</button>
+        <button onclick="pmStartAirtableSync(false)" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('refresh')} Sync ahora</button>
       </div>
 
       <details class="text-[11px] text-slate-500">
-        <summary class="cursor-pointer">📋 Plan B · Importar JSON manualmente (legacy)</summary>
+        <summary class="cursor-pointer">${osIcon('clipboard')} Plan B · Importar JSON manualmente (legacy)</summary>
         <div class="mt-2 bg-slate-50 border border-slate-200 rounded p-2">
           <textarea id="pm-airtable-json" rows="4" placeholder='[{"name":"4916 Barkbridge",...}]' class="w-full border border-slate-300 rounded p-1 text-[10px] font-mono"></textarea>
           <button onclick="pmImportFromJSON()" class="mt-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold px-2 py-1 rounded">Importar JSON</button>
@@ -7328,10 +7364,10 @@ window.pmOpenAirtableImport = pmOpenAirtableImport;
 
 async function pmStartAirtableSync(dryRun) {
   // El Airtable PAT vive server-side (AIRTABLE_API_KEY). El usuario NO pega token.
-  openModal('🔄 Sincronizando con Airtable...', `
+  openModal('Sincronizando con Airtable...', `
     <div class="text-center py-8">
-      <div class="text-5xl animate-pulse mb-3">🔄</div>
-      <div class="font-bold text-slate-900">${dryRun?'🧪 Dry run':'Sincronizando 10 tablas'}</div>
+      <div class="text-5xl animate-pulse mb-3">${osIcon('refresh')}</div>
+      <div class="font-bold text-slate-900">${dryRun?'Dry run':'Sincronizando 10 tablas'}</div>
       <div class="text-xs text-slate-500 mt-2">Hasta 90 segundos. No cierres la ventana.</div>
     </div>
   `);
@@ -7348,7 +7384,7 @@ async function pmStartAirtableSync(dryRun) {
     if (!accessToken || accessToken === window.SUPABASE_ANON_KEY) throw new Error('Sin sesión activa');
   } catch (e) {
     closeModal();
-    return alert('⚠️ Sesión expirada. Cerrá sesión y volvé a entrar.');
+    return alert('Sesión expirada. Cerrá sesión y volvé a entrar.');
   }
 
   try {
@@ -7365,11 +7401,11 @@ async function pmStartAirtableSync(dryRun) {
     closeModal();
     const stats = r.stats || {};
     const errs = (r.errors||[]);
-    openModal(dryRun ? '🧪 Dry run completado' : '✅ Sync completado', `
+    openModal(dryRun ? 'Dry run completado' : 'Sync completado', `
       <div class="space-y-3">
         <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-sm text-emerald-900">
           ${dryRun ? 'Simulación OK. <strong>No se escribió nada a la DB.</strong>' : 'Datos sincronizados correctamente.'}
-          <br><span class="text-[10px]">⏱ ${Math.round((r.duration_ms||0)/1000)}s</span>
+          <br><span class="text-[10px]">${osIcon('clock')} ${Math.round((r.duration_ms||0)/1000)}s</span>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Propiedades</div><div class="text-xl font-bold">${stats.properties||0}</div></div>
@@ -7383,7 +7419,7 @@ async function pmStartAirtableSync(dryRun) {
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">WiFi</div><div class="text-xl font-bold">${stats.wifi||0}</div></div>
           <div class="bg-slate-50 rounded p-2"><div class="text-[9px] uppercase font-bold text-slate-500">Tareas</div><div class="text-xl font-bold">${stats.tasks||0}</div></div>
         </div>
-        ${errs.length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">⚠️ ${errs.length} warnings (sync continuó pese a estos errores)</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${errs.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
+        ${errs.length ? `<details class="bg-amber-50 border border-amber-200 rounded p-2"><summary class="text-xs font-bold text-amber-900 cursor-pointer">${osIcon('alert')} ${errs.length} warnings (sync continuó pese a estos errores)</summary><pre class="text-[10px] mt-2 whitespace-pre-wrap">${errs.join('\\n').replace(/</g,'&lt;')}</pre></details>` : ''}
         <div class="flex gap-2 pt-2 border-t border-slate-200">
           <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cerrar</button>
           ${!dryRun ? `<button onclick="closeModal();pmLoadAll();" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">✓ Ver datos</button>` : ''}
@@ -7393,7 +7429,7 @@ async function pmStartAirtableSync(dryRun) {
     if (!dryRun) await pmLoadAll();
   } catch (e) {
     closeModal();
-    alert('⚠️ Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• Token con scopes correctos\n• Base ID correcto\n• Token tiene acceso a esa base');
+    alert('Sync falló:\n\n' + (e?.message || String(e)) + '\n\nVerificá:\n• Token con scopes correctos\n• Base ID correcto\n• Token tiene acceso a esa base');
   }
 }
 window.pmStartAirtableSync = pmStartAirtableSync;
@@ -7432,7 +7468,7 @@ async function pmImportFromJSON() {
     await sb.from('pm_properties').insert(payload);
     closeModal();
     await pmLoadAll();
-    alert('✅ Importadas ' + payload.length + ' propiedades.');
+    alert('Importadas ' + payload.length + ' propiedades.');
   } catch (e) { alert('Error: ' + e.message); }
 }
 window.pmImportFromJSON = pmImportFromJSON;
@@ -7465,7 +7501,7 @@ const PM_RO_BLOCKED_FNS = [
 ];
 
 function pmReadOnlyNotice() {
-  if (window.toast) toast('📖 Solo lectura: cargá o editá estos datos en Airtable (fuente de verdad). La app solo muestra y reporta.', 'info', { duration: 4500 });
+  if (window.toast) toast('Solo lectura: cargá o editá estos datos en Airtable (fuente de verdad). La app solo muestra y reporta.', 'info', { duration: 4500 });
   return undefined;
 }
 window.pmReadOnlyNotice = pmReadOnlyNotice;
@@ -7532,7 +7568,7 @@ async function pmPrintReportHTML(path, params, okMsg) {
   const token = await pmAuthToken();
   if (!token) { toast('Iniciá sesión para generar el PDF.', 'error'); return; }
   const qs = new URLSearchParams({ ...params, format: 'html' }).toString();
-  toast('⏳ Generando…', 'info');
+  toast('Generando…', 'info');
   let html;
   try {
     const r = await fetch(`/api/${path}?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -7545,11 +7581,11 @@ async function pmPrintReportHTML(path, params, okMsg) {
   const w = window.open('', '_blank');
   if (!w) return toast('Permití las ventanas emergentes (popups) para generar el PDF.', 'error');
   w.document.open(); w.document.write(printable); w.document.close();
-  toast(okMsg || '✅ Usá "Guardar como PDF" en el diálogo de impresión', 'success', { duration: 5000 });
+  toast(okMsg || 'Usá "Guardar como PDF" en el diálogo de impresión', 'success', { duration: 5000 });
 }
 
 async function pmOpenReport(type) {
-  await pmPrintReportHTML('pm-report', { type }, '✅ Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' — Guardar como PDF');
+  await pmPrintReportHTML('pm-report', { type }, 'Reporte ' + (type === 'monthly' ? 'mensual' : 'semanal') + ' — Guardar como PDF');
 }
 window.pmOpenReport = pmOpenReport;
 
@@ -7584,7 +7620,7 @@ window.pmSendReport = pmSendReport;
 async function pmGenerateWelcomeGuide(propertyId, unitId) {
   const params = { property_id: propertyId };
   if (unitId) params.unit_id = unitId;
-  await pmPrintReportHTML('pm-welcome-guide', params, '✅ Guía de Bienvenida — Guardar como PDF');
+  await pmPrintReportHTML('pm-welcome-guide', params, 'Guía de Bienvenida — Guardar como PDF');
 }
 window.pmGenerateWelcomeGuide = pmGenerateWelcomeGuide;
 
@@ -7603,9 +7639,9 @@ async function pmSendWelcomeGuide(propertyId, unitId) {
   const body = [
     `¡Hola${tenant ? ' ' + (tenant.full_name || '') : ''}! Te compartimos tu info de check-in:`,
     ``,
-    `🏠 Dirección: ${p.address || p.name}`,
-    `📶 WiFi: ${p.wifi_name || '—'}  ·  Clave: ${p.wifi_pass || '—'}`,
-    `🔑 Código de acceso: ${acc}`,
+    `Dirección: ${p.address || p.name}`,
+    `WiFi: ${p.wifi_name || '—'}  ·  Clave: ${p.wifi_pass || '—'}`,
+    `Código de acceso: ${acc}`,
     ``,
     `Check-in desde las 3:00 PM. Cualquier cosa, escribinos. ¡Bienvenido/a!`,
   ].join('\n');

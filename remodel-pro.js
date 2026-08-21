@@ -5,12 +5,12 @@
 
 // ─── CATÁLOGO MAESTRO DE ACTIVIDADES (estructura Denfield) ───
 const RM_PHASES = {
-  '1': { name: 'Demolición', icon: '⛏️', color: '#dc2626' },
-  '2': { name: 'Cimentación', icon: '🏗️', color: '#ea580c' },
-  '3': { name: 'Externo',     icon: '🏠', color: '#d97706' },
-  '4': { name: 'Estructura', icon: '🪵', color: '#65a30d' },
-  '5': { name: 'Interno',    icon: '🛏️', color: '#0891b2' },
-  '6': { name: 'Limpieza',   icon: '🧹', color: '#7c3aed' }
+  '1': { name: 'Demolición', icon: osIcon('construction'), color: '#dc2626' },
+  '2': { name: 'Cimentación', icon: osIcon('construction'), color: '#ea580c' },
+  '3': { name: 'Externo',     icon: osIcon('house'), color: '#d97706' },
+  '4': { name: 'Estructura', icon: osIcon('ruler'), color: '#65a30d' },
+  '5': { name: 'Interno',    icon: osIcon('bed'), color: '#3a5be0' },
+  '6': { name: 'Limpieza',   icon: osIcon('sparkles'), color: '#7c3aed' }
 };
 
 // Unidades disponibles para items custom (en español)
@@ -154,6 +154,8 @@ const rmState = {
   currentProject: null,
   // Editor state
   editName: '', editAddress: '', editSqft: 1500, editStartDate: new Date().toISOString().split('T')[0],
+  editPropertyId: null,        // casa del proyecto — cruza con el diagnóstico (insp_cantidades)
+  takeoffRep: null,            // último reporte de take-off aplicado (banner del Editor)
   selectedActivities: {},
   customActivities: {},  // items custom agregados por etapa: { code: { phase, subcat, desc, unit, qty, vu, days, mat_pct } }
   // Pricing (estándar industria)
@@ -238,6 +240,113 @@ const RM_STAGE_BENCHMARKS = [
 const RM_PORTFOLIO_TOTAL_PSF = 49.17;
 const RM_MARKET_AUSTIN_MIN = 65;
 const RM_MARKET_AUSTIN_MAX = 90;
+
+// ═══ TAKE-OFF DEL DIAGNÓSTICO → CANTIDADES DEL EDITOR ═══
+// Puente insp_cantidades (por division/item con unidad) → selectedActivities[code].qty.
+// Filosofía v1 (CEO 31-jul): SOLO se pre-llena lo que mapea limpio y con la MISMA unidad.
+// Nada de suponer materiales, prorratear vu ni crear códigos nuevos: lo que no calza
+// se muestra como referencia en el banner para que lo cargue una persona.
+// 'auto'  → códigos con unidad idéntica al ítem del take-off.
+// 'cond'  → ambiguo entre varios códigos: solo se llena si ESE código ya está en el
+//           proyecto y sin cantidad (el usuario ya eligió el material).
+// 'ref'   → existe código pero en otra unidad (casa/proyecto/techo) → referencia.
+// 'none'  → no hay código en el catálogo → "sin destino".
+const RM_TAKEOFF_MAP = {
+  // ── auto (unidad coincide) ──
+  'acceso_externo|Cerramiento / muro perimetral': { modo: 'auto', codes: ['3.14.1'] },
+  'acceso_externo|Patio / jardín / andenes':      { modo: 'auto', codes: ['3.6.1'] },
+  'estructura|Vigas de carga':                    { modo: 'auto', codes: ['4.1.3'] },
+  'estructura|Columnas / pilares':                { modo: 'auto', codes: ['3.16.1'] },
+  'muros|Muros exteriores (fachada)':             { modo: 'auto', codes: ['3.4.1'] },
+  'piso|Zócalos / guardaescobas':                 { modo: 'auto', codes: ['5.6.3'] },
+  'piso|Contrapiso / base de piso':               { modo: 'auto', codes: ['4.1.5'] },
+  'carpinteria|Puertas interiores':               { modo: 'auto', codes: ['5.8.1'] },
+  'carpinteria|Closets':                          { modo: 'auto', codes: ['5.8.2'] },
+  'redes|Equipos HVAC':                           { modo: 'auto', codes: ['5.5.2h'] },
+  // fan-out SOLO a los códigos seguros (1 por baño / por cocina). Ducha, cerramiento,
+  // accesorios e isla no siempre aplican → los agrega el usuario.
+  'redes|Baños':   { modo: 'auto', codes: ['1.1.4', '5.3.6', '5.3.5'] },
+  'redes|Cocinas': { modo: 'auto', codes: ['1.1.3', '5.4.4', '5.4.6'] },
+  // ── condicional (el material lo elige el usuario; alfombra nunca se llena sola) ──
+  'piso|Piso interior (acabado)': { modo: 'cond', codes: ['5.6.1', '5.6.2'], nota: 'elegí el material de piso' },
+  'muros|Muros interiores':       { modo: 'cond', codes: ['5.1.1', '5.1.2', '5.1.3'], nota: 'drywall / pintura / aislamiento' },
+  // ── referencia (hay código, pero se cotiza por casa/proyecto/techo) ──
+  'carpinteria|Ventanería':                  { modo: 'ref', nota: '3.7.1 cotiza TODAS las ventanas por casa' },
+  'carpinteria|Gabinetes (cocina/baños)':    { modo: 'ref', nota: '5.4.1 se cotiza en ft lineales' },
+  'redes|Puntos eléctricos (tomas/salidas)': { modo: 'ref', nota: '5.1.4 se cotiza por casa' },
+  'redes|Puntos hidráulicos / plomería':     { modo: 'ref', nota: '5.2.1p / 5.2.4p se cotizan por casa' },
+  'acceso_externo|Puerta / portón de acceso': { modo: 'ref', nota: '3.5.1 principal vs 3.5.2 secundarias' },
+  'techo|Cubierta / tejado (exterior)':       { modo: 'ref', nota: '3.1.1 / 3.1.2 se cotizan por techo entero' },
+  'techo|Estructura de techo (correas)':      { modo: 'ref', nota: '4.1.4 se cotiza en ft²' },
+  'techo|Cielorraso / techo interior':        { modo: 'ref', nota: 'no hay código de cielorraso' },
+  'muros|Revoques / estuco interior':         { modo: 'ref', nota: 'no hay código propio de revoque' },
+  'muros|Impermeabilización de muros':        { modo: 'ref', nota: '2.2.9 es de cimentación, por proyecto' },
+  'estructura|Zapatas y cimientos':           { modo: 'ref', nota: 'cimentación se cotiza por proyecto' },
+  'estructura|Losa de contrapiso':            { modo: 'ref', nota: '2.2.6 es por unidad' },
+  'placa|Placa de entrepiso':                 { modo: 'ref', nota: 'colisiona con Contrapiso (4.1.5)' },
+  // ── sin destino (no existe el código en el catálogo) ──
+  'redes|Puntos de gas':          { modo: 'none' },
+  'placa|Escaleras (tramos)':     { modo: 'none' },
+  'placa|Barandas':               { modo: 'none' },
+  'estructura|Muros de contención': { modo: 'none' },
+  'estructura|Viguetas de entrepiso': { modo: 'none' },
+};
+const RM_UNI_LBL = { u: 'u', ft2: 'ft²', ft: 'ft lin.' };
+
+// Trae el take-off de la inspección más reciente de la propiedad del proyecto activo.
+async function rmLoadTakeoff() {
+  const pid = rmState.editPropertyId;
+  if (!pid) return { error: 'El proyecto no tiene property_id: abrilo desde una casa para poder cruzarlo con el diagnóstico.' };
+  try {
+    const { data: insps, error: e1 } = await sb.from('remodel_inspecciones')
+      .select('id, nombre_ref, fecha_evaluacion').eq('property_id', pid).eq('active', true)
+      .order('fecha_evaluacion', { ascending: false }).limit(1);
+    if (e1) throw e1;
+    if (!insps || !insps.length) return { error: 'No hay inspecciones guardadas para esta casa.' };
+    const insp = insps[0];
+    const { data: cant, error: e2 } = await sb.from('insp_cantidades')
+      .select('division, item, cantidad, unidad').eq('inspeccion_id', insp.id);
+    if (e2) throw e2;
+    if (!cant || !cant.length) return { error: `La inspección "${insp.nombre_ref}" no tiene cantidades cargadas.`, insp };
+    return { insp, cant };
+  } catch (e) { return { error: 'No se pudo leer el diagnóstico: ' + (e.message || e) }; }
+}
+
+// Aplica el take-off. REGLA DURA: nunca pisa una cantidad existente (solo llena
+// códigos ausentes o con qty vacía). Devuelve el detalle para el banner.
+function rmApplyTakeoff(cant) {
+  const cat = rmGetCatalog();
+  const rep = { lleno: [], respetado: [], referencia: [], sinDestino: [], sinMapa: [] };
+  const vacio = c => { const s = rmState.selectedActivities[c]; return !s || s.qty == null || s.qty === '' || +s.qty === 0; };
+  (cant || []).forEach(r => {
+    const qty = +r.cantidad;
+    if (!(qty > 0)) return;
+    const uni = RM_UNI_LBL[r.unidad] || r.unidad || '';
+    const meta = { item: r.item, division: r.division, qty, uni };
+    const m = RM_TAKEOFF_MAP[r.division + '|' + r.item];
+    if (!m) { rep.sinMapa.push(meta); return; }
+    if (m.modo === 'none') { rep.sinDestino.push(meta); return; }
+    if (m.modo === 'ref') { rep.referencia.push({ ...meta, nota: m.nota }); return; }
+    const objetivo = m.modo === 'cond'
+      ? (m.codes || []).filter(c => rmState.selectedActivities[c])   // solo los que el usuario ya eligió
+      : (m.codes || []);
+    if (!objetivo.length) { rep.referencia.push({ ...meta, nota: m.nota || 'ningún código de este tipo está en el proyecto todavía' }); return; }
+    objetivo.forEach(code => {
+      const ci = cat.find(c => c.code === code);
+      if (!ci) { rep.referencia.push({ ...meta, nota: `el código ${code} no está en el catálogo activo` }); return; }
+      if (!vacio(code)) { rep.respetado.push({ ...meta, code, desc: ci.desc, qtyActual: rmState.selectedActivities[code].qty }); return; }
+      const prev = rmState.selectedActivities[code] || {};
+      rmState.selectedActivities[code] = {
+        qty, vu: prev.vu != null ? prev.vu : ci.vu,
+        days: Math.max(1, Math.ceil(qty * (ci.days_per_qty || 0))),
+        start_offset: prev.start_offset || 0,
+        src: 'takeoff',
+      };
+      rep.lleno.push({ ...meta, code, desc: ci.desc, unitCat: ci.unit });
+    });
+  });
+  return rep;
+}
 
 // ─── S2-G4: Catálogo dinámico (DB con fallback al hardcoded RM_CATALOG) ───
 // rmActiveCatalog se setea desde DB en rmLoadCatalog(). Si null → usar RM_CATALOG hardcodeado.
@@ -445,11 +554,11 @@ const rmQuickState = {
 
 // ─── TIPOS DE REMODELACIÓN (multiplican las tasas) ───
 const RM_TYPES = {
-  lipstick: { name: 'Lipstick',           icon: '✨', mult: 0.35, desc: 'Pintura + fixtures + deep clean' },
-  light:    { name: 'Cosmético Ligero',   icon: '🖌️', mult: 0.65, desc: 'Pintura + pisos + reparaciones' },
-  heavy:    { name: 'Cosmético Pesado',   icon: '🔧', mult: 1.00, desc: 'Cocina O baños + acabados (BASE)' },
-  full:     { name: 'Renovación Total',   icon: '🔨', mult: 1.55, desc: 'Cocina + baños + sistemas + acabados' },
-  gut:      { name: 'Gut Renovation',     icon: '⛏️', mult: 2.20, desc: 'Demolición a studs + replanteo + ampliación' }
+  lipstick: { name: 'Lipstick',           icon: osIcon('sparkles'), mult: 0.35, desc: 'Pintura + fixtures + deep clean' },
+  light:    { name: 'Cosmético Ligero',   icon: osIcon('palette'), mult: 0.65, desc: 'Pintura + pisos + reparaciones' },
+  heavy:    { name: 'Cosmético Pesado',   icon: osIcon('wrench'), mult: 1.00, desc: 'Cocina O baños + acabados (BASE)' },
+  full:     { name: 'Renovación Total',   icon: osIcon('hammer'), mult: 1.55, desc: 'Cocina + baños + sistemas + acabados' },
+  gut:      { name: 'Gut Renovation',     icon: osIcon('construction'), mult: 2.20, desc: 'Demolición a studs + replanteo + ampliación' }
 };
 
 // ─── AUTO-FILL TEMPLATES: para cada tipo, qué actividades incluir + cantidades por sqft ───
@@ -457,7 +566,7 @@ const RM_TYPES = {
 // `qty` = fijo · `f(s)` = función del sqft (devuelve cantidad)
 const RM_AUTOFILL_TEMPLATES = {
   lipstick: {
-    label: '✨ Lipstick',
+    label: 'Lipstick',
     desc: 'Pintura + fixtures + clean. Refresh barato para vender rápido.',
     activities: {
       '5.1.2': { f: s => s * 3 },       // interior paint ~3× sqft (paredes + techos)
@@ -470,7 +579,7 @@ const RM_AUTOFILL_TEMPLATES = {
     }
   },
   light: {
-    label: '🖌️ Cosmético Ligero',
+    label: 'Cosmético Ligero',
     desc: 'Pintura + pisos + repairs + fixtures básicos. Sin tocar cocina ni baños.',
     activities: {
       '1.1.6': { f: s => s * 0.3 },     // drywall removal parcial
@@ -487,7 +596,7 @@ const RM_AUTOFILL_TEMPLATES = {
     }
   },
   heavy: {
-    label: '🔧 Cosmético Pesado',
+    label: 'Cosmético Pesado',
     desc: 'Cocina O baños + acabados generales. Asume 2 baños.',
     activities: {
       // Demo
@@ -529,7 +638,7 @@ const RM_AUTOFILL_TEMPLATES = {
     }
   },
   full: {
-    label: '🔨 Renovación Total',
+    label: 'Renovación Total',
     desc: 'Cocina + baños + sistemas + acabados. Sin demo a studs.',
     activities: {
       // Demo completa
@@ -582,7 +691,7 @@ const RM_AUTOFILL_TEMPLATES = {
     }
   },
   gut: {
-    label: '⛏️ Gut Renovation',
+    label: 'Gut Renovation',
     desc: 'Demolición a studs + framing + replanteo total + exterior.',
     activities: {
       // Demo total
@@ -695,7 +804,7 @@ function rmAutoFillEditor(typeKey) {
 
   const e = rmCalcProject();
   setTimeout(() => {
-    alert(`✅ Auto-llenado completo\n\n• ${Object.keys(newSelected).length} actividades agregadas (template ${template.label})\n• Sqft usado: ${sqft}\n• Costo directo estimado: $${Math.round(e.totals.total).toLocaleString()}\n• Precio cliente sugerido: $${Math.round(e.pricing.clientPrice).toLocaleString()}\n• Duración estimada: ${e.totalDays} días\n${skipped.length?'\n⚠️ '+skipped.length+' codes del template no están en el catálogo: '+skipped.slice(0,5).join(', ')+'\n':''}\nAhora revisá la lista, ajustá cantidades y quitá lo que no aplique a esta casa.`);
+    alert(`Auto-llenado completo\n\n• ${Object.keys(newSelected).length} actividades agregadas (template ${template.label})\n• Sqft usado: ${sqft}\n• Costo directo estimado: $${Math.round(e.totals.total).toLocaleString()}\n• Precio cliente sugerido: $${Math.round(e.pricing.clientPrice).toLocaleString()}\n• Duración estimada: ${e.totalDays} días\n${skipped.length?'\n'+skipped.length+' codes del template no están en el catálogo: '+skipped.slice(0,5).join(', ')+'\n':''}\nAhora revisá la lista, ajustá cantidades y quitá lo que no aplique a esta casa.`);
   }, 100);
 }
 
@@ -1109,7 +1218,7 @@ async function rmAgentSend(userText) {
       });
       if (!resp.ok) {
         const err = await resp.text();
-        rmState.aiChatLog.push({ role: 'assistant', content: [{ type: 'text', text: '❌ Error: ' + err + '\n\n¿Deployaste la Edge Function `remodel-ai` y seteaste ANTHROPIC_API_KEY en Supabase secrets?' }] });
+        rmState.aiChatLog.push({ role: 'assistant', content: [{ type: 'text', text: 'Error: ' + err + '\n\n¿Deployaste la Edge Function `remodel-ai` y seteaste ANTHROPIC_API_KEY en Supabase secrets?' }] });
         break;
       }
       const data = await resp.json();
@@ -1135,7 +1244,7 @@ async function rmAgentSend(userText) {
       break; // end_turn o stop_sequence
     }
   } catch (e) {
-    rmState.aiChatLog.push({ role: 'assistant', content: [{ type: 'text', text: '❌ Error de red: ' + String(e) }] });
+    rmState.aiChatLog.push({ role: 'assistant', content: [{ type: 'text', text: 'Error de red: ' + String(e) }] });
   } finally {
     rmState.aiChatBusy = false;
     rmRenderTab();
@@ -1158,14 +1267,14 @@ function rmRenderAgent(body) {
   body.innerHTML = `
     <div class="flex justify-between items-end mb-3">
       <div>
-        <h2 class="text-lg font-bold">🤖 IA Agente — Claude para Remodel Pro</h2>
+        <h2 class="text-lg font-bold">${osIcon('bot')} IA Agente — Claude para Remodel Pro</h2>
         <p class="text-xs text-slate-500">${rmState.currentProject ? `Proyecto: ${rmState.editName} · ${e.activities.length} activ · $${Math.round(e.pricing?.clientPrice||0)}` : 'Sin proyecto cargado'}</p>
       </div>
-      <button onclick="rmAgentClear()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">🗑 Limpiar chat</button>
+      <button onclick="rmAgentClear()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded">${osIcon('trash')} Limpiar chat</button>
     </div>
 
     <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 text-[11px] text-purple-950 mb-3">
-      <strong>💡 Qué puede hacer:</strong>
+      <strong>${osIcon('lightbulb')} Qué puede hacer:</strong>
       <ul class="mt-1 ml-4 list-disc">
         <li>Agregar/modificar/quitar actividades del proyecto cargado ("agregame quartz countertops en 45 sqft")</li>
         <li>Sugerir suppliers y precios reales ("dónde compro tile más barato?")</li>
@@ -1197,14 +1306,14 @@ function rmRenderAgent(body) {
             <div class="${bg} rounded-2xl px-3 py-2 max-w-[85%] text-xs">
               ${m.content.map(c => {
                 if (c.type === 'text') return `<div class="whitespace-pre-wrap">${(c.text||'').replace(/</g,'&lt;')}</div>`;
-                if (c.type === 'tool_use') return `<div class="mt-1 text-[10px] bg-purple-100 text-purple-900 rounded px-1.5 py-0.5 inline-block font-mono">⚙️ ${c.name}(${JSON.stringify(c.input).slice(0,80)})</div>`;
+                if (c.type === 'tool_use') return `<div class="mt-1 text-[10px] bg-purple-100 text-purple-900 rounded px-1.5 py-0.5 inline-block font-mono">${osIcon('settings')} ${c.name}(${JSON.stringify(c.input).slice(0,80)})</div>`;
                 return '';
               }).join('')}
             </div>
           </div>
         `;
       }).join('')}
-      ${rmState.aiChatBusy ? `<div class="text-center text-xs text-slate-500 italic">⏳ Claude pensando...</div>` : ''}
+      ${rmState.aiChatBusy ? `<div class="text-center text-xs text-slate-500 italic">${osIcon('loader')} Claude pensando...</div>` : ''}
     </div>
 
     <form onsubmit="event.preventDefault(); rmAgentSend(document.getElementById('rm-agent-input').value); document.getElementById('rm-agent-input').value='';">
@@ -1290,6 +1399,7 @@ async function rmLoadProject(p) {
     rmLoadInvoices(p.id)
   ]);
   rmState.editName = p.name;
+  rmState.editPropertyId = p.property_id || null;
   rmState.editAddress = p.address || '';
   rmState.editSqft = p.sqft || 1500;
   rmState.editStartDate = p.start_date || new Date().toISOString().split('T')[0];
@@ -1385,7 +1495,7 @@ async function openRemodelPro(sys) {
   rmState.sys = sys;
   await rmLoadAll();
   if (typeof fcLoadConfig === 'function') { fcState.sys = sys; await fcLoadConfig().catch(() => {}); }
-  openModal(`🏗️ ${sys.name}`, '<div id="rm-root"></div>');
+  openModal(`${sys.name}`, '<div id="rm-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   rmRender();
@@ -1432,23 +1542,23 @@ function rmNavEsc(s) {
 function rmTabLabels() {
   const samplesCount = (Object.values(rmDynamicBenchmarks || {}).reduce(function (s, d) { return s + (d.samples || 0); }, 0)) + 5;
   return {
-    projects: '📁 Proyectos (' + rmState.projects.length + ')',
-    compare: '🎯 3 Estimaciones',
-    rates: '📊 Tasas $/ft²',
-    editor: rmState.currentProject ? ('✏️ ' + rmNavEsc(rmState.currentProject.name)) : '➕ Editor detallado',
-    forecast: '🔮 Pronóstico',
-    seguimiento: '🔄 Seguimiento',
-    gantt: '📅 Cronograma',
-    sow: '📋 SOW (Lender)',
-    obrapro: '🏗 Obra Pro',
-    versions: rmState.currentProject ? ('📜 Historial (' + rmState.versions.length + 'v · ' + rmState.changeOrders.length + 'CO)') : '📜 Historial',
-    crew: '👷 Crew (' + rmState.crew.length + ')',
-    purchases: '🛒 Lista compra',
-    field: '📱 Vista campo',
-    agent: '🤖 IA Agente',
-    catalog: '🛠 Catálogo (' + rmGetCatalog().length + ')',
-    learning: '📈 Precisión (' + samplesCount + ')',
-    calibration: '🎯 Calibración'
+    projects: 'Proyectos (' + rmState.projects.length + ')',
+    compare: '3 Estimaciones',
+    rates: 'Tasas $/ft²',
+    editor: rmState.currentProject ? (osIcon('pencil') + rmNavEsc(rmState.currentProject.name)) : 'Editor detallado',
+    forecast: 'Pronóstico',
+    seguimiento: 'Seguimiento',
+    gantt: 'Cronograma',
+    sow: 'SOW (Lender)',
+    obrapro: 'Obra Pro',
+    versions: rmState.currentProject ? ('Historial (' + rmState.versions.length + 'v · ' + rmState.changeOrders.length + 'CO)') : 'Historial',
+    crew: 'Crew (' + rmState.crew.length + ')',
+    purchases: 'Lista compra',
+    field: 'Vista campo',
+    agent: 'IA Agente',
+    catalog: 'Catálogo (' + rmGetCatalog().length + ')',
+    learning: 'Precisión (' + samplesCount + ')',
+    calibration: 'Calibración'
   };
 }
 
@@ -1463,31 +1573,31 @@ function rmNavHtml() {
   let steps = '';
   RM_GROUPS.forEach(function (g, i) {
     const on = g.id === activeGroup;
-    if (i) steps += '<span style="color:var(--mut,#94a3b8);font-size:13px;flex:none">→</span>';
+    if (i) steps += '<span style="color:var(--mut,#8b93a1);font-size:13px;flex:none">→</span>';
     steps += '<button onclick="rmSetGroup(\'' + g.id + '\')" style="flex:none;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;'
       + (on
-        ? 'border:1px solid var(--a1,#2563eb);background:var(--a1,#2563eb);color:#fff'
-        : 'border:1px solid var(--glassb,#e2e8f0);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#0f172a)')
+        ? 'border:1px solid var(--a1,#3a5be0);background:var(--a1,#3a5be0);color:#fff'
+        : 'border:1px solid var(--glassb,#dfe4ec);background:var(--glass,rgba(148,163,184,.08));color:var(--ink,#0e1420)')
       + '"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:800;'
-      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#e2e8f0);color:var(--mut,#64748b)')
+      + (on ? 'background:rgba(255,255,255,.25);color:#fff' : 'background:var(--glassb,#dfe4ec);color:var(--mut,#6f7785)')
       + '">' + g.num + '</span>' + g.name + '</button>';
   });
   // Chip del proyecto activo (compartido entre todos los pasos)
   let chip = '';
   if (rmState.currentProject) {
-    chip = '<span style="flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--glassb,#e2e8f0);background:var(--glass,rgba(148,163,184,.08));color:var(--mut,#475569)" title="Proyecto activo: todos los pasos abren con esta casa">📌 '
+    chip = '<span style="flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--glassb,#dfe4ec);background:var(--glass,rgba(148,163,184,.08));color:var(--mut,#5a6270)" title="Proyecto activo: todos los pasos abren con esta casa">' + osIcon('map-pin') + ' '
       + rmNavEsc(rmState.currentProject.address || rmState.currentProject.name || '')
-      + ' <a onclick="rmSetTab(\'projects\')" style="cursor:pointer;text-decoration:underline;color:var(--a1,#2563eb)">cambiar</a></span>';
+      + ' <a onclick="rmSetTab(\'projects\')" style="cursor:pointer;text-decoration:underline;color:var(--a1,#3a5be0)">cambiar</a></span>';
   }
   let subs = '';
   grp.tabs.forEach(function (t) {
     const on = rmState.tab === t;
     subs += '<button onclick="rmSetTab(\'' + t + '\')" style="flex:none;padding:8px 12px;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;background:none;border:none;border-bottom:2px solid '
-      + (on ? 'var(--a1,#2563eb);color:var(--ink,#0f172a)' : 'transparent;color:var(--mut,#64748b)')
+      + (on ? 'var(--a1,#3a5be0);color:var(--ink,#0e1420)' : 'transparent;color:var(--mut,#6f7785)')
       + '">' + (labels[t] || t) + '</button>';
   });
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">' + steps + chip + '</div>'
-    + '<div style="display:flex;gap:2px;margin:0 -24px 16px;padding:0 24px;overflow-x:auto;border-bottom:1px solid var(--glassb,#e2e8f0)">' + subs + '</div>';
+    + '<div style="display:flex;gap:2px;margin:0 -24px 16px;padding:0 24px;overflow-x:auto;border-bottom:1px solid var(--glassb,#dfe4ec)">' + subs + '</div>';
 }
 
 function rmRender() {
@@ -1559,10 +1669,10 @@ function moSyncAgo() {
 function moSyncBadgeHtml() {
   const map = {
     idle:    ['', ''],
-    saving:  ['💾 Guardando…', 'bg-amber-100 text-amber-800'],
+    saving:  ['Guardando…', 'bg-amber-100 text-amber-800'],
     synced:  [`☁️ Sincronizado · ${moSyncAgo()}`, 'bg-emerald-100 text-emerald-700'],
-    offline: ['⚠️ Modo offline', 'bg-orange-100 text-orange-800'],
-    error:   ['❌ Error de sync — reintentar', 'bg-red-100 text-red-700'],
+    offline: ['Modo offline', 'bg-orange-100 text-orange-800'],
+    error:   ['Error de sync — reintentar', 'bg-red-100 text-red-700'],
   };
   const [txt, cls] = map[moSync.status] || map.idle;
   if (!txt) return '<span id="mo-sync-badge"></span>';
@@ -1682,7 +1792,7 @@ function rmRenderCompare(body) {
     <div class="space-y-4">
       <!-- Inputs -->
       <div class="bg-white rounded-xl p-4 border border-slate-200">
-        <h3 class="text-xs font-bold uppercase text-slate-700 mb-3">🎯 Comparador de 3 fuentes de estimación</h3>
+        <h3 class="text-xs font-bold uppercase text-slate-700 mb-3">${osIcon('target')} Comparador de 3 fuentes de estimación</h3>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-[10px] text-slate-500 mb-1">Sqft</label>
@@ -1702,7 +1812,7 @@ function rmRenderCompare(body) {
         <!-- HISTÓRICO -->
         <div class="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-400 rounded-xl p-4">
           <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-bold text-emerald-900">🏠 Histórico AWA</h4>
+            <h4 class="text-sm font-bold text-emerald-900">${osIcon('house')} Histórico AWA</h4>
             <span class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded">${5 + dynCount} casas</span>
           </div>
           <div class="text-3xl font-bold text-emerald-700">${rmFmt(histTotal)}</div>
@@ -1717,7 +1827,7 @@ function rmRenderCompare(body) {
         <!-- MERCADO -->
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-400 rounded-xl p-4">
           <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-bold text-blue-900">📊 Mercado Austin</h4>
+            <h4 class="text-sm font-bold text-blue-900">${osIcon('chart')} Mercado Austin</h4>
             <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded">RSMeans/Houzz</span>
           </div>
           <div class="text-3xl font-bold text-blue-700">${rmFmt(mktTotal)}</div>
@@ -1732,7 +1842,7 @@ function rmRenderCompare(body) {
         <!-- HÍBRIDO -->
         <div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-500 rounded-xl p-4 ring-2 ring-amber-300">
           <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-bold text-amber-900">🎯 Híbrido (recomendado)</h4>
+            <h4 class="text-sm font-bold text-amber-900">${osIcon('target')} Híbrido (recomendado)</h4>
             <span class="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded">balance</span>
           </div>
           <div class="text-3xl font-bold text-amber-700">${rmFmt(hybTotal)}</div>
@@ -1747,7 +1857,7 @@ function rmRenderCompare(body) {
 
       <!-- Análisis comparativo -->
       <div class="bg-slate-900 text-white rounded-xl p-4">
-        <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">📐 Análisis comparativo</h4>
+        <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">${osIcon('ruler')} Análisis comparativo</h4>
         <div class="grid grid-cols-3 gap-3 text-xs">
           <div>
             <div class="text-[10px] text-slate-400">Margen vs Histórico</div>
@@ -1797,7 +1907,7 @@ function rmRenderCompare(body) {
 
 // ─── TAB: PRECISIÓN DEL MODELO (learning) ───
 async function rmRenderLearning(body) {
-  body.innerHTML = `<div class="text-center py-12">🔄 Cargando datos de aprendizaje...</div>`;
+  body.innerHTML = `<div class="text-center py-12">${osIcon('refresh')} Cargando datos de aprendizaje...</div>`;
   const { data: actuals } = await sb.from('remodel_actuals').select('*');
   const list = actuals || [];
 
@@ -1826,7 +1936,7 @@ async function rmRenderLearning(body) {
   body.innerHTML = `
     <div class="space-y-4">
       <div>
-        <h2 class="text-lg font-bold">📈 Precisión del modelo</h2>
+        <h2 class="text-lg font-bold">${osIcon('trending-up')} Precisión del modelo</h2>
         <p class="text-xs text-slate-500">El modelo aprende con cada proyecto completado. Reduce la desviación entre estimado y real.</p>
       </div>
 
@@ -1839,7 +1949,7 @@ async function rmRenderLearning(body) {
 
       ${list.length === 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-950">
-          <strong>🎓 Cómo alimentar el modelo:</strong><br>
+          <strong>${osIcon('graduation-cap')} Cómo alimentar el modelo:</strong><br>
           1. Crea un proyecto en el Editor<br>
           2. Conforme la obra avanza, abre el proyecto y registra <strong>"Real cost"</strong> en cada actividad<br>
           3. Al terminar, marca status "Completado"<br>
@@ -1855,7 +1965,7 @@ async function rmRenderLearning(body) {
               ${RM_STAGE_BENCHMARKS.map(s => {
                 const arr = byStage[s.key] || [];
                 const avg = arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
-                const status = avg === null ? 'sin datos' : Math.abs(avg) < 5 ? '✓ Excelente' : Math.abs(avg) < 15 ? '⚠️ Ajustar' : '🔴 Recalibrar';
+                const status = avg === null ? 'sin datos' : Math.abs(avg) < 5 ? '✓ Excelente' : Math.abs(avg) < 15 ? 'Ajustar' : 'Recalibrar';
                 const cls = avg === null ? 'text-slate-400' : Math.abs(avg) < 5 ? 'text-emerald-700' : Math.abs(avg) < 15 ? 'text-amber-700' : 'text-red-700';
                 return `<tr class="border-t border-slate-100">
                   <td class="py-1.5 px-2">${s.name}</td>
@@ -1917,7 +2027,7 @@ function rmRenderQuick(body) {
       <div class="lg:col-span-2 space-y-3">
         <!-- INPUT -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">⚡ Estimación rápida basada en 5 casas reales</h3>
+          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('zap')} Estimación rápida basada en 5 casas reales</h3>
           <div class="grid grid-cols-3 gap-3 items-end">
             <div>
               <label class="block text-[10px] text-slate-500 mb-1">Sqft de la casa</label>
@@ -1988,7 +2098,7 @@ function rmRenderQuick(body) {
         </div>
 
         <div class="bg-white rounded-lg p-3 border border-slate-200">
-          <div class="text-xs font-bold text-slate-700 uppercase mb-2">📈 Vs Mercado Austin</div>
+          <div class="text-xs font-bold text-slate-700 uppercase mb-2">${osIcon('trending-up')} Vs Mercado Austin</div>
           <div class="text-xs space-y-1">
             <div class="flex justify-between"><span class="text-slate-500">Tu costo interno:</span><span class="font-bold">$${totalPsf.toFixed(0)}/ft²</span></div>
             <div class="flex justify-between"><span class="text-slate-500">Mercado Austin:</span><span class="font-bold">$${RM_MARKET_AUSTIN_MIN}-${RM_MARKET_AUSTIN_MAX}/ft²</span></div>
@@ -1999,7 +2109,7 @@ function rmRenderQuick(body) {
         </div>
 
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] text-blue-950">
-          <strong>📊 Calibración:</strong> Datos promediados de <strong>5 casas reales</strong> (Ramble, Arcadia, Virginia, Idlewood, Picnic). Confianza estadística: 78%. Σ-1 a +1 cubre 68% de los casos.
+          <strong>${osIcon('chart')} Calibración:</strong> Datos promediados de <strong>5 casas reales</strong> (Ramble, Arcadia, Virginia, Idlewood, Picnic). Confianza estadística: 78%. Σ-1 a +1 cubre 68% de los casos.
         </div>
 
         <button onclick="rmQuickToProject()" class="w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg">→ Pasar al Editor detallado</button>
@@ -2038,7 +2148,7 @@ function rmQuickToProject() {
 function rmRenderRates(body) {
   body.innerHTML = `
     <div class="mb-3">
-      <h2 class="text-lg font-bold">📊 Tasas Unitarias por Etapa — $/ft² (calibrado con 5 casas)</h2>
+      <h2 class="text-lg font-bold">${osIcon('chart')} Tasas Unitarias por Etapa — $/ft² (calibrado con 5 casas)</h2>
       <p class="text-xs text-slate-500">Total portafolio: <strong>$${RM_PORTFOLIO_TOTAL_PSF}/ft²</strong> · Mercado Austin: <strong>$${RM_MARKET_AUSTIN_MIN}-${RM_MARKET_AUSTIN_MAX}/ft²</strong> · Margen estructural: $${(RM_MARKET_AUSTIN_MIN-RM_PORTFOLIO_TOTAL_PSF).toFixed(0)}-$${(RM_MARKET_AUSTIN_MAX-RM_PORTFOLIO_TOTAL_PSF).toFixed(0)}/ft²</p>
     </div>
     <div class="overflow-x-auto border border-slate-200 rounded-lg">
@@ -2132,7 +2242,9 @@ function rmRenderProjects(body) {
     <div class="flex justify-between items-center mb-3">
       <h2 class="text-lg font-bold">Proyectos de remodelación</h2>
       <div class="flex gap-2">
-        ${rmState.projects.length ? '<button onclick="rmExportAllExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-4 py-2 rounded">📥 Excel masivo</button>' : ''}
+        ${rmState.projects.length ? '<button onclick="rmExportAllExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-4 py-2 rounded">' + osIcon('inbox') + ' Excel masivo</button>' : ''}
+        <button onclick="if(window.rmPCOpenImport)rmPCOpenImport()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded" title="Importar costos por fase desde el Excel del Estimado">${osIcon('inbox')} Importar costos/fase</button>
+        <button onclick="if(window.rmSqftOpenPanel)rmSqftOpenPanel()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-4 py-2 rounded" title="Recalcular $/ft² real con margen de error (calibración)">📐 Recalcular $/ft²</button>
         <button onclick="rmNewProject()" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded">+ Nuevo proyecto</button>
       </div>
     </div>
@@ -2200,9 +2312,9 @@ function rmRenderProjects(body) {
               <td class="py-2 px-2 text-center"><span class="text-[10px] px-2 py-0.5 rounded bg-slate-100">${p.status}</span></td>
               <td class="py-2 px-2 text-right text-xs text-slate-500">${rmFmtDate(p.start_date)}</td>
               <td class="py-2 px-2 text-right whitespace-nowrap">
-                <button onclick='rmLoadProject(${JSON.stringify(p).replace(/'/g,"&#39;")})' class="text-xs text-slate-600 hover:text-slate-900 mr-1" title="Editar">📝</button>
-                <button onclick="rmExportProjectExcel('${p.id}')" class="text-xs text-emerald-600 hover:text-emerald-800 mr-1" title="Descargar Excel">📥</button>
-                <button onclick="rmDeleteProject('${p.id}')" class="text-xs text-red-600 hover:text-red-800" title="Borrar">🗑</button>
+                <button onclick='rmLoadProject(${JSON.stringify(p).replace(/'/g,"&#39;")})' class="text-xs text-slate-600 hover:text-slate-900 mr-1" title="Editar">${osIcon('pencil-line')}</button>
+                <button onclick="rmExportProjectExcel('${p.id}')" class="text-xs text-emerald-600 hover:text-emerald-800 mr-1" title="Descargar Excel">${osIcon('inbox')}</button>
+                <button onclick="rmDeleteProject('${p.id}')" class="text-xs text-red-600 hover:text-red-800" title="Borrar">${osIcon('trash')}</button>
               </td>
             </tr>
           `).join('') || `<tr><td colspan="8" class="text-center text-slate-400 py-8">${tagFilter?'Sin proyectos con tag "'+tagFilter+'".':'Sin proyectos. Click "+ Nuevo proyecto".'}</td></tr>`}
@@ -2274,9 +2386,9 @@ function rmRenderCharts(e) {
     data: {
       labels: groups.map(g => g.name),
       datasets: [
-        { label: 'Material', data: groups.map(g => Math.round(g.material)), backgroundColor: '#3b82f6' },
+        { label: 'Material', data: groups.map(g => Math.round(g.material)), backgroundColor: '#3a5be0' },
         { label: 'Mano de obra', data: groups.map(g => Math.round(g.labor)), backgroundColor: '#a855f7' },
-        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#64748b' }
+        { label: 'Equipo', data: groups.map(g => Math.round(g.equipment)), backgroundColor: '#6f7785' }
       ]
     },
     options: {
@@ -2306,13 +2418,13 @@ function rmRenderCatalog(body) {
   body.innerHTML = `
     <div class="flex justify-between items-end mb-3 flex-wrap gap-2">
       <div>
-        <h2 class="text-lg font-bold">🛠 Catálogo de actividades</h2>
+        <h2 class="text-lg font-bold">${osIcon('wrench')} Catálogo de actividades</h2>
         <p class="text-xs text-slate-500">${cat.length} items ${isFromDb ? '· cargados desde DB (editables)' : '· fallback hardcodeado (correr s2-g4-catalog.sql para activar edición)'}</p>
       </div>
       <div class="flex gap-2 flex-wrap">
         ${isFromDb ? `<button onclick="rmState.catalogEditView='${view==='new'?'list':'new'}'; rmRenderTab()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">${view==='new'?'✕ Cancelar':'+ Agregar actividad'}</button>` : ''}
         <button onclick="rmCatalogExportJson()" class="bg-slate-100 hover:bg-slate-200 text-xs font-bold px-3 py-2 rounded">⬇️ Export JSON</button>
-        <button onclick="rmState.tab='suppliers_sub'; rmRenderTab()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">🏪 Suppliers (${rmState.suppliers.length})</button>
+        <button onclick="rmState.tab='suppliers_sub'; rmRenderTab()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('store')} Suppliers (${rmState.suppliers.length})</button>
       </div>
     </div>
 
@@ -2328,7 +2440,7 @@ function rmRenderCatalog(body) {
           <div><label class="block text-[10px] text-slate-600 mb-0.5">Precio default $</label><input type="number" step="0.01" value="${n.vu_default}" oninput="rmState.catalogNew.vu_default=this.value" class="w-full border border-slate-300 rounded px-2 py-1" /></div>
           <div><label class="block text-[10px] text-slate-600 mb-0.5">% Material (0-1)</label><input type="number" step="0.05" min="0" max="1" value="${n.mat_pct}" oninput="rmState.catalogNew.mat_pct=this.value" class="w-full border border-slate-300 rounded px-2 py-1" /></div>
           <div><label class="block text-[10px] text-slate-600 mb-0.5">Días por unidad</label><input type="number" step="0.001" value="${n.days_per_qty}" oninput="rmState.catalogNew.days_per_qty=this.value" class="w-full border border-slate-300 rounded px-2 py-1" /></div>
-          <div class="flex items-end"><button onclick="rmCatalogAddNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded">💾 Crear</button></div>
+          <div class="flex items-end"><button onclick="rmCatalogAddNew()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 rounded">${osIcon('save')} Crear</button></div>
         </div>
       </div>
     ` : ''}
@@ -2358,7 +2470,7 @@ function rmRenderCatalog(body) {
                     <th class="text-right p-1.5 w-14">Mat%</th>
                     <th class="text-right p-1.5 w-16">d/qty</th>
                     <th class="text-right p-1.5 w-20">Mejor precio</th>
-                    <th class="text-left p-1.5 w-32" title="Depends on (CPM)">🔗 Depends on</th>
+                    <th class="text-left p-1.5 w-32" title="Depends on (CPM)">${osIcon('link')} Depends on</th>
                     <th class="text-center p-1.5 w-20">Acciones</th>
                   </tr>
                 </thead>
@@ -2382,7 +2494,7 @@ function rmRenderCatalog(body) {
                         <td class="p-1 text-center">
                           ${editable ? `
                             <button onclick="rmCatalogToggleActive('${it.code}', ${it.active!==false})" title="${it.active!==false?'Desactivar':'Activar'}" class="text-[10px] px-1 ${it.active!==false?'text-emerald-600':'text-slate-400'}">${it.active!==false?'✓':'○'}</button>
-                            ${!it.is_seed?`<button onclick="rmCatalogDelete('${it.code}')" title="Borrar" class="text-[10px] text-red-600 px-1">🗑</button>`:''}
+                            ${!it.is_seed?`<button onclick="rmCatalogDelete('${it.code}')" title="Borrar" class="text-[10px] text-red-600 px-1">${osIcon('trash')}</button>`:''}
                           ` : ''}
                         </td>
                       </tr>
@@ -2399,7 +2511,7 @@ function rmRenderCatalog(body) {
     <!-- Suppliers panel -->
     <div class="mt-4 bg-white rounded-xl border border-slate-200 p-4">
       <div class="flex justify-between items-center mb-3">
-        <h3 class="text-sm font-bold">🏪 Suppliers (${rmState.suppliers.length})</h3>
+        <h3 class="text-sm font-bold">${osIcon('store')} Suppliers (${rmState.suppliers.length})</h3>
         <button onclick="rmSupplierAdd()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">+ Agregar supplier</button>
       </div>
       ${rmState.suppliers.length === 0 ? `
@@ -2414,7 +2526,7 @@ function rmRenderCatalog(body) {
                 <td class="p-2"><span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded">${s.type}</span></td>
                 <td class="p-2 text-slate-500">${s.city || '—'}</td>
                 <td class="p-2 text-center">
-                  <button onclick="rmSupplierTogglePreferred('${s.id}', ${s.preferred})" class="${s.preferred?'text-amber-600':'text-slate-400'}">${s.preferred?'⭐':'☆'}</button>
+                  <button onclick="rmSupplierTogglePreferred('${s.id}', ${s.preferred})" class="${s.preferred?'text-amber-600':'text-slate-400'}">${s.preferred?osIcon('star'):'☆'}</button>
                 </td>
                 <td class="p-2 text-center">
                   <button onclick="rmSupplierAddPrice('${s.id}', '${(s.name||'').replace(/'/g,'&#39;')}')" class="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-900 px-2 py-1 rounded">+ Precio</button>
@@ -2427,11 +2539,11 @@ function rmRenderCatalog(body) {
     </div>
 
     <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] text-blue-950">
-      <strong>💡 Cómo funciona:</strong>
+      <strong>${osIcon('lightbulb')} Cómo funciona:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
         <li>El catálogo en DB <strong>reemplaza</strong> el hardcoded apenas cargás el archivo SQL. Si DB está vacía, el sistema usa el array hardcoded como fallback.</li>
         <li>Items <strong>seed</strong> (los 70 originales) tienen badge <code>SEED</code>. Items que agregues tienen badge <code>CUSTOM</code>.</li>
-        <li>Para preservar histórico, lo mejor es <strong>desactivar</strong> (○) en vez de borrar 🗑 — proyectos viejos siguen viendo el item.</li>
+        <li>Para preservar histórico, lo mejor es <strong>desactivar</strong> (○) en vez de borrar ${osIcon('trash')} — proyectos viejos siguen viendo el item.</li>
         <li>La columna <strong>Mejor precio</strong> muestra el menor precio registrado entre todos los suppliers. Si desvía >15% del VU default → fondo ámbar.</li>
         <li>Para registrar un precio real: agregá supplier → click "+ Precio" → te pide code + monto + fuente.</li>
       </ul>
@@ -2527,7 +2639,7 @@ function rmRenderCrew(body) {
   body.innerHTML = `
     <div class="flex justify-between items-center mb-3">
       <div>
-        <h2 class="text-lg font-bold">👷 Crew & Asignaciones</h2>
+        <h2 class="text-lg font-bold">${osIcon('hard-hat')} Crew & Asignaciones</h2>
         <p class="text-xs text-slate-500">${rmState.crew.length} workers · ${rmState.crewAssignments.length} asignaciones${rmState.currentProject?' en '+rmState.currentProject.name:''}</p>
       </div>
       <button onclick="rmCrewAdd()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">+ Worker</button>
@@ -2612,7 +2724,7 @@ function rmRenderCrew(body) {
         `}
       </div>
     ` : `
-      <div class="text-center py-8 text-xs text-slate-500">Cargá un proyecto desde 📁 Proyectos para asignar workers a actividades.</div>
+      <div class="text-center py-8 text-xs text-slate-500">Cargá un proyecto desde ${osIcon('folder')} Proyectos para asignar workers a actividades.</div>
     `}
   `;
 }
@@ -2622,7 +2734,7 @@ function rmRenderCrew(body) {
 // ============================================================
 function rmRenderPurchases(body) {
   if (!rmState.currentProject) {
-    body.innerHTML = `<div class="text-center py-12 text-slate-500">Cargá un proyecto desde 📁 Proyectos para generar la lista de compra de materiales.</div>`;
+    body.innerHTML = `<div class="text-center py-12 text-slate-500">Cargá un proyecto desde ${osIcon('folder')} Proyectos para generar la lista de compra de materiales.</div>`;
     return;
   }
   const e = rmCalcProject();
@@ -2674,20 +2786,20 @@ function rmRenderPurchases(body) {
   body.innerHTML = `
     <div class="flex justify-between items-end mb-3 flex-wrap gap-2">
       <div>
-        <h2 class="text-lg font-bold">🛒 Lista de compra — ${rmState.currentProject.name}</h2>
+        <h2 class="text-lg font-bold">${osIcon('package')} Lista de compra — ${rmState.currentProject.name}</h2>
         <p class="text-xs text-slate-500">${rows.length} items · ${Object.keys(bySupplier).length} suppliers · total materiales ${rmFmt(totalAll)}</p>
       </div>
       <button onclick="rmExportPurchasesCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-2 rounded">⬇️ Export CSV</button>
     </div>
 
     <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[11px] text-blue-950 mb-3">
-      <strong>💡 Cómo leer:</strong> "Ordenar antes del" = fecha uso − lead time (orden anticipada para que llegue a tiempo). Si "ordenar antes" ya pasó, ordená HOY. Los items sin supplier asignado los podés cargar desde 🛠 Catálogo → Suppliers.
+      <strong>${osIcon('lightbulb')} Cómo leer:</strong> "Ordenar antes del" = fecha uso − lead time (orden anticipada para que llegue a tiempo). Si "ordenar antes" ya pasó, ordená HOY. Los items sin supplier asignado los podés cargar desde ${osIcon('wrench')} Catálogo → Suppliers.
     </div>
 
     <!-- S5-G8: Facturas reales subidas (vendor invoices) -->
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
       <div class="bg-amber-100 px-3 py-2 flex justify-between items-center text-xs font-bold">
-        <span>🧾 Facturas recibidas (${rmState.invoices.length})</span>
+        <span>${osIcon('receipt')} Facturas recibidas (${rmState.invoices.length})</span>
         <div class="flex gap-2 items-center">
           <input type="file" accept=".pdf,image/*" id="rm-invoice-upload" class="hidden" onchange="rmUploadInvoice(this.files[0])" />
           <label for="rm-invoice-upload" class="bg-slate-900 hover:bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded cursor-pointer">+ Subir factura</label>
@@ -2710,7 +2822,7 @@ function rmRenderPurchases(body) {
                 <td class="p-1.5 text-right font-bold">${rmFmt(inv.total_amount)}</td>
                 <td class="p-1.5 text-center"><span class="text-[10px] bg-${inv.status==='reconciled'?'emerald':inv.status==='disputed'?'red':'amber'}-100 text-${inv.status==='reconciled'?'emerald':inv.status==='disputed'?'red':'amber'}-800 px-1.5 py-0.5 rounded">${inv.status}</span></td>
                 <td class="p-1.5 text-center">
-                  ${inv.pdf_path ? `<button onclick="rmViewInvoicePDF('${inv.pdf_path}')" class="text-[10px] text-blue-600 hover:text-blue-800 px-1">👁️</button>` : ''}
+                  ${inv.pdf_path ? `<button onclick="rmViewInvoicePDF('${inv.pdf_path}')" class="text-[10px] text-blue-600 hover:text-blue-800 px-1">${osIcon('eye')}</button>` : ''}
                   ${inv.status === 'pending' ? `<button onclick="rmReconcileInvoice('${inv.id}')" class="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">Reconciliar</button>` : ''}
                 </td>
               </tr>
@@ -2723,7 +2835,7 @@ function rmRenderPurchases(body) {
     ${Object.entries(bySupplier).map(([sup, data]) => `
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-3">
         <div class="bg-slate-100 px-3 py-2 flex justify-between text-xs font-bold">
-          <span>🏪 ${sup}</span>
+          <span>${osIcon('store')} ${sup}</span>
           <span class="text-slate-700">${data.rows.length} items · ${rmFmt(data.total)}</span>
         </div>
         <table class="w-full text-[11px]">
@@ -2742,7 +2854,7 @@ function rmRenderPurchases(body) {
                   <td class="p-1 text-right">${r.qty} ${r.unit}</td>
                   <td class="p-1 text-right font-bold">${rmFmt(r.mat_cost)}</td>
                   <td class="p-1 text-center ${r.lead_days?'text-blue-700 font-bold':'text-slate-400'}">${r.lead_days?r.lead_days+'d':'—'}</td>
-                  <td class="p-1 text-center ${overdue?'text-red-700 font-bold':urgent?'text-amber-700 font-bold':''}">${rmFmtDate(r.date_order)}${overdue?' ⚠️':urgent?' 🔔':''}</td>
+                  <td class="p-1 text-center ${overdue?'text-red-700 font-bold':urgent?'text-amber-700 font-bold':''}">${rmFmtDate(r.date_order)}${overdue?osIcon('alert'):urgent?osIcon('bell'):''}</td>
                   <td class="p-1 text-center text-slate-500">${rmFmtDate(r.date_use)}</td>
                 </tr>
               `;
@@ -2789,9 +2901,9 @@ function rmRenderField(body) {
   if (!rmState.currentProject) {
     body.innerHTML = `
       <div class="max-w-md mx-auto py-8 px-4 text-center">
-        <div class="text-5xl mb-3">📱</div>
+        <div class="text-5xl mb-3">${osIcon('phone')}</div>
         <h2 class="text-xl font-bold mb-2">Vista campo</h2>
-        <p class="text-sm text-slate-500 mb-4">Cargá un proyecto desde 📁 Proyectos para ver la vista mobile-friendly diseñada para foreman en sitio.</p>
+        <p class="text-sm text-slate-500 mb-4">Cargá un proyecto desde ${osIcon('folder')} Proyectos para ver la vista mobile-friendly diseñada para foreman en sitio.</p>
       </div>
     `;
     return;
@@ -2824,7 +2936,7 @@ function rmRenderField(body) {
         </div>
       </div>
 
-      <p class="text-[11px] text-slate-500 text-center mb-2">Tocá una actividad para registrar avance, costo real o foto. Cambios se guardan al hacer click en 💾.</p>
+      <p class="text-[11px] text-slate-500 text-center mb-2">Tocá una actividad para registrar avance, costo real o foto. Cambios se guardan al hacer click en ${osIcon('save')}.</p>
 
       <!-- Cards por actividad -->
       <div class="space-y-2">
@@ -2873,11 +2985,11 @@ function rmRenderField(body) {
                   </div>
                   <div class="grid grid-cols-3 gap-2">
                     <input type="file" accept="image/*" capture="environment" id="rm-field-photo-${a.code.replace(/[.p]/g,'_')}" class="hidden" onchange="rmFieldUploadPhoto('${a.code}', this.files[0])" />
-                    <label for="rm-field-photo-${a.code.replace(/[.p]/g,'_')}" class="bg-blue-600 text-white text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-1 cursor-pointer">📷 Foto</label>
+                    <label for="rm-field-photo-${a.code.replace(/[.p]/g,'_')}" class="bg-blue-600 text-white text-xs font-bold py-2.5 rounded-lg flex items-center justify-center gap-1 cursor-pointer">${osIcon('camera')} Foto</label>
                     ${(rmState.photos || []).filter(p => p.activity_code === a.code).length > 0 ? `
-                      <button onclick="rmShowPhotoGallery('${a.code}')" class="bg-slate-700 text-white text-xs font-bold py-2.5 rounded-lg">🖼️ ${(rmState.photos || []).filter(p => p.activity_code === a.code).length} fotos</button>
-                    ` : `<button onclick="rmShowPhotoGallery('${a.code}')" disabled class="bg-slate-200 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed">🖼️ 0</button>`}
-                    <button onclick="rmSaveActuals()" class="bg-emerald-600 text-white text-xs font-bold py-2.5 rounded-lg">💾 Guardar</button>
+                      <button onclick="rmShowPhotoGallery('${a.code}')" class="bg-slate-700 text-white text-xs font-bold py-2.5 rounded-lg">${(rmState.photos || []).filter(p => p.activity_code === a.code).length} fotos</button>
+                    ` : `<button onclick="rmShowPhotoGallery('${a.code}')" disabled class="bg-slate-200 text-slate-400 text-xs font-bold py-2.5 rounded-lg cursor-not-allowed">${osIcon('image')} 0</button>`}
+                    <button onclick="rmSaveActuals()" class="bg-emerald-600 text-white text-xs font-bold py-2.5 rounded-lg">${osIcon('save')} Guardar</button>
                   </div>
                 </div>
               ` : ''}
@@ -2887,7 +2999,7 @@ function rmRenderField(body) {
       </div>
 
       <div class="mt-4 text-center text-[10px] text-slate-400">
-        Pensado para 📱. En desktop usá la vista 🔄 Seguimiento → Por actividad.
+        Pensado para ${osIcon('phone')}. En desktop usá la vista ${osIcon('refresh')} Seguimiento → Por actividad.
       </div>
     </div>
   `;
@@ -2908,17 +3020,17 @@ function rmGenerateProposalPDF() {
     const acts = (e.byPhase[p]?.activities) || [];
     if (!acts.length) return '';
     return `
-      <tr class="phase-header"><td colspan="5" style="background:#0F172A;color:white;font-weight:bold;padding:8px 12px;">${info.icon} ${p}. ${info.name}</td></tr>
+      <tr class="phase-header"><td colspan="5" style="background:#0e1420;color:white;font-weight:bold;padding:8px 12px;">${info.icon} ${p}. ${info.name}</td></tr>
       ${acts.map(a => `
         <tr>
-          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#64748b;">${a.code}</td>
+          <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:10px;color:#6f7785;">${a.code}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;">${a.desc}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${a.qty} ${a.unit}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">$${(+a.vu).toFixed(2)}</td>
           <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:bold;">${rmFmt(a.total)}</td>
         </tr>
       `).join('')}
-      <tr><td colspan="4" style="padding:6px 12px;text-align:right;background:#F8FAFC;font-weight:bold;">Subtotal ${info.name}</td><td style="padding:6px 12px;text-align:right;background:#F8FAFC;font-weight:bold;">${rmFmt(e.byPhase[p].total)}</td></tr>
+      <tr><td colspan="4" style="padding:6px 12px;text-align:right;background:#faf8f4;font-weight:bold;">Subtotal ${info.name}</td><td style="padding:6px 12px;text-align:right;background:#faf8f4;font-weight:bold;">${rmFmt(e.byPhase[p].total)}</td></tr>
     `;
   }).join('');
 
@@ -2929,30 +3041,30 @@ function rmGenerateProposalPDF() {
 <title>Propuesta — ${proj.name}</title>
 <style>
   @page { size: letter; margin: 0.6in; }
-  body { font-family: -apple-system, 'Segoe UI', sans-serif; color:#0F172A; margin:0; line-height:1.45; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; color:#0e1420; margin:0; line-height:1.45; }
   .watermark { position:fixed; top:40%; left:50%; transform:translate(-50%,-50%) rotate(-30deg); font-size:140px; font-weight:900; color:rgba(15,23,42,0.04); z-index:-1; pointer-events:none; letter-spacing:8px; }
-  header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:16px; border-bottom:3px solid #0F172A; margin-bottom:24px; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:16px; border-bottom:3px solid #0e1420; margin-bottom:24px; }
   .brand { font-size:26px; font-weight:900; letter-spacing:-0.5px; }
-  .brand-sub { color:#64748b; font-size:11px; margin-top:2px; }
-  .meta { text-align:right; font-size:11px; color:#64748b; }
+  .brand-sub { color:#6f7785; font-size:11px; margin-top:2px; }
+  .meta { text-align:right; font-size:11px; color:#6f7785; }
   h1 { font-size:22px; margin:0 0 4px; }
-  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#475569; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:1px; color:#5a6270; margin:24px 0 8px; padding-bottom:4px; border-bottom:1px solid #e5e7eb; }
   .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; font-size:12px; margin-bottom:16px; }
-  .info-grid div strong { display:block; color:#64748b; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
+  .info-grid div strong { display:block; color:#6f7785; font-size:9px; text-transform:uppercase; margin-bottom:2px; }
   table { width:100%; border-collapse:collapse; font-size:11px; }
-  .pricing-box { background:#F1F5F9; border-radius:8px; padding:16px; margin-top:16px; }
-  .pricing-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #e2e8f0; font-size:12px; }
-  .pricing-row:last-child { border-bottom:none; font-size:18px; font-weight:900; padding-top:12px; margin-top:4px; border-top:2px solid #0F172A; }
-  .terms { font-size:10px; color:#475569; margin-top:24px; }
+  .pricing-box { background:#eef1f6; border-radius:8px; padding:16px; margin-top:16px; }
+  .pricing-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #dfe4ec; font-size:12px; }
+  .pricing-row:last-child { border-bottom:none; font-size:18px; font-weight:900; padding-top:12px; margin-top:4px; border-top:2px solid #0e1420; }
+  .terms { font-size:10px; color:#5a6270; margin-top:24px; }
   .signature { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:48px; font-size:11px; }
-  .signature div { border-top:1px solid #0F172A; padding-top:6px; }
-  .print-button { position:fixed; top:12px; right:12px; background:#0F172A; color:white; padding:10px 16px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+  .signature div { border-top:1px solid #0e1420; padding-top:6px; }
+  .print-button { position:fixed; top:12px; right:12px; background:#0e1420; color:white; padding:10px 16px; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
   @media print { .print-button { display:none; } }
 </style>
 </head>
 <body>
 <div class="watermark">${watermark}</div>
-<button class="print-button" onclick="window.print()">📄 Guardar como PDF</button>
+<button class="print-button" onclick="window.print()">${osIcon('file')} Guardar como PDF</button>
 
 <header>
   <div>
@@ -2967,7 +3079,7 @@ function rmGenerateProposalPDF() {
 </header>
 
 <h1>${proj.name}</h1>
-<div style="font-size:12px;color:#64748b;margin-bottom:24px;">${proj.address || ''}</div>
+<div style="font-size:12px;color:#6f7785;margin-bottom:24px;">${proj.address || ''}</div>
 
 <div class="info-grid">
   <div><strong>Superficie</strong>${e.sqft || '—'} ft²</div>
@@ -2979,12 +3091,12 @@ function rmGenerateProposalPDF() {
 <h2>Detalle del trabajo</h2>
 <table>
   <thead>
-    <tr style="background:#F8FAFC;">
-      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#475569;">Code</th>
-      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#475569;">Actividad</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#475569;">Cant.</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#475569;">$/u</th>
-      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#475569;">Total</th>
+    <tr style="background:#faf8f4;">
+      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a6270;">Code</th>
+      <th style="padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a6270;">Actividad</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">Cant.</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">$/u</th>
+      <th style="padding:8px 12px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a6270;">Total</th>
     </tr>
   </thead>
   <tbody>${phaseRows}</tbody>
@@ -3000,7 +3112,8 @@ function rmGenerateProposalPDF() {
   <div class="pricing-row"><span>Inversión total</span><span>${rmFmt(e.pricing.clientPrice)}</span></div>
 </div>
 
-<div style="font-size:11px;color:#475569;margin-top:8px;">${e.sqft ? '<strong>$' + (e.pricing.clientPrice/e.sqft).toFixed(0) + '/ft²</strong> sobre ' + e.sqft + ' ft² de área a remodelar.' : ''}</div>
+<div style="font-size:11px;color:#5a6270;margin-top:8px;">${e.sqft ? '<strong>$' + (e.pricing.clientPrice/e.sqft).toFixed(0) + '/ft²</strong> sobre ' + e.sqft + ' ft² de área a remodelar.' : ''}</div>
+${(typeof rmSqftBadgeHtml === 'function') ? rmSqftBadgeHtml(e) : ''}
 
 <h2>Términos</h2>
 <div class="terms">
@@ -3074,7 +3187,7 @@ async function rmShowPhotoGallery(activityCode) {
     <div id="rm-photo-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:10000;overflow-y:auto;padding:16px;" onclick="if(event.target===this)this.remove()">
       <div style="max-width:900px;margin:0 auto;color:white;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h2 style="font-size:18px;font-weight:bold;">📷 ${activityCode} · ${photos.length} fotos</h2>
+          <h2 style="font-size:18px;font-weight:bold;">${osIcon('camera')} ${activityCode} · ${photos.length} fotos</h2>
           <button onclick="document.getElementById('rm-photo-overlay').remove()" style="background:white;color:black;padding:6px 12px;border-radius:6px;font-weight:bold;">✕ Cerrar</button>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
@@ -3082,8 +3195,8 @@ async function rmShowPhotoGallery(activityCode) {
             <div style="background:#1F2937;border-radius:8px;overflow:hidden;">
               <img src="${urls[i]}" style="width:100%;height:200px;object-fit:cover;" />
               <div style="padding:8px;font-size:11px;">
-                <div style="font-weight:bold;text-transform:uppercase;color:${p.before_after==='antes'?'#FBBF24':p.before_after==='despues'?'#34D399':'#94A3B8'};">${p.before_after || 'proceso'}</div>
-                <div style="color:#94A3B8;">${rmFmtDate(p.taken_at)}</div>
+                <div style="font-weight:bold;text-transform:uppercase;color:${p.before_after==='antes'?'#FBBF24':p.before_after==='despues'?'#4ade9e':'#8b93a1'};">${p.before_after || 'proceso'}</div>
+                <div style="color:#8b93a1;">${rmFmtDate(p.taken_at)}</div>
                 ${p.note ? `<div style="color:#E5E7EB;margin-top:4px;">${p.note}</div>` : ''}
               </div>
             </div>
@@ -3223,7 +3336,7 @@ async function rmExportEditorExcelDenfield() {
     ws1.getCell(`M${row}`).style = { ...styleCalc, numFmt:FMT_CURRENCY, font:{bold:true} };
     ws1.getCell(`N${row}`).value = { formula:`IFERROR((F${row}-M${row})/F${row},0)` };
     ws1.getCell(`N${row}`).style = { ...styleCalc, numFmt:FMT_PCT };
-    ws1.getCell(`O${row}`).value = { formula:`IF(M${row}=0,"○ Sin gasto",IF(N${row}>=0.1,"◐ Dentro",IF(N${row}>=0,"⚠ Apretado","● Sobre presup.")))` };
+    ws1.getCell(`O${row}`).value = { formula:`IF(M${row}=0,"○ Sin gasto",IF(N${row}>=0.1,"◐ Dentro",IF(N${row}>=0,"Apretado","● Sobre presup.")))` };
     ws1.getCell(`O${row}`).style = { ...styleCalc, alignment:{horizontal:'left'} };
     if (dias > 0) cursor.setDate(cursor.getDate() + dias);
   });
@@ -3491,7 +3604,7 @@ function rmRenderCustomItemsForPhase(phaseId) {
   if (!items.length) return '';
   return `
     <div class="mt-2 pt-2 border-t border-emerald-200">
-      <div class="text-[10px] font-bold uppercase text-emerald-700 mb-1.5">✨ Items personalizados (${items.length})</div>
+      <div class="text-[10px] font-bold uppercase text-emerald-700 mb-1.5">${osIcon('sparkles')} Items personalizados (${items.length})</div>
       ${items.map(([code, it]) => {
         const total = (+it.qty || 0) * (+it.vu || 0);
         return `
@@ -3567,7 +3680,7 @@ function rmShowAddCustom(phaseId) {
           <input id="rm-cust-days" type="number" step="0.5" placeholder="0" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
         </div>
         <div class="pt-2 flex gap-2 border-t border-slate-200">
-          <button onclick="rmCustomAdd('${phaseId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded">💾 Agregar al estimado</button>
+          <button onclick="rmCustomAdd('${phaseId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded">${osIcon('save')} Agregar al estimado</button>
           <button onclick="document.getElementById('rm-custom-modal').remove()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded text-sm">Cancelar</button>
         </div>
       </div>
@@ -3670,7 +3783,7 @@ async function rmAutoGenPlanner(projectId, projectName) {
     const days = Math.max(1, Math.round((cfg.days || Math.max(1, Math.ceil((cat.days_per_qty || 0) * (cfg.qty || 1)))) * fCal));
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = rmAddWorkDays(activityStart, i);
-      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
+      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#6f7785' };
       inserts.push({ project_id: projectId, property_name: projectName, date: date.toISOString().split('T')[0], activity_name: cat.desc + (days > 1 ? ` (día ${i + 1}/${days})` : ''), stage: phaseInfo.name.toLowerCase().replace(/\s/g, '_'), activity_code: code, notes: `[Estimador] ${code}`, start_hour: 7, end_hour: 17, status: 'planned', priority: i === 0 ? 'normal' : 'low', is_critical: !!(e.cpm && e.cpm.criticalPath && e.cpm.criticalPath.includes(code)), created_by: state.user.id });
     }
   });
@@ -3693,7 +3806,7 @@ async function rmLoadObraPro(projectId) {
   rmState.obraPro = { milestones: m, inspections: i, punch: pu };
 }
 function rmRenderObraPro(body) {
-  if (!rmState.currentProject) { body.innerHTML = '<div class="text-center py-12 text-slate-500">Cargá un proyecto desde <b>📁 Proyectos</b> para su capa de obra (hitos, inspecciones, punch list).</div>'; return; }
+  if (!rmState.currentProject) { body.innerHTML = '<div class="text-center py-12 text-slate-500">Cargá un proyecto desde <b>' + osIcon('folder') + ' Proyectos</b> para su capa de obra (hitos, inspecciones, punch list).</div>'; return; }
   if (!rmState.obraPro) { rmLoadObraPro(rmState.currentProject.id).then(() => rmRenderTab()); body.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">Cargando obra…</div>'; return; }
   const esc = s => String(s == null ? '' : s).replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const { milestones, inspections, punch } = rmState.obraPro;
@@ -3702,32 +3815,32 @@ function rmRenderObraPro(body) {
   body.innerHTML = `
     <div class="space-y-4">
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <h2 class="text-lg font-bold">🏗 Obra Pro — ${esc(rmState.editName || rmState.currentProject.name)}</h2>
-        ${holdOpen ? `<span class="text-xs bg-red-50 text-red-700 border border-red-200 rounded px-2 py-1 font-bold">⛔ ${holdOpen} hold point(s) sin aprobar — bloquean avance</span>` : '<span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-1 font-bold">✓ Sin hold points abiertos</span>'}
+        <h2 class="text-lg font-bold">${osIcon('construction')} Obra Pro — ${esc(rmState.editName || rmState.currentProject.name)}</h2>
+        ${holdOpen ? `<span class="text-xs bg-red-50 text-red-700 border border-red-200 rounded px-2 py-1 font-bold">${osIcon('ban')} ${holdOpen} hold point(s) sin aprobar — bloquean avance</span>` : '<span class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded px-2 py-1 font-bold">✓ Sin hold points abiertos</span>'}
       </div>
 
       <div class="border border-slate-200 rounded-lg p-3">
-        <div class="flex items-center justify-between mb-2"><b class="text-sm">🎯 Hitos (plan vs real)</b><button onclick="rmAddMilestone()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Hito</button></div>
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">${osIcon('target')} Hitos (plan vs real)</b><button onclick="rmAddMilestone()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Hito</button></div>
         ${milestones.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1 text-slate-500">Hito</th><th class="text-left p-1 text-slate-500">Plan</th><th class="text-left p-1 text-slate-500">Real</th><th class="text-right p-1 text-slate-500">Desvío</th><th class="text-right p-1 text-slate-500">Draw</th><th class="p-1"></th></tr></thead><tbody>
-          ${milestones.map(m => { const d = dlt(m.plan_date, m.real_date); return `<tr class="border-t border-slate-100"><td class="p-1 font-semibold">${esc(m.nombre || m.tipo)}</td><td class="p-1">${m.plan_date || '—'}</td><td class="p-1">${m.real_date || '<span class="text-slate-400">pendiente</span>'}</td><td class="p-1 text-right ${d > 0 ? 'text-red-600' : d < 0 ? 'text-emerald-600' : ''}">${d != null ? (d > 0 ? '+' : '') + d + 'd' : '—'}</td><td class="p-1 text-right">${m.draw_amount ? '$' + Math.round(m.draw_amount).toLocaleString() : '—'}</td><td class="p-1 text-right"><button onclick="rmMilestoneReal('${m.id}')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold" title="Marcar fecha real (hoy)">✓ real</button> <button onclick="rmArchiveObra('remodel_milestones','${m.id}')" class="text-[10px] text-red-500">🗑</button></td></tr>`; }).join('')}
+          ${milestones.map(m => { const d = dlt(m.plan_date, m.real_date); return `<tr class="border-t border-slate-100"><td class="p-1 font-semibold">${esc(m.nombre || m.tipo)}</td><td class="p-1">${m.plan_date || '—'}</td><td class="p-1">${m.real_date || '<span class="text-slate-400">pendiente</span>'}</td><td class="p-1 text-right ${d > 0 ? 'text-red-600' : d < 0 ? 'text-emerald-600' : ''}">${d != null ? (d > 0 ? '+' : '') + d + 'd' : '—'}</td><td class="p-1 text-right">${m.draw_amount ? '$' + Math.round(m.draw_amount).toLocaleString() : '—'}</td><td class="p-1 text-right"><button onclick="rmMilestoneReal('${m.id}')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold" title="Marcar fecha real (hoy)">✓ real</button> <button onclick="rmArchiveObra('remodel_milestones','${m.id}')" class="text-[10px] text-red-500">${osIcon('trash')}</button></td></tr>`; }).join('')}
         </tbody></table>` : '<div class="text-xs text-slate-400">Sin hitos. Agregá permisos, inspecciones, pre-entrega, entrega.</div>'}
         <div class="text-[10px] text-slate-400 mt-1">Draw schedule: cada hito puede tener su monto de draw (ligado a hitos).</div>
       </div>
 
       <div class="border border-slate-200 rounded-lg p-3">
-        <div class="flex items-center justify-between mb-2"><b class="text-sm">🔎 Inspecciones / Hold points</b><button onclick="rmAddInspection()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Inspección</button></div>
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">${osIcon('search')} Inspecciones / Hold points</b><button onclick="rmAddInspection()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Inspección</button></div>
         ${inspections.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1 text-slate-500">Etapa</th><th class="text-left p-1 text-slate-500">Tipo</th><th class="text-left p-1 text-slate-500">Hold</th><th class="text-left p-1 text-slate-500">Estado</th><th class="p-1"></th></tr></thead><tbody>
-          ${inspections.map(i => `<tr class="border-t border-slate-100"><td class="p-1">${esc(i.stage || '—')}</td><td class="p-1 font-semibold">${esc(i.tipo || '—')}</td><td class="p-1">${i.hold_point ? '⛔ sí' : 'no'}</td><td class="p-1"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${i.status === 'aprobada' ? 'bg-emerald-100 text-emerald-700' : i.status === 'rechazada' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">${i.status || 'pendiente'}</span></td><td class="p-1 text-right"><button onclick="rmInspStatus('${i.id}','aprobada')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold">✓</button> <button onclick="rmInspStatus('${i.id}','rechazada')" class="text-[10px] bg-red-50 text-red-700 px-1.5 rounded font-bold">✗</button> <button onclick="rmArchiveObra('remodel_inspections','${i.id}')" class="text-[10px] text-red-500">🗑</button></td></tr>`).join('')}
+          ${inspections.map(i => `<tr class="border-t border-slate-100"><td class="p-1">${esc(i.stage || '—')}</td><td class="p-1 font-semibold">${esc(i.tipo || '—')}</td><td class="p-1">${i.hold_point ? 'sí' : 'no'}</td><td class="p-1"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${i.status === 'aprobada' ? 'bg-emerald-100 text-emerald-700' : i.status === 'rechazada' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}">${i.status || 'pendiente'}</span></td><td class="p-1 text-right"><button onclick="rmInspStatus('${i.id}','aprobada')" class="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 rounded font-bold">✓</button> <button onclick="rmInspStatus('${i.id}','rechazada')" class="text-[10px] bg-red-50 text-red-700 px-1.5 rounded font-bold">✗</button> <button onclick="rmArchiveObra('remodel_inspections','${i.id}')" class="text-[10px] text-red-500">${osIcon('trash')}</button></td></tr>`).join('')}
         </tbody></table>` : '<div class="text-xs text-slate-400">Sin inspecciones. Un hold point pendiente bloquea el avance de su etapa.</div>'}
       </div>
 
       <div class="border border-slate-200 rounded-lg p-3">
-        <div class="flex items-center justify-between mb-2"><b class="text-sm">📋 Punch list ${punch.filter(x => x.status === 'abierto').length ? `<span class="text-red-600">(${punch.filter(x => x.status === 'abierto').length} abiertos)</span>` : ''}</b><button onclick="rmAddPunch()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Ítem</button></div>
-        ${punch.length ? punch.map(p => `<div class="flex items-center justify-between text-xs py-1 border-t border-slate-100"><div><span class="font-semibold ${p.status === 'resuelto' ? 'line-through text-slate-400' : ''}">${esc(p.item)}</span> <span class="text-slate-400">· ${esc(p.stage || 's/etapa')}${p.severity === 'alta' ? ' · 🔴 alta' : ''}</span></div><div><button onclick="rmPunchToggle('${p.id}','${p.status === 'abierto' ? 'resuelto' : 'abierto'}')" class="text-[10px] ${p.status === 'abierto' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'} px-1.5 rounded font-bold">${p.status === 'abierto' ? '✓ resolver' : 'reabrir'}</button> <button onclick="rmArchiveObra('remodel_punch_list','${p.id}')" class="text-[10px] text-red-500">🗑</button></div></div>`).join('') : '<div class="text-xs text-slate-400">Sin ítems de punch list.</div>'}
+        <div class="flex items-center justify-between mb-2"><b class="text-sm">${osIcon('clipboard')} Punch list ${punch.filter(x => x.status === 'abierto').length ? `<span class="text-red-600">(${punch.filter(x => x.status === 'abierto').length} abiertos)</span>` : ''}</b><button onclick="rmAddPunch()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Ítem</button></div>
+        ${punch.length ? punch.map(p => `<div class="flex items-center justify-between text-xs py-1 border-t border-slate-100"><div><span class="font-semibold ${p.status === 'resuelto' ? 'line-through text-slate-400' : ''}">${esc(p.item)}</span> <span class="text-slate-400">· ${esc(p.stage || 's/etapa')}${p.severity === 'alta' ? ' · alta' : ''}</span></div><div><button onclick="rmPunchToggle('${p.id}','${p.status === 'abierto' ? 'resuelto' : 'abierto'}')" class="text-[10px] ${p.status === 'abierto' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'} px-1.5 rounded font-bold">${p.status === 'abierto' ? '✓ resolver' : 'reabrir'}</button> <button onclick="rmArchiveObra('remodel_punch_list','${p.id}')" class="text-[10px] text-red-500">${osIcon('trash')}</button></div></div>`).join('') : '<div class="text-xs text-slate-400">Sin ítems de punch list.</div>'}
       </div>
 
       <div class="border border-slate-200 rounded-lg p-3">
-        <div class="flex items-center justify-between mb-1"><b class="text-sm">📆 Calendario laboral</b><button onclick="rmAddHoliday()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Día no laborable</button></div>
+        <div class="flex items-center justify-between mb-1"><b class="text-sm">${osIcon('calendar')} Calendario laboral</b><button onclick="rmAddHoliday()" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded px-2 py-1 font-bold">+ Día no laborable</button></div>
         <div class="text-[11px] text-slate-500">Los fines de semana + feriados cargados se excluyen de los días-plan del cronograma (días laborables reales).</div>
       </div>
     </div>`;

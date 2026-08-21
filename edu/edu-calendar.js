@@ -101,7 +101,7 @@ function eduRenderCallsEnhanced() {
       <div class="bg-slate-900 text-white rounded-xl p-4">
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <div class="text-xs font-bold uppercase text-slate-400">📅 Calendario de sesiones</div>
+            <div class="text-xs font-bold uppercase text-slate-400">${osIcon('calendar',{size:12})} Calendario de sesiones</div>
             <div class="flex items-center gap-2 mt-1">
               <button onclick="eduCallsNavMonth(-1)" class="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs">←</button>
               <div class="text-xl font-bold capitalize">${monthLabel}</div>
@@ -126,16 +126,16 @@ function eduRenderCallsEnhanced() {
         <span class="font-bold text-slate-700 mr-1">Filtrar:</span>
         <select onchange="eduCallsState.statusFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
           <option value="all" ${eduCallsState.statusFilter==='all'?'selected':''}>Todos los status</option>
-          <option value="pendiente" ${eduCallsState.statusFilter==='pendiente'?'selected':''}>⏳ Pendiente</option>
-          <option value="confirmado" ${eduCallsState.statusFilter==='confirmado'?'selected':''}>✅ Confirmado</option>
+          <option value="pendiente" ${eduCallsState.statusFilter==='pendiente'?'selected':''}>Pendiente</option>
+          <option value="confirmado" ${eduCallsState.statusFilter==='confirmado'?'selected':''}>Confirmado</option>
           <option value="asistio" ${eduCallsState.statusFilter==='asistio'?'selected':''}>✓ Asistió</option>
           <option value="no_asistio" ${eduCallsState.statusFilter==='no_asistio'?'selected':''}>✗ No asistió</option>
-          <option value="reprogramo" ${eduCallsState.statusFilter==='reprogramo'?'selected':''}>🔄 Reprogramó</option>
+          <option value="reprogramo" ${eduCallsState.statusFilter==='reprogramo'?'selected':''}>Reprogramó</option>
           <option value="cancelo" ${eduCallsState.statusFilter==='cancelo'?'selected':''}>✕ Canceló</option>
         </select>
         <select onchange="eduCallsState.motivoFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
           <option value="all" ${eduCallsState.motivoFilter==='all'?'selected':''}>Todos los motivos</option>
-          ${motivos.map(m => `<option value="${m.id}" ${eduCallsState.motivoFilter===m.id?'selected':''}>${m.emoji||''} ${m.label}</option>`).join('')}
+          ${motivos.map(m => `<option value="${m.id}" ${eduCallsState.motivoFilter===m.id?'selected':''}>${m.label}</option>`).join('')}
         </select>
         <select onchange="eduCallsState.studentFilter=this.value; eduRender();" class="border border-slate-300 rounded px-2 py-1">
           <option value="all" ${eduCallsState.studentFilter==='all'?'selected':''}>Todos los estudiantes</option>
@@ -169,11 +169,11 @@ function eduRenderCallsEnhanced() {
                   const mot = motivos.find(m => m.id === c.motivo);
                   const stat = c.status_attendance || 'pendiente';
                   const statBadge = {
-                    pendiente: '<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">⏳ PEND</span>',
-                    confirmado: '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold">✅ CONF</span>',
+                    pendiente: '<span class="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('hourglass',{size:9}) + ' PEND</span>',
+                    confirmado: '<span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('check-circle',{size:9}) + ' CONF</span>',
                     asistio: '<span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✓ ASIS</span>',
                     no_asistio: '<span class="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✗ NO ASIS</span>',
-                    reprogramo: '<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">🔄 REPROG</span>',
+                    reprogramo: '<span class="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold">' + osIcon('refresh',{size:9}) + ' REPROG</span>',
                     cancelo: '<span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded text-[9px] font-bold">✕ CANC</span>'
                   }[stat] || stat;
                   const d = new Date(c.scheduled_at);
@@ -185,20 +185,20 @@ function eduRenderCallsEnhanced() {
                     </td>
                     <td class="p-2 max-w-[150px]"><button onclick="eduShowStudentDetail('${c.student_id}')" class="text-blue-600 hover:underline truncate text-left block">${(st?.full_name||'—').replace(/</g,'&lt;')}</button></td>
                     <td class="p-2 max-w-[220px]">
-                      <div class="font-medium">${mot ? mot.emoji+' '+mot.label : (c.motivo || c.type || '—')}</div>
+                      <div class="font-medium">${mot ? mot.label : (c.motivo || c.type || '—')}</div>
                       ${c.topic ? `<div class="text-[10px] text-slate-500 truncate" title="${(c.topic||'').replace(/"/g,'&quot;')}">${(c.topic||'').replace(/</g,'&lt;')}</div>` : ''}
                     </td>
                     <td class="p-2 max-w-[120px]"><div class="truncate">${(c.attended_by||'—').replace(/</g,'&lt;')}</div></td>
                     <td class="p-2">${statBadge}${c.status_reason ? `<div class="text-[9px] text-slate-500 truncate max-w-[100px]" title="${(c.status_reason||'').replace(/"/g,'&quot;')}">${(c.status_reason||'').replace(/</g,'&lt;')}</div>` : ''}</td>
-                    <td class="p-2">${c.evidence_url ? `<a href="${c.evidence_url}" target="_blank" class="text-[10px] text-blue-600 hover:underline">📎 ver</a>` : '<span class="text-[10px] text-slate-300">—</span>'}</td>
+                    <td class="p-2">${c.evidence_url ? `<a href="${c.evidence_url}" target="_blank" class="text-[10px] text-blue-600 hover:underline">${osIcon('paperclip',{size:10})} ver</a>` : '<span class="text-[10px] text-slate-300">—</span>'}</td>
                     <td class="p-2 text-right whitespace-nowrap">
                       ${isFuture ? `
-                        <button onclick="eduCallSendInvite('${c.id}')" class="text-[10px] text-blue-700 hover:underline mr-1" title="Enviar invitación por correo">📧</button>
-                        <button onclick="eduCallDownloadICS('${c.id}')" class="text-[10px] text-violet-700 hover:underline mr-1" title="Descargar invitación .ics">📅</button>
+                        <button onclick="eduCallSendInvite('${c.id}')" class="text-[10px] text-blue-700 hover:underline mr-1" title="Enviar invitación por correo">${osIcon('mail')}</button>
+                        <button onclick="eduCallDownloadICS('${c.id}')" class="text-[10px] text-violet-700 hover:underline mr-1" title="Descargar invitación .ics">${osIcon('calendar')}</button>
                       ` : ''}
                       <button onclick="eduCallOpenResult('${c.id}')" class="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold mr-1">Marcar</button>
-                      <button onclick="eduCallEdit('${c.id}')" class="text-[10px] text-slate-600 hover:text-slate-900 mr-1" title="Editar">✏️</button>
-                      <button onclick="eduCallDelete('${c.id}')" class="text-[10px] text-red-600 hover:text-red-800" title="Eliminar">🗑️</button>
+                      <button onclick="eduCallEdit('${c.id}')" class="text-[10px] text-slate-600 hover:text-slate-900 mr-1" title="Editar">${osIcon('pencil')}</button>
+                      <button onclick="eduCallDelete('${c.id}')" class="text-[10px] text-red-600 hover:text-red-800" title="Eliminar">${osIcon('trash')}</button>
                     </td>
                   </tr>`;
                 }).join('')}
@@ -256,7 +256,7 @@ async function eduAgendarCallNueva(presetStudentId) {
 
       <!-- ── ASISTENTES Y UBICACIÓN ── -->
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-        <div class="text-[10px] font-bold uppercase text-blue-800">📧 Asistentes que reciben invitación</div>
+        <div class="text-[10px] font-bold uppercase text-blue-800">${osIcon('mail')} Asistentes que reciben invitación</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Coach que atiende (email) *</label>
@@ -265,8 +265,8 @@ async function eduAgendarCallNueva(presetStudentId) {
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Status inicial</label>
             <select id="ec-status" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="pendiente">⏳ Pendiente</option>
-              <option value="confirmado">✅ Confirmado</option>
+              <option value="pendiente">${osIcon('loader')} Pendiente</option>
+              <option value="confirmado">${osIcon('check-circle')} Confirmado</option>
             </select>
           </div>
         </div>
@@ -296,16 +296,16 @@ async function eduAgendarCallNueva(presetStudentId) {
 
       <div class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded p-2">
         <input type="checkbox" id="ec-send-invites" checked />
-        <label for="ec-send-invites" class="text-xs text-slate-700"><strong>📤 Enviar invitaciones por correo al guardar</strong> (abre tu cliente de email con .ics adjunto y todos los emails como destinatarios)</label>
+        <label for="ec-send-invites" class="text-xs text-slate-700"><strong>${osIcon('upload')} Enviar invitaciones por correo al guardar</strong> (abre tu cliente de email con .ics adjunto y todos los emails como destinatarios)</label>
       </div>
 
       <div class="flex gap-2">
-        <button onclick="eduCallSave()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold py-2.5 rounded-lg">💾 Agendar sesión</button>
+        <button onclick="eduCallSave()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-900 text-sm font-bold py-2.5 rounded-lg">${osIcon('save')} Agendar sesión</button>
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `;
-  openModal('📅 Nueva sesión', html);
+  openModal('Nueva sesión', html);
   if (presetStudentId) setTimeout(eduCallOnStudentChange, 50);
 }
 
@@ -319,7 +319,7 @@ function eduCallOnStudentChange() {
     hint.innerHTML = `✓ Email del estudiante: <strong>${email}</strong> — recibirá invitación automáticamente.`;
     hint.className = 'text-[10px] text-emerald-700 mt-1';
   } else {
-    hint.innerHTML = `⚠️ Este estudiante <strong>no tiene email en el CRM</strong>. Editalo primero o agregalo manualmente en "asistentes adicionales" abajo.`;
+    hint.innerHTML = `${osIcon('alert')} Este estudiante <strong>no tiene email en el CRM</strong>. Editalo primero o agregalo manualmente en "asistentes adicionales" abajo.`;
     hint.className = 'text-[10px] text-amber-700 mt-1';
   }
 }
@@ -389,7 +389,7 @@ function eduCallOpenResult(callId) {
         <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Status de asistencia *</label>
         <div class="grid grid-cols-2 gap-1">
           ${['asistio','no_asistio','reprogramo','cancelo','confirmado','pendiente'].map(s => {
-            const labels = { asistio:'✓ Asistió', no_asistio:'✗ No asistió', reprogramo:'🔄 Reprogramó', cancelo:'✕ Canceló', confirmado:'✅ Confirmado', pendiente:'⏳ Pendiente' };
+            const labels = { asistio:'✓ Asistió', no_asistio:'✗ No asistió', reprogramo:'Reprogramó', cancelo:'✕ Canceló', confirmado:'Confirmado', pendiente:'Pendiente' };
             const sel = (c.status_attendance || 'pendiente') === s;
             return `<button type="button" onclick="document.getElementById('ec-r-status').value='${s}'; document.querySelectorAll('.ec-r-stat-btn').forEach(b=>b.classList.remove('bg-amber-500','text-white')); this.classList.add('bg-amber-500','text-white');" class="ec-r-stat-btn px-3 py-1.5 rounded border border-slate-300 text-xs font-bold ${sel?'bg-amber-500 text-white':'bg-white hover:bg-slate-50'}">${labels[s]}</button>`;
           }).join('')}
@@ -418,7 +418,7 @@ function eduCallOpenResult(callId) {
         <input id="ec-r-evidence" type="url" value="${(c.evidence_url||'').replace(/"/g,'&quot;')}" placeholder="https://..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm"/>
       </div>
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">⭐ Calificación de la sesión (preparación + interés del estudiante)</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('star')} Calificación de la sesión (preparación + interés del estudiante)</label>
         <div class="flex items-center gap-2">
           ${[1,2,3,4,5].map(n => `<button type="button" onclick="document.getElementById('ec-r-rating').value=${n}; document.querySelectorAll('.ec-r-star').forEach((s,i)=>s.classList.toggle('text-amber-500', i<${n}));" class="ec-r-star text-3xl ${(+c.rating||0)>=n?'text-amber-500':'text-slate-300'}">★</button>`).join('')}
           <input type="hidden" id="ec-r-rating" value="${c.rating||''}"/>
@@ -430,15 +430,15 @@ function eduCallOpenResult(callId) {
         <textarea id="ec-r-summary" rows="4" class="w-full border border-slate-300 rounded px-3 py-2 text-xs">${escapeHtml(c.summary || c.notes_md || '')}</textarea>
       </div>
       <div class="bg-blue-50 border border-blue-200 rounded p-2 text-[11px] text-blue-800">
-        💡 Si el status es "reprogramó", al guardar te ofrezco crear la nueva sesión vinculada.
+        ${osIcon('lightbulb')} Si el status es "reprogramó", al guardar te ofrezco crear la nueva sesión vinculada.
       </div>
       <div class="flex gap-2">
-        <button onclick="eduCallSaveResult('${callId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">💾 Guardar resultado</button>
+        <button onclick="eduCallSaveResult('${callId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg">${osIcon('save')} Guardar resultado</button>
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2.5 rounded-lg">Cancelar</button>
       </div>
     </div>
   `;
-  openModal('📋 Marcar resultado de la sesión', html);
+  openModal('Marcar resultado de la sesión', html);
 }
 
 async function eduCallSaveResult(callId) {
@@ -495,7 +495,7 @@ async function eduCallEdit(id) {
     if (c.notes_md) document.getElementById('ec-notes').value = c.notes_md;
     // Cambia el botón a "Actualizar"
     const btn = document.querySelector('#modal-body button[onclick="eduCallSave()"]');
-    if (btn) { btn.textContent = '💾 Actualizar sesión'; btn.setAttribute('onclick', `eduCallUpdate('${id}')`); }
+    if (btn) { btn.textContent = 'Actualizar sesión'; btn.setAttribute('onclick', `eduCallUpdate('${id}')`); }
   }, 50);
 }
 
@@ -640,7 +640,7 @@ function eduCallSendInvite(id, silent) {
   }).eq('id', id).then(() => {});
 
   if (!silent) {
-    const msg = `📅 Se abrió Google Calendar con la invitación para ${attendees.length} persona(s).\n\nRevisá los datos y dale "Guardar" — Google manda las invitaciones automáticamente.`;
+    const msg = `Se abrió Google Calendar con la invitación para ${attendees.length} persona(s).\n\nRevisá los datos y dale "Guardar" — Google manda las invitaciones automáticamente.`;
     if (window.toast) toast(msg, 'info');
     else alert(msg);
   }

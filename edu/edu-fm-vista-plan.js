@@ -32,7 +32,7 @@ function fmRenderDiagPlan() {
     var bloquesVisibles = fmFiltrarBloquesPorModo(bloques, fmState.diagModo);
   } catch (err) {
     console.error('[fmRenderDiagPlan setup]', err);
-    return `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">⚠️ Error generando plan</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${escapeHtml(String(err?.message || err))}</pre><button onclick="fmDiagReset()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Reiniciar diagnóstico</button></div></div>`;
+    return `<div class="p-8 max-w-3xl mx-auto"><div class="bg-red-50 border border-red-200 rounded-xl p-6"><h3 class="font-bold text-red-900 mb-2">${osIcon('alert')} Error generando plan</h3><pre class="text-xs text-red-700 bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">${escapeHtml(String(err?.message || err))}</pre><button onclick="fmDiagReset()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">${osIcon('refresh')} Reiniciar diagnóstico</button></div></div>`;
   }
 
   return `
@@ -50,11 +50,11 @@ function fmRenderDiagPlan() {
               ${fmState.diagStudentId ? (() => {
                 const sel = (eduState.students||[]).find(s => s.id === fmState.diagStudentId);
                 const name = sel ? (sel.full_name || 'estudiante') : 'estudiante';
-                return `<button onclick="fmLinkPlanAStudiante('${fmState.diagStudentId}', '${sel?.mentorship_id||''}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-bold" title="Guardar y vincular directo a ${name.replace(/"/g,'&quot;')}">💾 Guardar plan para ${name.replace(/</g,'&lt;')}</button>`;
-              })() : `<button onclick="fmAbrirVincularEstudiante()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold">💾 Vincular a estudiante (CRM)</button>`}
-              <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">🖨️ Imprimir</button>
-              <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">📋 Copiar</button>
-              <button onclick="fmDiagReset()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">🔄 Repetir</button>
+                return `<button onclick="fmLinkPlanAStudiante('${fmState.diagStudentId}', '${sel?.mentorship_id||''}')" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg text-sm font-bold" title="Guardar y vincular directo a ${name.replace(/"/g,'&quot;')}">Guardar plan para ${name.replace(/</g,'&lt;')}</button>`;
+              })() : `<button onclick="fmAbrirVincularEstudiante()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-sm font-bold">${osIcon('save')} Vincular a estudiante (CRM)</button>`}
+              <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">${osIcon('printer')} Imprimir</button>
+              <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">${osIcon('clipboard')} Copiar</button>
+              <button onclick="fmDiagReset()" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-600">${osIcon('refresh')} Repetir</button>
             </div>
           </div>
           <div class="mt-6 bg-blue-900 bg-opacity-50 print:bg-blue-50 rounded-lg p-4 border border-blue-700 print:border-blue-200">
@@ -72,7 +72,7 @@ function fmRenderDiagPlan() {
       <div class="max-w-5xl mx-auto px-8 py-8">
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
           <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <span>🔬</span> Análisis Profundo del Cliente
+            <span>${osIcon('search')}</span> Análisis Profundo del Cliente
           </h2>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
@@ -97,13 +97,13 @@ function fmRenderDiagPlan() {
           <!-- Fortalezas + Riesgos lado a lado -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-              <h4 class="text-sm font-bold text-emerald-900 mb-2">✅ Fortalezas identificadas</h4>
+              <h4 class="text-sm font-bold text-emerald-900 mb-2">${osIcon('check-circle')} Fortalezas identificadas</h4>
               <ul class="space-y-1 text-xs text-emerald-900">
                 ${r.fortalezas.length ? r.fortalezas.map(f => `<li class="flex gap-1.5"><span>•</span><span>${f}</span></li>`).join('') : '<li class="italic text-emerald-700">Estás empezando — esa es tu primera fortaleza: claridad para construir desde cero.</li>'}
               </ul>
             </div>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h4 class="text-sm font-bold text-red-900 mb-2">⚠️ Riesgos críticos a mitigar</h4>
+              <h4 class="text-sm font-bold text-red-900 mb-2">${osIcon('alert')} Riesgos críticos a mitigar</h4>
               <ul class="space-y-1 text-xs text-red-900">
                 ${fmGenerarRiesgos(a, p).map(r => `<li class="flex gap-1.5"><span>•</span><span>${r}</span></li>`).join('')}
               </ul>
@@ -113,14 +113,14 @@ function fmRenderDiagPlan() {
 
         <!-- Selector de modo de detalle -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6 print:hidden">
-          <h3 class="font-bold text-slate-900 mb-2">📐 ¿Cuánto detalle querés ver del plan?</h3>
+          <h3 class="font-bold text-slate-900 mb-2">${osIcon('ruler')} ¿Cuánto detalle querés ver del plan?</h3>
           <p class="text-xs text-slate-600 mb-3">El plan completo tiene ${bloques.length} bloques (~${fmTotalHoras(bloques)} horas de trabajo total). Elegí el nivel de detalle según para qué lo necesitás.</p>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             ${[
-              { id: 'panorama', label: '🗺️ Panorama', desc: 'Lista de bloques sin detalle', count: '0 bloques abiertos' },
-              { id: 'foco', label: '🎯 Foco', desc: 'Solo el bloque actual', count: '1 bloque' },
-              { id: 'medio', label: '📋 Trimestre', desc: 'Próximos 3-4 bloques', count: `${Math.min(4, bloques.length)} bloques` },
-              { id: 'completo', label: '📚 Completo', desc: 'TODO hasta meta final', count: `${bloques.length} bloques` }
+              { id: 'panorama', label: 'Panorama', desc: 'Lista de bloques sin detalle', count: '0 bloques abiertos' },
+              { id: 'foco', label: 'Foco', desc: 'Solo el bloque actual', count: '1 bloque' },
+              { id: 'medio', label: 'Trimestre', desc: 'Próximos 3-4 bloques', count: `${Math.min(4, bloques.length)} bloques` },
+              { id: 'completo', label: 'Completo', desc: 'TODO hasta meta final', count: `${bloques.length} bloques` }
             ].map(m => {
               const active = fmState.diagModo === m.id;
               return `<button onclick="fmDiagSetModo('${m.id}')" class="text-left px-3 py-3 rounded-lg border-2 transition ${active ? 'border-amber-500 bg-amber-50' : 'border-slate-200 hover:border-amber-300'}">
@@ -136,7 +136,7 @@ function fmRenderDiagPlan() {
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-6">
           <div class="flex items-start justify-between mb-3">
             <div>
-              <h2 class="text-xl font-bold text-slate-900">📋 Plan de Acción · ${bloques.length} Bloques</h2>
+              <h2 class="text-xl font-bold text-slate-900">${osIcon('clipboard')} Plan de Acción · ${bloques.length} Bloques</h2>
               <p class="text-sm text-slate-600 mt-1">Camino completo desde hoy hasta tu meta final. Cada bloque incluye qué hacer paso por paso, qué entregar, qué herramientas usar y errores comunes.</p>
             </div>
           </div>
@@ -151,7 +151,7 @@ function fmRenderDiagPlan() {
                   <div class="text-xs font-bold text-amber-700">${b.etapa}</div>
                   <div class="text-sm font-medium text-slate-900 truncate">${b.subetapa}</div>
                 </div>
-                <div class="text-xs text-slate-500 flex-shrink-0">${visible || expandido ? '▼' : '▶'}</div>
+                <div class="text-xs text-slate-500 flex-shrink-0">${visible || expandido ? '▼' : osIcon('play')}</div>
               </a>
             `;}).join('')}
           </div>
@@ -172,13 +172,13 @@ function fmRenderDiagPlan() {
         ${fmState.diagModo !== 'completo' && bloques.length > bloquesVisibles.length ? `
           <div class="bg-amber-50 border-2 border-dashed border-amber-300 rounded-2xl p-6 text-center mb-6 print:hidden">
             <p class="text-sm text-amber-900 mb-3">Hay <strong>${bloques.length - bloquesVisibles.length} bloques más</strong> en el plan completo hasta tu meta final.</p>
-            <button onclick="fmDiagSetModo('completo')" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700">📚 Ver plan completo</button>
+            <button onclick="fmDiagSetModo('completo')" class="px-5 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700">${osIcon('book')} Ver plan completo</button>
           </div>
         ` : ''}
 
         <!-- Checklist Final -->
         <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl shadow-sm p-6 mb-6 print:bg-white print:text-slate-900 print:border print:border-slate-300">
-          <h2 class="text-xl font-bold mb-2 flex items-center gap-2"><span>✅</span> Checklist Final</h2>
+          <h2 class="text-xl font-bold mb-2 flex items-center gap-2"><span>${osIcon('check-circle')}</span> Checklist Final</h2>
           <p class="text-sm text-slate-300 print:text-slate-600 mb-4">Vas a estar listo para tu primer (o próximo) deal cuando todos estos ítems estén ✓:</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             ${checklistFinal.map(item => `
@@ -198,9 +198,9 @@ function fmRenderDiagPlan() {
 
         <!-- Botones acción al final -->
         <div class="flex gap-3 print:hidden">
-          <button onclick="fmDiagOpenLibrary()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">📚 Abrir Biblioteca</button>
-          <button onclick="fmDiagPrintPlan()" class="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800">🖨️ Imprimir Plan</button>
-          <button onclick="fmDiagReset()" class="px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300">🔄 Nuevo diagnóstico</button>
+          <button onclick="fmDiagOpenLibrary()" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">${osIcon('book')} Abrir Biblioteca</button>
+          <button onclick="fmDiagPrintPlan()" class="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800">${osIcon('printer')} Imprimir Plan</button>
+          <button onclick="fmDiagReset()" class="px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300">${osIcon('refresh')} Nuevo diagnóstico</button>
         </div>
 
       </div>
@@ -211,12 +211,12 @@ function fmRenderDiagPlan() {
         #fm-plan-print { background: white !important; }
         .print\\:hidden { display: none !important; }
         .print\\:bg-white { background: white !important; }
-        .print\\:text-slate-900 { color: #0F172A !important; }
-        .print\\:border { border: 1px solid #E2E8F0 !important; }
+        .print\\:text-slate-900 { color: #211e17 !important; }
+        .print\\:border { border: 1px solid #e8e3d9 !important; }
         .print\\:bg-blue-50 { background: #EFF6FF !important; }
         .print\\:bg-amber-50 { background: #FFFBEB !important; }
-        .print\\:text-amber-700 { color: #B45309 !important; }
-        .print\\:text-blue-700 { color: #1D4ED8 !important; }
+        .print\\:text-amber-700 { color: #8a6400 !important; }
+        .print\\:text-blue-700 { color: #275c43 !important; }
       }
     </style>
   `;
@@ -226,56 +226,56 @@ function fmRenderDiagPlan() {
 const FM_ETAPA_MAP = {
   'PRE-E0': {
     nombre: 'Pre-Fundación · Reconstrucción de Crédito',
-    icono: '🪜',
+    icono: osIcon('construction'),
     proposito: 'Antes de poder formar LLC y pedir HML, necesitás el crédito en orden. Esto es un track paralelo que no bloquea avanzar con el resto.',
     aprenderas: 'Cómo leer un reporte de crédito, identificar qué baja el score, reconstruirlo con secured cards + utilización < 30% + on-time pagos, y monitorear progreso mensual.',
     despues: 'E0 — Fundación legal y mental'
   },
   'E0': {
     nombre: 'Fundación · Bases legales, mentales y financieras',
-    icono: '🏛️',
+    icono: osIcon('landmark'),
     proposito: 'Construir las bases legales (LLC, EIN, banco), mentales (Big Why, disciplina) y de equipo (CPA, abogado) ANTES de buscar deals. Sin estas bases, todo lo demás se cae.',
     aprenderas: 'Cómo proteger tu patrimonio con LLC en el estado correcto, formar Operating Agreement, obtener EIN, abrir cuenta bancaria de negocio, definir tu Big Why, instalar bloque diario no negociable, y armar tu equipo mínimo.',
     despues: 'E1 — Evaluar mercado y deals con criterio'
   },
   'E1': {
     nombre: 'Evaluar · Criterio de mercado y análisis de deals',
-    icono: '🔍',
+    icono: osIcon('search'),
     proposito: 'Aprender a leer el mercado y filtrar deals con números reales — no con intuición ni con lo que dice el wholesaler.',
     aprenderas: 'Cómo definir Buy Box operativo en 5 ZIPs, validar ARV con comparables vendidos, aplicar MAO (Máxima Oferta Aceptable) a 10+ propiedades, y descartar rápido lo que no funciona.',
     despues: 'E2 — Estructurar capital y financiamiento'
   },
   'E1/E2': {
     nombre: 'Evaluar + Estructurar (paralelo)',
-    icono: '🔁',
+    icono: osIcon('refresh'),
     proposito: 'Estos bloques mezclan análisis de deals + setup financiero. Avanzás los dos frentes en paralelo.',
     aprenderas: 'Cómo justificar ofertas por MAO con números reales y al mismo tiempo cerrar tu HML.',
     despues: 'E3 — Ofertar con autoridad'
   },
   'E2/E1': {
     nombre: 'Estructurar + Evaluar (paralelo)',
-    icono: '🔁',
+    icono: osIcon('refresh'),
     proposito: 'Estos bloques mezclan setup financiero + análisis de deals. Avanzás los dos frentes en paralelo.',
     aprenderas: 'Cómo cerrar HML y al mismo tiempo seguir analizando deals con MAO.',
     despues: 'E3 — Ofertar con autoridad'
   },
   'E2': {
     nombre: 'Estructurar · Capital y financiamiento listos',
-    icono: '💵',
+    icono: osIcon('banknote'),
     proposito: 'Separar capital líquido del teórico y dejar el financiamiento pre-aprobado ANTES de ofertar. Los wholesalers no te toman en serio sin esto.',
     aprenderas: 'Cuánto earnest money podés poner, cuánto gap cubrir, cuántos meses de reservas necesitás, qué HMLs comparar y cómo conseguir 5 term sheets reales.',
     despues: 'E3 — Generar deal flow y ofertar'
   },
   'E3': {
     nombre: 'Ofertar · Red operativa y ofertas con autoridad',
-    icono: '📨',
+    icono: osIcon('mail'),
     proposito: 'Construir red de wholesalers + realtors para que entren deals constantes y empezar a ofertar como buyer serio.',
     aprenderas: 'Cómo posicionarte ante wholesalers, armar tu pitch de buyer, ofertar con LOI + Proof of Funds, y hacer follow-up disciplinado para subir tasa de aceptación.',
     despues: 'E4 — Ejecutar tu primer deal'
   },
   'E4': {
     nombre: 'Ejecutar · Cerrar y operar tu primer deal',
-    icono: '🔨',
+    icono: osIcon('hammer'),
     proposito: 'Cerrar tu primer deal de forma controlada: due diligence completa, scope of work claro, GCs gestionados con disciplina.',
     aprenderas: 'Cómo correr inspecciones, armar SOW realista, manejar GC y subcontratistas con draw schedule, controlar presupuesto y cronograma sin sorpresas.',
     despues: 'E5 — Salir del deal con margen'
@@ -289,7 +289,7 @@ const FM_ETAPA_MAP = {
   },
   'REVISIÓN': {
     nombre: 'Revisión · Preparación para sesión con mentor',
-    icono: '📊',
+    icono: osIcon('chart'),
     proposito: 'Preparar todo el contexto para sacar el máximo provecho de tu próxima sesión con el coach.',
     aprenderas: 'Cómo armar un caso completo para revisión: números, decisiones, dudas concretas, screenshots de evidencia.',
     despues: 'Próxima sesión y siguiente ciclo'
@@ -310,11 +310,11 @@ function fmRenderEtapaHeader(etapa) {
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
         <div class="bg-white/10 print:bg-blue-50 print:border print:border-blue-200 rounded p-2.5">
-          <div class="text-[10px] font-bold text-amber-300 print:text-amber-800 mb-1">🎯 PROPÓSITO DE ESTA ETAPA</div>
+          <div class="text-[10px] font-bold text-amber-300 print:text-amber-800 mb-1">${osIcon('target')} PROPÓSITO DE ESTA ETAPA</div>
           <div class="text-slate-100 print:text-slate-800 leading-relaxed">${info.proposito}</div>
         </div>
         <div class="bg-white/10 print:bg-emerald-50 print:border print:border-emerald-200 rounded p-2.5">
-          <div class="text-[10px] font-bold text-emerald-300 print:text-emerald-800 mb-1">🧠 QUÉ VAS A APRENDER</div>
+          <div class="text-[10px] font-bold text-emerald-300 print:text-emerald-800 mb-1">${osIcon('brain')} QUÉ VAS A APRENDER</div>
           <div class="text-slate-100 print:text-slate-800 leading-relaxed">${info.aprenderas}</div>
         </div>
         <div class="bg-white/10 print:bg-blue-50 print:border print:border-blue-200 rounded p-2.5">
@@ -396,19 +396,19 @@ function fmRenderBloque(b, idx, p, a) {
         <table class="w-full border border-slate-300 text-sm">
           <tbody>
             <tr class="border-b border-slate-300">
-              <th class="bg-slate-800 text-white text-left p-3 w-1/3 align-top font-bold text-sm">⏱️ Tiempo estimado</th>
+              <th class="bg-slate-800 text-white text-left p-3 w-1/3 align-top font-bold text-sm">${osIcon('clock')} Tiempo estimado</th>
               <td class="p-3 align-top">${b.tiempo}</td>
             </tr>
             <tr class="border-b border-slate-300">
-              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🎯 Actividad</th>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">${osIcon('target')} Actividad</th>
               <td class="p-3 align-top">${actividadStr}</td>
             </tr>
             <tr class="border-b border-slate-300">
-              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">📦 Entregable</th>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">${osIcon('package')} Entregable</th>
               <td class="p-3 align-top font-medium">${b.entregable}</td>
             </tr>
             <tr class="border-b border-slate-300">
-              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🪜 Paso a paso</th>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">Paso a paso</th>
               <td class="p-3 align-top">
                 <ol class="space-y-1.5 list-decimal list-inside text-slate-800">
                   ${pasos.map(paso => `<li>${paso}</li>`).join('')}
@@ -417,7 +417,7 @@ function fmRenderBloque(b, idx, p, a) {
             </tr>
             ${criterios.length ? `
               <tr class="border-b border-slate-300">
-                <th class="bg-emerald-800 text-white text-left p-3 align-top font-bold text-sm">✅ Cómo sabés que el bloque está LISTO</th>
+                <th class="bg-emerald-800 text-white text-left p-3 align-top font-bold text-sm">${osIcon('check-circle')} Cómo sabés que el bloque está LISTO</th>
                 <td class="p-3 align-top bg-emerald-50/40">
                   <ul class="space-y-1.5 text-slate-800">
                     ${criterios.map(c => `<li class="flex gap-2"><span class="text-emerald-600 font-bold">✓</span><span>${c}</span></li>`).join('')}
@@ -425,7 +425,7 @@ function fmRenderBloque(b, idx, p, a) {
                 </td>
               </tr>` : ''}
             <tr class="border-b border-slate-300">
-              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">🧰 Recursos y herramientas</th>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">${osIcon('wrench')} Recursos y herramientas</th>
               <td class="p-3 align-top">
                 <ul class="space-y-1.5">
                   ${b.recursos.map(r => `
@@ -438,7 +438,7 @@ function fmRenderBloque(b, idx, p, a) {
               </td>
             </tr>
             <tr>
-              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">⚠️ Errores reales que veo todo el tiempo</th>
+              <th class="bg-slate-800 text-white text-left p-3 align-top font-bold text-sm">${osIcon('alert')} Errores reales que veo todo el tiempo</th>
               <td class="p-3 align-top">
                 <ul class="space-y-1 text-slate-800">
                   ${b.errores.map(e => `<li class="flex gap-2"><span class="text-red-500">•</span><span>${e}</span></li>`).join('')}
@@ -452,7 +452,7 @@ function fmRenderBloque(b, idx, p, a) {
       <!-- Nota educativa de cierre del bloque -->
       <div class="px-6 pb-5">
         <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r p-3 text-xs text-amber-900 print:bg-amber-50 print:border-amber-500">
-          <strong>📌 Antes de pasar al siguiente bloque:</strong> revisá los criterios de éxito arriba. Si alguno queda flojo, no avances — el siguiente bloque va a chocar con esa debilidad. La metodología funciona en secuencia.
+          <strong>${osIcon('map-pin')} Antes de pasar al siguiente bloque:</strong> revisá los criterios de éxito arriba. Si alguno queda flojo, no avances — el siguiente bloque va a chocar con esa debilidad. La metodología funciona en secuencia.
         </div>
       </div>
     </div>
@@ -778,9 +778,9 @@ function fmDiagPrintPlan() {
   @page { margin: 1.2cm; }
   @media print {
     .no-print { display: none !important; }
-    .bg-slate-900, .bg-slate-800, .bg-slate-700 { background: #fff !important; color: #0F172A !important; }
-    .text-white { color: #0F172A !important; }
-    .text-slate-300, .text-slate-400 { color: #475569 !important; }
+    .bg-slate-900, .bg-slate-800, .bg-slate-700 { background: #fff !important; color: #211e17 !important; }
+    .text-white { color: #211e17 !important; }
+    .text-slate-300, .text-slate-400 { color: #5f594c !important; }
     /* Forzar que cada bloque grande no se corte feo */
     [id^="bloque-"] { page-break-inside: avoid; break-inside: avoid; }
     /* Evitar fondos oscuros que gasten tinta */
@@ -790,9 +790,9 @@ function fmDiagPrintPlan() {
 </head>
 <body>
   <div class="no-print sticky top-0 z-50 bg-emerald-600 text-white p-3 flex justify-between items-center shadow-md">
-    <div class="text-sm font-bold">📋 Plan de Acción listo para imprimir</div>
+    <div class="text-sm font-bold">${osIcon('clipboard')} Plan de Acción listo para imprimir</div>
     <div class="flex gap-2">
-      <button onclick="window.print()" class="bg-white text-emerald-700 font-bold px-4 py-2 rounded-lg text-sm">🖨️ Imprimir / Guardar PDF</button>
+      <button onclick="window.print()" class="bg-white text-emerald-700 font-bold px-4 py-2 rounded-lg text-sm">${osIcon('printer')} Imprimir / Guardar PDF</button>
       <button onclick="window.close()" class="bg-emerald-700 hover:bg-emerald-800 font-bold px-4 py-2 rounded-lg text-sm">✕ Cerrar</button>
     </div>
   </div>
@@ -833,7 +833,7 @@ function fmRenderChatMessage(m, i, mode) {
   const safe = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
   return `
     <div class="flex items-start gap-3">
-      <div class="w-8 h-8 rounded-full bg-${color}-100 flex items-center justify-center flex-shrink-0 text-lg">🤖</div>
+      <div class="w-8 h-8 rounded-full bg-${color}-100 flex items-center justify-center flex-shrink-0 text-lg">${osIcon('bot')}</div>
       <div class="bg-slate-50 rounded-2xl rounded-tl-sm px-4 py-3 text-sm max-w-3xl flex-1">
         <div class="prose prose-sm prose-slate max-w-none [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:rounded [&_pre]:p-3 [&_code]:bg-slate-200 [&_code]:px-1 [&_code]:rounded [&_h1]:text-base [&_h2]:text-base [&_h3]:text-sm [&_strong]:text-slate-900 [&_blockquote]:border-l-4 [&_blockquote]:border-${color}-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-slate-700">${safe}</div>
       </div>

@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-07-25T19:17:22.017Z",
+        "reason": "CEO confirmó: Inter es la body font establecida de la app"
+      },
+      {
+        "rule": "overused-font",
+        "value": "fraunces",
+        "createdAt": "2026-07-25T19:17:22.105Z",
+        "reason": "CEO confirmó: Fraunces es la serif editorial de marca (brief + La Boveda)"
+      },
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          "edu/edu-credit.js"
+        ],
+        "createdAt": "2026-07-25T19:24:29.652Z"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "edu/edu-credit.js"
+        ],
+        "createdAt": "2026-07-25T19:24:29.745Z"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "edu/edu-credit.js"
+        ],
+        "createdAt": "2026-07-25T19:54:24.614Z"
+      }
+    ]
+  }
+}

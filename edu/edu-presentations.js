@@ -24,11 +24,11 @@ window.eduPresWizard = window.eduPresWizard || {
 };
 
 const EDU_PRES_PRESETS = [
-  { key: 'informe',   icon: '📊', label: 'Informe ejecutivo',  desc: 'KPIs, hallazgos, recomendaciones. Para junta directiva o socios.', defaultSlides: 10 },
-  { key: 'educativo', icon: '🎓', label: 'Educativo / clase',  desc: 'Objetivos de aprendizaje, casos, ejercicios. Para mentorías y workshops.', defaultSlides: 15 },
-  { key: 'pitch',     icon: '🎤', label: 'Pitch comercial',    desc: 'Problema, solución, prueba, CTA. Para vender a un cliente.', defaultSlides: 12 },
-  { key: 'marketing', icon: '📣', label: 'Marketing / redes',  desc: 'Hooks visuales, antes/después. Para carruseles o contenido.', defaultSlides: 8 },
-  { key: 'libre',     icon: '✨', label: 'Tema libre',         desc: 'Cualquier tema. La IA adapta estructura al input.', defaultSlides: 12 }
+  { key: 'informe',   icon: 'chart',          label: 'Informe ejecutivo',  desc: 'KPIs, hallazgos, recomendaciones. Para junta directiva o socios.', defaultSlides: 10 },
+  { key: 'educativo', icon: 'graduation-cap', label: 'Educativo / clase',  desc: 'Objetivos de aprendizaje, casos, ejercicios. Para mentorías y workshops.', defaultSlides: 15 },
+  { key: 'pitch',     icon: 'mic',            label: 'Pitch comercial',    desc: 'Problema, solución, prueba, CTA. Para vender a un cliente.', defaultSlides: 12 },
+  { key: 'marketing', icon: 'megaphone',      label: 'Marketing / redes',  desc: 'Hooks visuales, antes/después. Para carruseles o contenido.', defaultSlides: 8 },
+  { key: 'libre',     icon: 'sparkles',       label: 'Tema libre',         desc: 'Cualquier tema. La IA adapta estructura al input.', defaultSlides: 12 }
 ];
 
 function eduPresSetField(field, value) {
@@ -116,11 +116,11 @@ function eduRenderPresentations() {
       <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl overflow-hidden">
         <div class="bg-violet-700 text-white px-4 py-3 flex items-center justify-between flex-wrap gap-2">
           <div>
-            <div class="text-[10px] uppercase font-bold text-violet-200 tracking-wider">🎬 Generador IA de presentaciones</div>
+            <div class="text-[10px] uppercase font-bold text-violet-200 tracking-wider">${osIcon('video',{size:12})} Generador IA de presentaciones</div>
             <div class="text-base font-bold mt-0.5">${w.expertMode ? 'Modo experto · prompt libre' : `Wizard · Paso ${w.step} de 3`}</div>
           </div>
           <div class="flex gap-2">
-            <button onclick="window.eduPresWizard.expertMode = !window.eduPresWizard.expertMode; eduRender();" class="text-[11px] bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded">${w.expertMode ? '🧙 Volver al wizard' : '⚡ Modo experto'}</button>
+            <button onclick="window.eduPresWizard.expertMode = !window.eduPresWizard.expertMode; eduRender();" class="text-[11px] bg-white/20 hover:bg-white/30 text-white font-bold px-3 py-1.5 rounded">${w.expertMode ? osIcon('undo',{size:12}) + ' Volver al wizard' : osIcon('zap',{size:12}) + ' Modo experto'}</button>
             ${w.step > 1 && !w.expertMode ? `<button onclick="eduPresWizardReset()" class="text-[11px] bg-white/10 hover:bg-white/20 text-white font-bold px-3 py-1.5 rounded">↺ Reiniciar</button>` : ''}
           </div>
         </div>
@@ -128,7 +128,7 @@ function eduRenderPresentations() {
         ${w.generating ? `
           <!-- VISTA DE PROGRESO -->
           <div class="p-6 text-center bg-white">
-            <div class="text-3xl mb-2">🧠</div>
+            <div class="mb-2">${osIcon('brain',{size:36})}</div>
             <div class="font-bold text-violet-900 text-base">${w.progress.message || 'Generando...'}</div>
             ${w.progress.total > 0 ? `
               <div class="mt-3 max-w-md mx-auto">
@@ -147,7 +147,7 @@ function eduRenderPresentations() {
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tipo</label>
               <select id="exp-preset" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-                ${EDU_PRES_PRESETS.map(p => `<option value="${p.key}" ${w.preset_type===p.key?'selected':''}>${p.icon} ${p.label}</option>`).join('')}
+                ${EDU_PRES_PRESETS.map(p => `<option value="${p.key}" ${w.preset_type===p.key?'selected':''}>${p.label}</option>`).join('')}
               </select>
             </div>
             <div>
@@ -172,7 +172,7 @@ function eduRenderPresentations() {
                 </select>
               </div>
             </div>
-            <button onclick="eduGeneratePresentationV2(true)" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-bold py-2.5 rounded">🚀 Generar presentación</button>
+            <button onclick="eduGeneratePresentationV2(true)" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-bold py-2.5 rounded">${osIcon('rocket',{size:14})} Generar presentación</button>
           </div>
         ` : w.step === 1 ? `
           <!-- PASO 1: ELEGIR TIPO -->
@@ -181,7 +181,7 @@ function eduRenderPresentations() {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
               ${EDU_PRES_PRESETS.map(p => `
                 <button onclick="eduPresPickPreset('${p.key}')" class="text-left p-3 rounded-lg border-2 ${w.preset_type===p.key?'border-violet-600 bg-violet-50':'border-slate-200 bg-white hover:border-violet-400'} transition">
-                  <div class="text-lg">${p.icon} <span class="font-bold text-sm text-slate-900">${p.label}</span></div>
+                  <div class="text-lg">${osIcon(p.icon,{size:18})} <span class="font-bold text-sm text-slate-900">${p.label}</span></div>
                   <div class="text-[11px] text-slate-600 mt-1">${p.desc}</div>
                   <div class="text-[9px] text-violet-600 mt-1">~${p.defaultSlides} slides recomendados</div>
                 </button>
@@ -192,7 +192,7 @@ function eduRenderPresentations() {
           <!-- PASO 2: TEMA + DETALLES -->
           <div class="p-4 space-y-3">
             <div class="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>2. Contame sobre ${sel?.icon || ''} ${sel?.label || 'la presentación'}</span>
+              <span>2. Contame sobre ${sel ? osIcon(sel.icon,{size:14}) : ''} ${sel?.label || 'la presentación'}</span>
             </div>
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">Título de la presentación *</label>
@@ -235,7 +235,7 @@ function eduRenderPresentations() {
           <div class="p-4 space-y-3">
             <div class="text-sm font-bold text-slate-900">3. Confirmar y generar</div>
             <div class="bg-white border border-violet-200 rounded-lg p-3 space-y-2">
-              <div class="flex justify-between text-sm"><span class="text-slate-600">Tipo:</span><strong>${sel?.icon} ${sel?.label}</strong></div>
+              <div class="flex justify-between text-sm"><span class="text-slate-600">Tipo:</span><strong>${sel ? osIcon(sel.icon,{size:14}) : ''} ${sel?.label}</strong></div>
               <div class="flex justify-between text-sm"><span class="text-slate-600">Título:</span><strong class="text-right max-w-[60%] truncate">${(w.title||'—').replace(/</g,'&lt;')}</strong></div>
               <div class="flex justify-between text-sm"><span class="text-slate-600">Audiencia:</span><strong>${(w.audience||'—').replace(/</g,'&lt;')}</strong></div>
               <div class="flex justify-between text-sm"><span class="text-slate-600"># Slides:</span><strong>${w.slides_count}</strong></div>
@@ -243,24 +243,24 @@ function eduRenderPresentations() {
               <div class="text-xs text-slate-700 pt-2 border-t border-violet-100"><span class="text-slate-500 font-bold">Tema:</span> ${(w.topic||'—').replace(/</g,'&lt;')}</div>
             </div>
             <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900">
-              ⏱ Tiempo estimado: <strong>~${15 + (w.slides_count * 15)} segundos</strong> (outline 15s + slide 15s c/u). Genera slide-por-slide en vivo, con barra de progreso.
+              ${osIcon('clock',{size:12})} Tiempo estimado: <strong>~${15 + (w.slides_count * 15)} segundos</strong> (outline 15s + slide 15s c/u). Genera slide-por-slide en vivo, con barra de progreso.
             </div>
             <div class="flex justify-between items-center pt-2">
               <button onclick="eduPresWizardBack()" class="text-sm text-slate-600 hover:text-slate-900">← Atrás</button>
-              <button onclick="eduGeneratePresentationV2(false)" class="bg-violet-700 hover:bg-violet-800 text-white font-bold text-sm px-6 py-2.5 rounded shadow">🚀 Generar presentación</button>
+              <button onclick="eduGeneratePresentationV2(false)" class="bg-violet-700 hover:bg-violet-800 text-white font-bold text-sm px-6 py-2.5 rounded shadow">${osIcon('rocket',{size:14})} Generar presentación</button>
             </div>
           </div>
         `}
       </div>
 
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">⚠️ ${ai.error}</div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">${osIcon('alert',{size:14})} ${ai.error}</div>` : ''}
 
       <!-- 📦 LEGACY: completamente oculto (solo accesible cambiando flag en consola) -->
       ${window.__eduShowLegacy ? `
       <details class="bg-slate-50 border border-slate-200 rounded-xl">
-        <summary class="cursor-pointer text-[10px] font-bold uppercase text-slate-500 px-3 py-2">🔧 Modo legacy V1 (dev only)</summary>
+        <summary class="cursor-pointer text-[10px] font-bold uppercase text-slate-500 px-3 py-2">${osIcon('wrench',{size:12})} Modo legacy V1 (dev only)</summary>
         <div class="p-4">
-        <div class="text-xs font-bold uppercase text-violet-900 mb-3">🎬 Generar presentación con IA + web search live</div>
+        <div class="text-xs font-bold uppercase text-violet-900 mb-3">${osIcon('video',{size:14})} Generar presentación con IA + web search live</div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -270,10 +270,10 @@ function eduRenderPresentations() {
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Tipo</label>
             <select id="edu-pres-type" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="class">📚 Clase magistral</option>
-              <option value="workshop">🛠 Taller práctico</option>
-              <option value="webinar">📡 Webinar abierto</option>
-              <option value="keynote">🎤 Keynote / Pitch</option>
+              <option value="class">Clase magistral</option>
+              <option value="workshop">Taller práctico</option>
+              <option value="webinar">Webinar abierto</option>
+              <option value="keynote">Keynote / Pitch</option>
             </select>
           </div>
         </div>
@@ -310,13 +310,13 @@ function eduRenderPresentations() {
           <div>
             <label class="block text-[10px] font-bold text-slate-600 mb-1">Dominio temático *</label>
             <select id="edu-pres-domain" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
-              <option value="real-estate">🏠 Real Estate (Redfin, FRED, NAR, MLS)</option>
-              <option value="marketing">📣 Marketing / Growth (HubSpot, Statista, Pew)</option>
-              <option value="finance">💰 Finanzas / Inversión (SEC, FRED, Bloomberg)</option>
-              <option value="tech">💻 Tech / Software (Gartner, IDC, CB Insights)</option>
-              <option value="sales">🤝 Ventas / B2B (HubSpot Sales, Salesforce, Gong)</option>
-              <option value="leadership">👥 Liderazgo / Management (HBR, McKinsey, Bain)</option>
-              <option value="general">🌍 General / Otro tema</option>
+              <option value="real-estate">Real Estate (Redfin, FRED, NAR, MLS)</option>
+              <option value="marketing">Marketing / Growth (HubSpot, Statista, Pew)</option>
+              <option value="finance">Finanzas / Inversión (SEC, FRED, Bloomberg)</option>
+              <option value="tech">Tech / Software (Gartner, IDC, CB Insights)</option>
+              <option value="sales">Ventas / B2B (HubSpot Sales, Salesforce, Gong)</option>
+              <option value="leadership">Liderazgo / Management (HBR, McKinsey, Bain)</option>
+              <option value="general">General / Otro tema</option>
             </select>
             <div class="text-[9px] text-slate-500 mt-0.5">Define qué fuentes prioriza la IA</div>
           </div>
@@ -333,7 +333,7 @@ function eduRenderPresentations() {
         </div>
 
         <div class="mt-2">
-          <label class="block text-[10px] font-bold text-slate-600 mb-1">🔍 Fuentes preferidas (opcional)</label>
+          <label class="block text-[10px] font-bold text-slate-600 mb-1">${osIcon('search',{size:12})} Fuentes preferidas (opcional)</label>
           <textarea id="edu-pres-sources" rows="2" placeholder="Si querés que la IA priorice fuentes específicas, listalas. Ej: 'Statista, Gartner, McKinsey 2024 report'. La IA igual usa las del dominio por default." class="w-full border border-slate-300 rounded px-3 py-2 text-xs"></textarea>
         </div>
 
@@ -346,26 +346,26 @@ function eduRenderPresentations() {
           <div class="flex items-center gap-4 flex-wrap">
             <label class="flex items-center gap-2 text-xs">
               <input type="checkbox" id="edu-pres-live" checked />
-              <span><strong>🌐 Web search live</strong> — datos verificables en vivo</span>
+              <span><strong>${osIcon('globe',{size:12})} Web search live</strong> — datos verificables en vivo</span>
             </label>
             <label class="flex items-center gap-2 text-xs bg-amber-50 border border-amber-300 px-2 py-1 rounded">
               <input type="checkbox" id="edu-pres-research" />
-              <span><strong>🔬 Investigación profunda</strong> — extended thinking + 25 búsquedas (3-5 min, +costo, insights no obvios)</span>
+              <span><strong>${osIcon('flask',{size:12})} Investigación profunda</strong> — extended thinking + 25 búsquedas (3-5 min, +costo, insights no obvios)</span>
             </label>
           </div>
-          <button onclick="withLoading(this, eduGeneratePresentation)" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2.5 rounded">🤖 Generar con IA</button>
+          <button onclick="withLoading(this, eduGeneratePresentation)" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold px-5 py-2.5 rounded">${osIcon('bot',{size:14})} Generar con IA</button>
         </div>
-        <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">⚡ Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
+        <div class="text-[10px] text-violet-700 mt-2 italic" id="edu-pres-time-hint">${osIcon('zap',{size:11})} Modo normal: ~30-90 seg, 8 web searches. Modo investigación: ~3-5 min, 25 searches + thinking. Activá investigación para casos donde necesitás profundidad real (clase nueva, tema técnico, lanzamiento).</div>
         </div>
       </details>
       ` : ''}
 
       ${ai.loading ? `
         <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center">
-          <div class="text-3xl animate-pulse">🧠</div>
+          <div class="animate-pulse">${osIcon('brain',{size:36})}</div>
           <div class="mt-2 font-bold text-violet-900">${ai.status === 'starting' ? 'Iniciando job en background...' : ai.status === 'running' ? 'Claude analizando + buscando data live...' : 'Procesando...'}</div>
           <div class="text-[11px] text-violet-700 mt-1">
-            ${ai.elapsed_sec != null ? `⏱ ${ai.elapsed_sec}s transcurridos` : ''}
+            ${ai.elapsed_sec != null ? `${osIcon('clock',{size:11})} ${ai.elapsed_sec}s transcurridos` : ''}
             ${ai.job_id ? ` · job <code class="text-[9px]">${ai.job_id.slice(0,8)}</code>` : ''}
             ${(ai.missed_polls||0) > 0 ? ` <span class="text-amber-700">· ${ai.missed_polls} polls sin respuesta (RLS?)</span>` : ''}
           </div>
@@ -373,17 +373,17 @@ function eduRenderPresentations() {
           <div class="text-[10px] text-violet-600 mt-2 italic">Esto puede tardar 60-120 segundos.</div>
         </div>
       ` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">⚠️ ${ai.error}</div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 whitespace-pre-wrap">${osIcon('alert',{size:14})} ${ai.error}</div>` : ''}
 
       ${draft ? `
         <!-- Preview de la presentación generada -->
         <div class="bg-white border-2 border-emerald-300 rounded-xl overflow-hidden">
           <div class="bg-emerald-50 border-b border-emerald-200 px-3 py-2 flex justify-between items-center flex-wrap gap-2">
-            <div class="text-xs font-bold uppercase text-emerald-900">✅ Generada · ${(draft.slides||[]).length} slides</div>
+            <div class="text-xs font-bold uppercase text-emerald-900">${osIcon('check-circle',{size:13})} Generada · ${(draft.slides||[]).length} slides</div>
             <div class="flex gap-1">
-              <button onclick="eduDownloadPPTX()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">📥 Descargar PPTX</button>
-              <button onclick="eduDownloadSpeakerNotes()" class="bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded">📋 Speaker notes</button>
-              <button onclick="eduDownloadPresJSON()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded" title="Backup en JSON por si el PPTX no funciona">📄 JSON</button>
+              <button onclick="eduDownloadPPTX()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('download',{size:12})} Descargar PPTX</button>
+              <button onclick="eduDownloadSpeakerNotes()" class="bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold px-3 py-1.5 rounded">${osIcon('clipboard',{size:12})} Speaker notes</button>
+              <button onclick="eduDownloadPresJSON()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded" title="Backup en JSON por si el PPTX no funciona">${osIcon('file',{size:12})} JSON</button>
             </div>
           </div>
           <div class="p-4 max-h-[60vh] overflow-y-auto">
@@ -403,17 +403,17 @@ function eduRenderPresentations() {
                   ${(s.bullets || []).length ? `<ul class="text-xs text-slate-700 mt-2 ml-4 list-disc space-y-0.5">${s.bullets.map(b => `<li>${b}</li>`).join('')}</ul>` : ''}
                   ${(s.stats || []).length ? `
                     <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-1">
-                      ${s.stats.map(st => `<div class="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px]"><strong>${st.label}</strong><div class="text-blue-700 font-bold">${st.value}</div>${st.source_name?`<div class="text-[9px] text-slate-500">📍 ${st.source_name}</div>`:''}</div>`).join('')}
+                      ${s.stats.map(st => `<div class="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px]"><strong>${st.label}</strong><div class="text-blue-700 font-bold">${st.value}</div>${st.source_name?`<div class="text-[9px] text-slate-500">${osIcon('map-pin',{size:10})} ${st.source_name}</div>`:''}</div>`).join('')}
                     </div>
                   ` : ''}
-                  ${s.speaker_notes ? `<details class="mt-2"><summary class="cursor-pointer text-[10px] text-slate-600 font-bold">🎙 Speaker notes</summary><div class="text-[11px] text-slate-700 mt-1 bg-slate-50 rounded p-2 whitespace-pre-wrap">${s.speaker_notes}</div></details>` : ''}
+                  ${s.speaker_notes ? `<details class="mt-2"><summary class="cursor-pointer text-[10px] text-slate-600 font-bold">${osIcon('mic',{size:11})} Speaker notes</summary><div class="text-[11px] text-slate-700 mt-1 bg-slate-50 rounded p-2 whitespace-pre-wrap">${s.speaker_notes}</div></details>` : ''}
                   ${(s.sources || []).length ? `<div class="text-[9px] text-slate-500 mt-2">Fuentes: ${s.sources.map(src => `<a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a>`).join(' · ')}</div>` : ''}
                 </div>
               `).join('')}
             </div>
             ${(draft.all_sources || []).length ? `
               <div class="mt-4 pt-3 border-t border-slate-200">
-                <div class="text-xs font-bold uppercase text-slate-700 mb-1">📚 Todas las fuentes citadas</div>
+                <div class="text-xs font-bold uppercase text-slate-700 mb-1">${osIcon('book',{size:13})} Todas las fuentes citadas</div>
                 <ul class="text-[10px] text-slate-600 space-y-0.5">
                   ${draft.all_sources.map(src => `<li>• <a href="${src.url}" target="_blank" class="text-blue-600 hover:underline">${src.title || src.url}</a></li>`).join('')}
                 </ul>
@@ -426,7 +426,7 @@ function eduRenderPresentations() {
       <!-- Historial de presentaciones -->
       ${presentations.length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📚 Historial — ${presentations.length} presentaciones</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('book',{size:13})} Historial — ${presentations.length} presentaciones</div>
           <div class="divide-y divide-slate-100 max-h-72 overflow-y-auto">
             ${presentations.map(p => `
               <div class="p-2 flex justify-between items-start gap-2 hover:bg-slate-50">
@@ -436,7 +436,7 @@ function eduRenderPresentations() {
                 </div>
                 <div class="flex gap-1 flex-shrink-0">
                   <button onclick="eduLoadPresentation('${p.id}')" class="text-blue-600 text-[10px] hover:underline">cargar</button>
-                  <button onclick="eduDeletePresentation('${p.id}')" class="text-red-500 hover:text-red-700 text-[10px]">🗑</button>
+                  <button onclick="eduDeletePresentation('${p.id}')" class="text-red-500 hover:text-red-700 text-[10px]" title="Eliminar presentación">${osIcon('trash',{size:12})}</button>
                 </div>
               </div>
             `).join('')}
@@ -475,7 +475,7 @@ async function eduGeneratePresentationV2(isExpertMode) {
 
   w.generating = true;
   w.cancel = false;
-  w.progress = { phase: 'outline', current: 0, total: w.slides_count, message: '📋 Generando outline (estructura del deck)...' };
+  w.progress = { phase: 'outline', current: 0, total: w.slides_count, message: 'Generando outline (estructura del deck)...' };
   eduRender();
 
   const baseUrl = `${window.SUPABASE_URL}/functions/v1/generate-presentation-v2`;
@@ -498,7 +498,7 @@ async function eduGeneratePresentationV2(isExpertMode) {
     if (token === window.SUPABASE_ANON_KEY) throw new Error('Caché devolvió anon key en vez de session token');
   } catch (e) {
     return _eduPresFail(
-      '⚠️ Tu sesión expiró o no se pudo leer.\n\n' +
+      'Tu sesión expiró o no se pudo leer.\n\n' +
       'Hacé esto:\n' +
       '1) Cerrá sesión (botón Salir abajo a la izquierda)\n' +
       '2) Volvé a entrar con tu email\n' +
@@ -545,7 +545,7 @@ async function eduGeneratePresentationV2(isExpertMode) {
     const prevSlide = i > 0 ? outline.slides_outline[i - 1] : null;
     const nextOutline = i + 1 < outline.slides_outline.length ? outline.slides_outline[i + 1] : null;
 
-    w.progress = { phase: 'slide', current: i + 1, total: outline.slides_outline.length, message: `🎨 Slide ${i + 1}/${outline.slides_outline.length}: ${slideInfo.title}` };
+    w.progress = { phase: 'slide', current: i + 1, total: outline.slides_outline.length, message: `Slide ${i + 1}/${outline.slides_outline.length}: ${slideInfo.title}` };
     eduRender();
 
     let slide = null;
@@ -787,7 +787,7 @@ async function eduDownloadPPTX() {
   // Asegurar que PptxGenJS esté disponible
   const ok = await _eduEnsurePptxGen();
   if (!ok || typeof PptxGenJS === 'undefined') {
-    return alert('⚠️ No pude cargar la librería PptxGenJS.\n\nProbá:\n1) Verificar que tengas internet\n2) Desactivar bloqueadores de ads/scripts\n3) Hard refresh (Cmd+Shift+R)\n\nMientras tanto, podés usar el botón "📋 Speaker notes" para descargar como markdown.');
+    return alert('No pude cargar la librería PptxGenJS.\n\nProbá:\n1) Verificar que tengas internet\n2) Desactivar bloqueadores de ads/scripts\n3) Hard refresh (Cmd+Shift+R)\n\nMientras tanto, podés usar el botón "Speaker notes" para descargar como markdown.');
   }
 
   // Construir + descargar con método robusto (blob + anchor)
@@ -817,7 +817,7 @@ async function eduDownloadPPTX() {
       eduBuildPPTX(p, { download: true });
     } catch (e2) {
       console.error('[edu-pres] Fallback writeFile() también falló:', e2);
-      alert('⚠️ Error generando el .pptx:\n\n' + (e?.message || String(e)) + '\n\nMientras tanto:\n• Click "📋 Speaker notes" para markdown\n• O click "📄 JSON" para descargar el contenido raw\n\nPasame screenshot de la consola (F12) para que lo arregle.');
+      alert('Error generando el .pptx:\n\n' + (e?.message || String(e)) + '\n\nMientras tanto:\n• Click "Speaker notes" para markdown\n• O click "JSON" para descargar el contenido raw\n\nPasame screenshot de la consola (F12) para que lo arregle.');
     }
   }
 }
@@ -1576,7 +1576,7 @@ function renderSplitImage(slide, s, c) {
     slide.addShape('rect', { x: 0, y: 0.55, w: 6.5, h: 6.55, fill: { color: c.NAV }, line: { type: 'none' } });
     slide.addShape('rect', { x: 0.4, y: 1.2, w: 5.7, h: 0.08, fill: { color: c.GOLD }, line: { color: c.GOLD } });
     if (s.image_query) {
-      slide.addText('🎨', { x: 0, y: 3, w: 6.5, h: 1.5, fontSize: 60, color: c.GOLD, align: 'center' });
+      slide.addText(osIcon('palette'), { x: 0, y: 3, w: 6.5, h: 1.5, fontSize: 60, color: c.GOLD, align: 'center' });
     }
     slide.addText((s.block_label || s.title || '').toUpperCase(), { x: 0.4, y: 1.5, w: 5.7, h: 0.4, fontSize: 12, bold: true, color: c.GOLD, charSpacing: 3 });
   }
@@ -1622,7 +1622,7 @@ function renderChartSpotlight(slide, s, c) {
         slide.addShape('roundRect', { x, y: 1.7, w: cardW, h: 4.7, fill: { color: c.WHITE }, line: { color: c.ACCENT, width: 2 }, rectRadius: 0.08 });
         slide.addText(String(st.value || st.trend || ''), { x: x + 0.2, y: 2.2, w: cardW - 0.4, h: 1.5, fontSize: 36, bold: true, color: c.ACCENT, align: 'center', valign: 'middle' });
         slide.addText(String(st.label || ''), { x: x + 0.2, y: 4.0, w: cardW - 0.4, h: 1.0, fontSize: 14, color: c.NAV, align: 'center', valign: 'top' });
-        if (st.source_name) slide.addText('📍 ' + st.source_name, { x: x + 0.2, y: 5.5, w: cardW - 0.4, h: 0.5, fontSize: 9, italic: true, color: c.GRAY_MED, align: 'center' });
+        if (st.source_name) slide.addText(osIcon('map-pin') + st.source_name, { x: x + 0.2, y: 5.5, w: cardW - 0.4, h: 0.5, fontSize: 9, italic: true, color: c.GRAY_MED, align: 'center' });
       });
     } else {
       slide.addText('Datos clave', { x: 0.6, y: 3.8, w: 7.8, h: 0.6, fontSize: 18, bold: true, color: c.GRAY_MED, italic: true, align: 'center' });
@@ -1630,13 +1630,13 @@ function renderChartSpotlight(slide, s, c) {
   }
 
   // Panel derecho con 3 insights
-  const insights = s.insights || (s.bullets || []).slice(0, 3).map(b => ({ title: '💡', body: b }));
+  const insights = s.insights || (s.bullets || []).slice(0, 3).map(b => ({ title: '', body: b }));
   const xI = 8.85, wI = 4.05;
   insights.slice(0, 3).forEach((ins, i) => {
     const y = 1.4 + i * 1.8;
     slide.addShape('roundRect', { x: xI, y, w: wI, h: 1.6, fill: { color: c.WHITE }, line: { color: c.ACCENT, width: 1.5 }, rectRadius: 0.1 });
     slide.addShape('rect', { x: xI, y, w: 0.1, h: 1.6, fill: { color: c.GOLD }, line: { color: c.GOLD } });
-    slide.addText(String(ins.title || '💡'), { x: xI + 0.2, y: y + 0.15, w: wI - 0.4, h: 0.4, fontSize: 16, bold: true, color: c.ACCENT });
+    slide.addText(String(ins.title || osIcon('lightbulb')), { x: xI + 0.2, y: y + 0.15, w: wI - 0.4, h: 0.4, fontSize: 16, bold: true, color: c.ACCENT });
     slide.addText(String(ins.body || ''), { x: xI + 0.2, y: y + 0.55, w: wI - 0.4, h: 1.0, fontSize: 11, color: c.NAV, valign: 'top' });
   });
 }
@@ -1710,10 +1710,10 @@ function eduRenderReports() {
   return `
     <div class="space-y-3">
       <div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-900">
-        💡 <strong>Informes IA</strong> — generá reportes semanales/quincenales/mensuales con análisis de cartera, progreso de estudiantes y notas de clases.
+        ${osIcon('lightbulb',{size:13})} <strong>Informes IA</strong> — generá reportes semanales/quincenales/mensuales con análisis de cartera, progreso de estudiantes y notas de clases.
       </div>
       <div class="text-center py-8 text-slate-500">
-        <div class="text-3xl mb-2">📈</div>
+        <div class="mb-2">${osIcon('trending-up',{size:32})}</div>
         <div class="text-sm font-bold">Sección en construcción</div>
         <div class="text-xs mt-1">La generación de informes con IA se conecta en el siguiente turno.</div>
       </div>
@@ -1737,7 +1737,7 @@ function eduRenderReports() {
 async function openEduPresentationsSystem(sys) {
   eduState.sys = sys;
   // Por default arranca con la primera mentoría activa
-  openModal(`🎬 ${sys.name}`, '<div id="edu-root">Cargando...</div>');
+  openModal(`${sys.name}`, '<div id="edu-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await eduLoadAll();

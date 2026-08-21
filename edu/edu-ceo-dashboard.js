@@ -72,7 +72,7 @@ function eduCeoBust() { eduCeoCache = { key: null, data: null, loading: false };
 
 // ─── Render principal ───
 function eduRenderCeoDashboard(d) {
-  if (!d) return `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-2xl animate-pulse">🧠</div><div class="text-xs text-violet-800 mt-1">Cargando dashboard ejecutivo...</div></div>`;
+  if (!d) return `<div class="bg-violet-50 border border-violet-200 rounded p-4 text-center"><div class="text-2xl animate-pulse">${osIcon('brain')}</div><div class="text-xs text-violet-800 mt-1">Cargando dashboard ejecutivo...</div></div>`;
   return `
     <section class="space-y-3 mt-3">
       ${eduCeoRenderHealthScore(d)}
@@ -82,7 +82,7 @@ function eduRenderCeoDashboard(d) {
       ${eduCeoRenderCuellos(d)}
       ${eduCeoRenderMotivosDesercion(d)}
       ${eduCeoRenderRevenue(d)}
-      <!-- 🆕 Seguimiento de planes (conectado al diagnóstico FlipMentoría) -->
+      <!-- Seguimiento de planes (conectado al diagnóstico FlipMentoría) -->
       ${eduCeoRenderPlanResumen(d)}
       ${eduCeoRenderPlanDistribucion(d)}
       ${eduCeoRenderPlanVelocity(d)}
@@ -183,7 +183,7 @@ function eduCeoRenderOkrTracking(d) {
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-slate-900 text-white px-4 py-3 flex justify-between items-center">
-        <h3 class="font-bold text-sm">🎯 OKRs — Objetivos del trimestre</h3>
+        <h3 class="font-bold text-sm">${osIcon('target')} OKRs — Objetivos del trimestre</h3>
         <div class="flex gap-2 text-xs">
           <span class="bg-emerald-500 px-2 py-0.5 rounded font-bold">${logrados} logrados</span>
           <span class="bg-amber-500 px-2 py-0.5 rounded font-bold">${cerca} cerca</span>
@@ -243,7 +243,7 @@ function eduCeoRenderFunnel(d) {
   const total = funnel.reduce((s, x) => s + (+x.estudiantes || 0), 0);
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">🔻 Funnel — Distribución por etapa</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">Funnel — Distribución por etapa</h3></div>
       <div class="p-3 space-y-2">
         ${funnel.map((f, i) => {
           const width = Math.max(20, +f.pct_del_total || 0);
@@ -271,7 +271,7 @@ function eduCeoRenderCuellos(d) {
   return `
     <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
       <div class="bg-red-50 px-4 py-3 border-b border-red-200">
-        <h3 class="font-bold text-sm text-red-900">⚠️ Cuellos de botella en el funnel</h3>
+        <h3 class="font-bold text-sm text-red-900">${osIcon('alert')} Cuellos de botella en el funnel</h3>
         <p class="text-[11px] text-red-700">Etapas donde los estudiantes se quedan más tiempo que la mediana.</p>
       </div>
       <table class="w-full text-xs">
@@ -304,7 +304,7 @@ function eduCeoRenderMotivosDesercion(d) {
   const total = m.reduce((s, x) => s + (+x.cantidad || 0), 0);
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">🚪 Top motivos de deserción</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('door')} Top motivos de deserción</h3></div>
       <div class="p-3 space-y-1">
         ${m.slice(0,8).map(x => {
           const pct = Math.round(100 * (+x.cantidad) / total);
@@ -328,10 +328,10 @@ function eduCeoRenderMotivosDesercion(d) {
 // ─── 7. Revenue (si hay pricing cargado) ───
 function eduCeoRenderRevenue(d) {
   const r = d.revenue || {};
-  if (!r.revenue_total_contratado && !r.deal_revenue_estudiantes) return `<div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">💡 <strong>Revenue tracking inactivo.</strong> Cargá <code>contract_value</code> en <code>edu_students</code> para ver LTV, ROI y revenue del programa.</div>`;
+  if (!r.revenue_total_contratado && !r.deal_revenue_estudiantes) return `<div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">${osIcon('lightbulb')} <strong>Revenue tracking inactivo.</strong> Cargá <code>contract_value</code> en <code>edu_students</code> para ver LTV, ROI y revenue del programa.</div>`;
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-emerald-600 text-white px-4 py-3"><h3 class="font-bold text-sm">💰 Revenue del programa</h3></div>
+      <div class="bg-emerald-600 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('dollar')} Revenue del programa</h3></div>
       <div class="p-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
         <div><div class="text-[10px] uppercase text-slate-500 font-bold">Contratado total</div><div class="text-xl font-bold text-emerald-700">$${(+r.revenue_total_contratado||0).toLocaleString()}</div></div>
         <div><div class="text-[10px] uppercase text-slate-500 font-bold">Revenue de activos</div><div class="text-xl font-bold text-emerald-700">$${(+r.revenue_activos||0).toLocaleString()}</div></div>
@@ -348,7 +348,7 @@ function eduCeoRenderTendencia(d) {
   if (!t.length) return '';
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">📈 Tendencia últimos 6 meses</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('trending-up')} Tendencia últimos 6 meses</h3></div>
       <div class="overflow-x-auto"><table class="w-full text-xs">
         <thead><tr class="bg-slate-50 text-[10px] uppercase text-slate-500">
           <th class="text-left p-2">Mes</th>
@@ -379,7 +379,7 @@ function eduCeoRenderRetencionCohort(d) {
   if (!r.length) return '';
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">🔁 Retención por cohort</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('refresh')} Retención por cohort</h3></div>
       <table class="w-full text-xs">
         <thead><tr class="bg-slate-50 text-[10px] uppercase text-slate-500">
           <th class="text-left p-2">Cohort (mes ingreso)</th>
@@ -426,14 +426,14 @@ function eduCeoRenderPlanResumen(d) {
   const r = d.planResumen || {};
   if (!r.planes_activos) {
     return `<div class="bg-amber-50 border border-amber-200 rounded p-3 text-xs text-amber-800">
-      💡 <strong>Sin planes activos.</strong> Generá planes desde Metodología FlipMentoría → Diagnóstico → Vincular a estudiante.
+      ${osIcon('lightbulb')} <strong>Sin planes activos.</strong> Generá planes desde Metodología FlipMentoría → Diagnóstico → Vincular a estudiante.
     </div>`;
   }
   const pctActivosUltimaSemana = r.planes_activos ? Math.round(100 * r.activos_ultima_semana / r.planes_activos) : 0;
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-violet-600 text-white px-4 py-3">
-        <h3 class="font-bold text-sm">📋 Seguimiento de Planes — Conectado con Diagnóstico FlipMentoría</h3>
+        <h3 class="font-bold text-sm">${osIcon('clipboard')} Seguimiento de Planes — Conectado con Diagnóstico FlipMentoría</h3>
         <p class="text-[11px] opacity-80 mt-0.5">Métricas de avance de los estudiantes que tienen plan generado.</p>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-3">
@@ -457,13 +457,13 @@ function eduCeoRenderPlanDistribucion(d) {
   const dist = d.planDistribucion || [];
   if (!dist.length) return '';
   const labels = {
-    sin_data: ['📭 Sin tareas', 'slate'],
-    sin_empezar: ['⏳ Sin empezar', 'slate'],
-    lejos: ['🔴 Lejos (<25%)', 'red'],
-    avanzando: ['🟡 Avanzando (25-50%)', 'amber'],
-    mitad: ['🔵 A la mitad (50-75%)', 'blue'],
-    finalizando: ['🟢 Finalizando (75-99%)', 'emerald'],
-    completado: ['🏆 Completado (100%)', 'violet']
+    sin_data: ['Sin tareas', 'slate'],
+    sin_empezar: ['Sin empezar', 'slate'],
+    lejos: ['' + kitStatusDot('bad') + ' Lejos (<25%)', 'red'],
+    avanzando: ['Avanzando (25-50%)', 'amber'],
+    mitad: ['A la mitad (50-75%)', 'blue'],
+    finalizando: ['Finalizando (75-99%)', 'emerald'],
+    completado: ['Completado (100%)', 'violet']
   };
   const total = dist.reduce((s, x) => s + (+x.estudiantes || 0), 0);
   // Ordenar por nivel de avance
@@ -471,7 +471,7 @@ function eduCeoRenderPlanDistribucion(d) {
   const sorted = [...dist].sort((a,b) => orden.indexOf(a.bucket) - orden.indexOf(b.bucket));
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">📊 Distribución del avance del plan</h3></div>
+      <div class="bg-slate-900 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('chart')} Distribución del avance del plan</h3></div>
       <div class="p-3 space-y-2">
         ${sorted.map(b => {
           const [lbl, color] = labels[b.bucket] || [b.bucket, 'slate'];
@@ -502,7 +502,7 @@ function eduCeoRenderPlanVelocity(d) {
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-slate-900 text-white px-4 py-3 flex justify-between items-center">
-        <h3 class="font-bold text-sm">⚡ Velocity — Tareas completadas por semana</h3>
+        <h3 class="font-bold text-sm">${osIcon('zap')} Velocity — Tareas completadas por semana</h3>
         <span class="text-xs">Promedio: <strong>${totalSemana}</strong>/sem</span>
       </div>
       <div class="p-3">
@@ -531,7 +531,7 @@ function eduCeoRenderPlanRiesgo(d) {
   return `
     <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
       <div class="bg-red-50 px-4 py-3 border-b border-red-200">
-        <h3 class="font-bold text-sm text-red-900">⚠️ Estudiantes en riesgo de abandono (plan sin avance)</h3>
+        <h3 class="font-bold text-sm text-red-900">${osIcon('alert')} Estudiantes en riesgo de abandono (plan sin avance)</h3>
         <p class="text-[11px] text-red-700">Estos estudiantes no han marcado tareas del plan en mucho tiempo. Contactar urgente.</p>
       </div>
       <div class="max-h-80 overflow-y-auto">
@@ -553,7 +553,7 @@ function eduCeoRenderPlanRiesgo(d) {
                 <td class="p-2 text-right font-bold">${s.pct_avance != null ? s.pct_avance+'%' : '—'}</td>
                 <td class="p-2 text-right font-bold ${s.dias_sin_actividad > 30 ? 'text-red-700' : 'text-amber-700'}">${s.dias_sin_actividad != null ? s.dias_sin_actividad+'d' : 'nunca'}</td>
                 <td class="p-2"><span class="bg-${c}-100 text-${c}-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${s.riesgo}</span></td>
-                <td class="p-2 text-right">${s.email ? `<a href="mailto:${(window.esc||((x)=>x))(s.email)}" class="text-blue-600 text-[10px] hover:underline">📧 contactar</a>` : ''}</td>
+                <td class="p-2 text-right">${s.email ? `<a href="mailto:${(window.esc||((x)=>x))(s.email)}" class="text-blue-600 text-[10px] hover:underline">${osIcon('mail')} contactar</a>` : ''}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -570,7 +570,7 @@ function eduCeoRenderPlanBloquesLentos(d) {
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-amber-500 text-white px-4 py-3">
-        <h3 class="font-bold text-sm">🐌 Bloques del plan donde más se atascan</h3>
+        <h3 class="font-bold text-sm">Bloques del plan donde más se atascan</h3>
         <p class="text-[11px] opacity-90 mt-0.5">Identificá si hay contenido confuso o pasos donde necesitan ayuda extra.</p>
       </div>
       <div class="max-h-72 overflow-y-auto">
@@ -606,7 +606,7 @@ function eduCeoRenderPlanTop(d) {
   if (!t.length) return '';
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div class="bg-emerald-600 text-white px-4 py-3"><h3 class="font-bold text-sm">🏆 Top estudiantes con mejor avance</h3></div>
+      <div class="bg-emerald-600 text-white px-4 py-3"><h3 class="font-bold text-sm">${osIcon('trophy')} Top estudiantes con mejor avance</h3></div>
       <div class="max-h-64 overflow-y-auto">
         <table class="w-full text-xs">
           <thead class="bg-slate-50 sticky top-0"><tr class="text-[10px] uppercase text-slate-500">

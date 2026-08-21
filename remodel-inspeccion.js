@@ -100,7 +100,7 @@ function inRenderDB() {
       ${x.property_id ? `<button class="repbtn" style="padding:3px 7px;font-size:10px" onclick="inPrellenarEstimador('${x.id}')" title="Pre-llenar Estimador Pro con el daño por etapa">→ Estimador</button>` : ''}
     </td></tr>`).join('');
   return `<div class="card"><div class="chart-h"><div class="t">Inspecciones guardadas</div><div class="k">${IN.inspecciones.length} evaluaciones · por property_id (Ficha de Casa)</div></div>
-    <div style="display:flex;gap:8px;margin:8px 0"><button class="repbtn" onclick="inStartWizard()">＋ Nueva inspección</button><button class="repbtn ghost" onclick="inExportTodo()">⬇ Exportar todo (XLS)</button></div>
+    <div style="display:flex;gap:8px;margin:8px 0"><button class="repbtn" onclick="inStartWizard()">＋ Nueva inspección</button><button class="repbtn ghost" onclick="inExportTodo()">${osIcon('download', {size:12})} Exportar todo (XLS)</button></div>
     <table class="ptable"><thead><tr><th>Propiedad</th><th style="text-align:right">Daño global</th><th>Veredicto</th><th>Fecha</th><th>Ficha</th><th></th></tr></thead>
     <tbody>${rows || '<tr><td colspan="6" style="padding:14px;opacity:.6">Sin inspecciones — creá la primera.</td></tr>'}</tbody></table></div>`;
 }
@@ -170,10 +170,10 @@ function inRenderWizard() {
   const pct = Math.round(100 * (w.idx) / (total - 1));
   const res = inWizardCompute();
   // panel lateral en vivo
-  const barra = (pct2, label, val, emoji) => `<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>${emoji || ''} ${IN_E(label)}</span><b>${val != null ? val + '%' : '—'}</b></div><div style="height:6px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, val || 0)}%;background:${(val || 0) >= 60 ? '#f87171' : (val || 0) >= 40 ? '#e7b65e' : '#34d399'}"></i></div></div>`;
+  const barra = (pct2, label, val, emoji) => `<div style="margin-bottom:7px"><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span>${emoji || ''} ${IN_E(label)}</span><b>${val != null ? val + '%' : '—'}</b></div><div style="height:6px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, val || 0)}%;background:${(val || 0) >= 60 ? '#ff6b6b' : (val || 0) >= 40 ? '#fbbf24' : '#4ade9e'}"></i></div></div>`;
   const panel = `<div class="card" style="align-self:flex-start;position:sticky;top:10px">
     <div style="text-align:center;padding:8px 0"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;opacity:.6">Daño Global Estimado</div>
-      <div style="font-size:38px;font-weight:800;color:${(res.global || 0) >= 60 ? '#f87171' : (res.global || 0) >= 40 ? '#e7b65e' : '#34d399'}">${res.global != null ? res.global + '%' : '—'}</div>
+      <div style="font-size:38px;font-weight:800;color:${(res.global || 0) >= 60 ? '#ff6b6b' : (res.global || 0) >= 40 ? '#fbbf24' : '#4ade9e'}">${res.global != null ? res.global + '%' : '—'}</div>
       <div style="font-size:11px;opacity:.7">${IN_E(inVeredicto(res.global))}</div></div>
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px;opacity:.6">Divisiones Técnicas</div>
     ${IN.divisiones.map(d => barra(null, d.nombre, res.divisiones[d.key], d.emoji)).join('')}
@@ -181,7 +181,7 @@ function inRenderWizard() {
     ${IN.patologias.map(p => barra(null, p.nombre, res.patologias[p.key], p.emoji)).join('')}
   </div>`;
   // avisos
-  const avisosHtml = (w.avisos || []).length ? `<div class="card" style="border:1px solid rgba(231,182,94,.4);margin-bottom:10px"><div class="lab" style="color:#e7b65e">⚠ Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin:3px 0">• ${IN_E(a)}</div>`).join('')}</div>` : '';
+  const avisosHtml = (w.avisos || []).length ? `<div class="card" style="border:1px solid rgba(251,191,36,.4);margin-bottom:10px"><div class="lab" style="color:#fbbf24">${osIcon('alert', {size:12})} Avisos</div>${w.avisos.map(a => `<div style="font-size:11px;margin:3px 0">• ${IN_E(a)}</div>`).join('')}</div>` : '';
   let body = '';
   if (step.tipo === 'datos') {
     body = `<div class="card"><div class="chart-h"><div class="t">Datos básicos</div></div>
@@ -189,21 +189,21 @@ function inRenderWizard() {
       <label style="font-size:11px;opacity:.7">Dirección<br><input id="in-dir" value="${IN_E(w.direccion || '')}" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 10px"></label>
       <label style="font-size:11px;opacity:.7">Casa (property_id) — la inspección vive en su Ficha<br><select id="in-pid" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px;color:inherit;margin:4px 0 10px"><option value="">(sin casa asignada)</option>${IN.props.map(p => `<option value="${p.property_id}" ${w.property_id === p.property_id ? 'selected' : ''}>${IN_E((p.address || '').split(',')[0])}</option>`).join('')}</select></label>
       <div style="font-size:11px;opacity:.7;margin-bottom:4px">¿Compra o Renta?</div>
-      <div style="display:flex;gap:8px">${['compra', 'renta'].map(u => `<button class="repbtn ${w.uso === u ? '' : 'ghost'}" onclick="IN.wizard.uso='${u}';inRenderWizard()">${u === 'compra' ? '🏷️ Compra (flip)' : '🔑 Renta'}</button>`).join('')}</div></div>`;
+      <div style="display:flex;gap:8px">${['compra', 'renta'].map(u => `<button class="repbtn ${w.uso === u ? '' : 'ghost'}" onclick="IN.wizard.uso='${u}';inRenderWizard()">${u === 'compra' ? osIcon('dollar', {size:12}) + ' Compra (flip)' : osIcon('key', {size:12}) + ' Renta'}</button>`).join('')}</div></div>`;
   } else if (step.tipo === 'pisos') {
     body = `<div class="card"><div class="chart-h"><div class="t">¿Cuántos pisos tiene la vivienda?</div><div class="k">2+ agrega la evaluación de Placa de entrepiso y Escaleras</div></div>
       <div style="display:flex;gap:10px;margin-top:8px">${[[1, '1 Piso'], [2, '2 o más pisos']].map(([n, l]) => `<button class="repbtn ${(w.numero_pisos >= 2 ? 2 : 1) === n ? '' : 'ghost'}" style="flex:1;padding:14px" onclick="inSetPisos(${n})">${l}</button>`).join('')}</div></div>`;
   } else if (step.tipo === 'redes') {
     const redes = ['plomeria', 'gas', 'electricidad'];
     const raw = w.raw.redes = w.raw.redes || {};
-    body = `<div class="card"><div class="chart-h"><div class="t">🔌 Redes</div><div class="k">cada red pesa ${IN_cfg('red_peso_pct', 33.33)}% de la división · solo cuenta "No funciona"</div></div>
+    body = `<div class="card"><div class="chart-h"><div class="t">${osIcon('zap', {size:14})} Redes</div><div class="k">cada red pesa ${IN_cfg('red_peso_pct', 33.33)}% de la división · solo cuenta "No funciona"</div></div>
       ${redes.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)"><b style="text-transform:capitalize">${r}</b>
         <div style="display:flex;gap:6px">${[['funciona', 'Funciona'], ['no_funciona', 'No funciona']].map(([v, l]) => `<button class="repbtn ${raw[r] === v ? '' : 'ghost'}" style="padding:4px 10px;font-size:11px" onclick="inSetRed('${r}','${v}')">${l}</button>`).join('')}</div></div>`).join('')}
       <div class="meta" style="margin-top:8px">Las redes que "No funciona" cargan la división Redes. Externas sin servicio → aviso de permisos.</div></div>`;
   } else if (step.tipo === 'carpinteria') {
     const raw = w.raw.carpinteria = w.raw.carpinteria || {};
     const campos = [['ventanas', 'Ventanas'], ['puertas_int', 'Puertas interiores'], ['gabinetes', 'Gabinetes (cocina/baños)']];
-    body = `<div class="card"><div class="chart-h"><div class="t">🪚 Carpintería</div><div class="k">ratio de unidades dañadas → score 1-5 (no afecta otras patologías)</div></div>
+    body = `<div class="card"><div class="chart-h"><div class="t">${osIcon('hammer', {size:14})} Carpintería</div><div class="k">ratio de unidades dañadas → score 1-5 (no afecta otras patologías)</div></div>
       ${campos.map(([k, l]) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0"><span>${l}</span><span style="font-size:11px">dañadas <input type="number" min="0" value="${raw[k + '_mal'] || 0}" onchange="inSetCarp('${k}_mal',this.value)" style="width:52px;text-align:right;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:3px;color:inherit"> de <input type="number" min="0" value="${raw[k + '_tot'] || 0}" onchange="inSetCarp('${k}_tot',this.value)" style="width:52px;text-align:right;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:3px;color:inherit"></span></div>`).join('')}
       <div class="meta" style="margin-top:8px">Ratio total dañadas/total → 0-100% → score. El resto de las patologías de la casa no se tocan.</div></div>`;
   } else if (step.tipo === 'division') {
@@ -216,28 +216,28 @@ function inRenderWizard() {
         <div style="display:flex;justify-content:space-between;font-size:8px;opacity:.5;margin-top:2px"><span>sin daño</span><span>leve</span><span>moderado</span><span>grave</span><span>crítico</span></div></div>`).join('')}</div>`;
   } else if (step.tipo === 'limpieza') {
     const items = ['Retiro de escombros', 'Limpieza profunda interior', 'Limpieza de fachada', 'Retiro de basura/enseres', 'Limpieza de patio/jardín'];
-    body = `<div class="card"><div class="chart-h"><div class="t">🧹 Limpieza</div><div class="k">NO pondera el daño — va a la BD y al entregable</div></div>
+    body = `<div class="card"><div class="chart-h"><div class="t">${osIcon('sparkles', {size:14})} Limpieza</div><div class="k">NO pondera el daño — va a la BD y al entregable</div></div>
       ${items.map(it => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px"><input type="checkbox" ${(w.limpieza || []).includes(it) ? 'checked' : ''} onchange="inToggleLimpieza('${IN_E(it).replace(/'/g, '')}')"> ${it}</label>`).join('')}</div>`;
   } else if (step.tipo === 'reporte') {
     const etapas = res.etapas;
-    body = `<div class="card"><div class="chart-h"><div class="t">📊 Reporte de diagnóstico</div><div class="k">${IN_E(w.nombre_ref)} · ${IN_E(inVeredicto(res.global))}</div></div>
-      <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${(res.global || 0) >= 60 ? '#f87171' : '#34d399'}">${res.global != null ? res.global + '%' : '—'}</div><div style="opacity:.7">Daño Global Estimado</div></div>
+    body = `<div class="card"><div class="chart-h"><div class="t">${osIcon('chart', {size:14})} Reporte de diagnóstico</div><div class="k">${IN_E(w.nombre_ref)} · ${IN_E(inVeredicto(res.global))}</div></div>
+      <div style="text-align:center;padding:12px"><div style="font-size:46px;font-weight:800;color:${(res.global || 0) >= 60 ? '#ff6b6b' : '#4ade9e'}">${res.global != null ? res.global + '%' : '—'}</div><div style="opacity:.7">Daño Global Estimado</div></div>
       <div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:8px 0 4px">Daño por etapa de renovación</div>
       <table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right"><b class="${(etapas[e.etapa] || 0) >= 50 ? 'down' : ''}">${etapas[e.etapa] != null ? etapas[e.etapa] + '%' : '—'}</b></td></tr>`).join('')}</tbody></table>
-      ${(() => { try { const rh = inRehabEstimado({ property_id: w.property_id, dano_etapas: res.etapas }); return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:12px 0 4px">💵 Rehab estimado (daño × $/sqft calibrado)</div><div style="padding:8px 10px;border-radius:8px;background:rgba(52,211,153,.08);margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px" class="up">${IN_M(rh.total)}</b><span style="font-size:10px;opacity:.7">${rh.sqft} sqft × ${rh.calibPsf}/sqft ${rh.n ? '<span style=\'background:rgba(18,181,160,.18);color:#12b5a0;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:800\'>calibrado con ' + rh.n + ' obras</span>' : ''}</span></div></div><table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right">${IN_M(rh.porEtapa[e.etapa] || 0)}</td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:4px">Este total = candidato a \'Valor Remodelación\' → alimenta el MAO/underwriting de Fix & Flip por property_id.</div>`; } catch (e) { return ''; } })()}
+      ${(() => { try { const rh = inRehabEstimado({ property_id: w.property_id, dano_etapas: res.etapas }); return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;opacity:.6;margin:12px 0 4px">${osIcon('banknote', {size:12})} Rehab estimado (daño × $/sqft calibrado)</div><div style="padding:8px 10px;border-radius:8px;background:rgba(52,211,153,.08);margin-bottom:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:20px" class="up">${IN_M(rh.total)}</b><span style="font-size:10px;opacity:.7">${rh.sqft} sqft × ${rh.calibPsf}/sqft ${rh.n ? '<span style=\'background:rgba(92,121,240,.18);color:#5c79f0;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:800\'>calibrado con ' + rh.n + ' obras</span>' : ''}</span></div></div><table class="ptable"><tbody>${IN.etapas.filter(e => e.etapa !== 'Limpieza').map(e => `<tr><td>${e.emoji} ${IN_E(e.etapa)}</td><td style="text-align:right">${IN_M(rh.porEtapa[e.etapa] || 0)}</td></tr>`).join('')}</tbody></table><div class="meta" style="margin-top:4px">Este total = candidato a \'Valor Remodelación\' → alimenta el MAO/underwriting de Fix & Flip por property_id.</div>`; } catch (e) { return ''; } })()}
       <div class="meta" style="margin-top:8px">Al guardar: se registra por property_id (Ficha de Casa) con TODAS las respuestas crudas + exportables JSON/XLS. Botón "→ Estimador" pre-llena el pronóstico con este daño por etapa.</div>
-      <div style="display:flex;gap:8px;margin-top:10px"><button class="repbtn" onclick="inSaveWizard()">💾 Guardar inspección</button></div></div>`;
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="repbtn" onclick="inSaveWizard()">${osIcon('save', {size:12})} Guardar inspección</button></div></div>`;
   }
   const nav = `<div style="display:flex;justify-content:space-between;margin-top:12px">
     <button class="repbtn ghost" ${w.idx === 0 ? 'disabled' : ''} onclick="inNav(-1)">← Atrás</button>
     <span style="font-size:11px;opacity:.6;align-self:center">Paso ${w.idx + 1} de ${total} · ${step.seccion} · ${pct}%</span>
     ${w.idx < total - 1 ? `<button class="repbtn" onclick="inNav(1)">Siguiente →</button>` : '<span></span>'}</div>`;
   const html = `<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">
-    <div>${avisosHtml}<div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-bottom:12px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#12b5a0,#2f6ef0)"></i></div>${body}${nav}</div>
+    <div>${avisosHtml}<div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-bottom:12px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#5c79f0,#3a5be0)"></i></div>${body}${nav}</div>
     ${panel}</div>`;
   const ov = document.getElementById('in-wizard-body');
   if (ov) ov.innerHTML = html;
-  else openModal('🔍 Inspección de vivienda', `<div id="in-wizard-body">${html}</div>`);
+  else openModal('Inspección de vivienda', `<div id="in-wizard-body">${html}</div>`);
 }
 window.inRenderWizard = inRenderWizard;
 
@@ -308,7 +308,7 @@ async function inSaveWizard() {
   if (w.id) { ({ error } = await sb.from('remodel_inspecciones').update(row).eq('id', w.id)); }
   else { ({ error } = await sb.from('remodel_inspecciones').insert(row)); }
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
-  alert('✅ Inspección guardada' + (res.global != null ? ` — daño global ${res.global}%` : '') + '.');
+  alert('Inspección guardada' + (res.global != null ? ` — daño global ${res.global}%` : '') + '.');
   closeModal(); await inLoad(); if (window.rcRender) rcRender();
 }
 window.inSaveWizard = inSaveWizard;

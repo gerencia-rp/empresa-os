@@ -37,7 +37,7 @@ async function rmSyncToPlanner() {
     // Crear 1 entry por día de duración (para verlo en cada día del Planner)
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = (typeof rmAddWorkDays === "function" ? rmAddWorkDays(activityStart, i) : rmAddDays(activityStart, i));
-      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#64748b' };
+      const phaseInfo = RM_PHASES[cat.phase] || { name: cat.cat, color: '#756c5c' };
       const dayLabel = days > 1 ? ` (día ${i+1}/${days})` : '';
       inserts.push({
         project_id: projectId,
@@ -123,7 +123,19 @@ function rmToggleActivity(code) {
   }
   rmRenderTab();
 }
-function rmSetQty(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].qty = +v; rmRenderTab(); }
+function rmSetQty(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].qty = +v; rmState.selectedActivities[code].src = 'manual'; rmRenderTab(); }
+
+// Trae las cantidades del diagnóstico (insp_cantidades) al Editor. No pisa nada cargado.
+async function rmTraerTakeoff() {
+  const res = await rmLoadTakeoff();
+  if (res.error) { alert(res.error); return; }
+  const rep = rmApplyTakeoff(res.cant);
+  rep._insp = res.insp;
+  rmState.takeoffRep = rep;
+  rmRenderTab();
+}
+function rmCerrarTakeoffBanner() { rmState.takeoffRep = null; rmRenderTab(); }
+window.rmTraerTakeoff = rmTraerTakeoff; window.rmCerrarTakeoffBanner = rmCerrarTakeoffBanner;
 function rmSetVu(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].vu = +v; rmRenderTab(); }
 function rmSetDays(code, v) { if(!rmState.selectedActivities[code])return; rmState.selectedActivities[code].days = +v; rmRenderTab(); }
 

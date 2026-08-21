@@ -107,7 +107,7 @@ async function openLoanCalculator(sys) {
   if (sys.data.lastPropertyId) {
     loanLoadFromSaved(sys.data.lastPropertyId);
   }
-  openModal(`🏦 ${sys.name}`, '<div id="loan-root"></div>');
+  openModal(sys.name, '<div id="loan-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-6xl');
   loanRender();
@@ -157,7 +157,7 @@ function loanPersist() {
 function loanShowSavedBadge() {
   const b = document.getElementById('loan-saved-badge');
   if (!b) return;
-  b.textContent = '💾 Guardado ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  b.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   b.classList.remove('opacity-0'); b.classList.add('opacity-100');
   clearTimeout(loanState._savedTimer);
   loanState._savedTimer = setTimeout(() => { b.classList.remove('opacity-100'); b.classList.add('opacity-0'); }, 2000);
@@ -230,29 +230,29 @@ function loanRender() {
     ${propertySelectorHtml(loanState.propertyId, 'loanOnPropertyChange', 'loanSaveProperty')}
     ${loanState.propertyId ? `
       <div class="flex items-center justify-between text-[10px] mb-3 -mt-1">
-        <span class="text-emerald-700 font-bold">🔒 Auto-guardado por propiedad — tus números persisten al cerrar el modal</span>
+        <span class="text-emerald-700 font-bold">${osIcon('lock', {size:12})} Auto-guardado por propiedad — tus números persisten al cerrar el modal</span>
         <span id="loan-saved-badge" class="text-emerald-600 font-bold opacity-0 transition-opacity"></span>
       </div>
     ` : `
       <div class="bg-amber-50 border border-amber-200 rounded p-2 text-[11px] text-amber-900 mb-3">
-        ⚠️ <strong>Estás en modo "one-off"</strong> — los cálculos NO se guardan. Vinculá una propiedad arriba para que se guarden automáticamente.
+        ${osIcon('alert', {size:13})} <strong>Estás en modo "one-off"</strong> — los cálculos NO se guardan. Vinculá una propiedad arriba para que se guarden automáticamente.
       </div>
     `}
 
     <!-- Toggle tipo de préstamo -->
     <div class="flex gap-2 mb-4">
       <button onclick="loanState.mode='hml'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='hml'?'border-orange-500 bg-orange-50':'border-slate-200 hover:border-slate-400'}">
-        <div class="text-2xl mb-1">⚡</div>
+        <div class="mb-1">${osIcon('zap', {size:22})}</div>
         <div class="text-sm font-bold ${m==='hml'?'text-orange-900':''}">Hard Money Lender</div>
         <div class="text-[10px] text-slate-500">Corto plazo (6-12m) · Interest only · 10-13%</div>
       </button>
       <button onclick="loanState.mode='conv'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='conv'?'border-blue-500 bg-blue-50':'border-slate-200 hover:border-slate-400'}">
-        <div class="text-2xl mb-1">🏛️</div>
+        <div class="mb-1">${osIcon('landmark', {size:22})}</div>
         <div class="text-sm font-bold ${m==='conv'?'text-blue-900':''}">Convencional 30 años (Refi)</div>
         <div class="text-[10px] text-slate-500">Largo plazo · P&I amortizado · 7-8%</div>
       </button>
       <button onclick="loanState.mode='compare'; loanRender(); loanPersist()" class="flex-1 p-3 rounded-lg border-2 ${m==='compare'?'border-slate-900 bg-slate-100':'border-slate-200 hover:border-slate-400'}">
-        <div class="text-2xl mb-1">⚖️</div>
+        <div class="mb-1">${osIcon('scale', {size:22})}</div>
         <div class="text-sm font-bold ${m==='compare'?'text-slate-900':''}">Comparar BRRRR completo</div>
         <div class="text-[10px] text-slate-500">HML → Refi → Cash-out</div>
       </button>
@@ -262,7 +262,7 @@ function loanRender() {
       <!-- INPUTS -->
       <div class="lg:col-span-7 space-y-3">
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">📋 Datos del deal</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('clipboard', {size:13})} Datos del deal</h3>
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Precio compra</label>
@@ -282,7 +282,7 @@ function loanRender() {
 
         ${m === 'hml' || m === 'compare' ? `
           <div class="bg-orange-50 rounded-xl p-4 border border-orange-200">
-            <h3 class="text-xs font-bold text-orange-900 uppercase mb-3">⚡ Configuración Hard Money Lender</h3>
+            <h3 class="text-xs font-bold text-orange-900 uppercase mb-3">${osIcon('zap', {size:13})} Configuración Hard Money Lender</h3>
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTC % (Loan to Cost)</label>
@@ -315,7 +315,7 @@ function loanRender() {
 
         ${m === 'conv' || m === 'compare' ? `
           <div class="bg-blue-50 rounded-xl p-4 border border-blue-200">
-            <h3 class="text-xs font-bold text-blue-900 uppercase mb-3">🏛️ Configuración 30 años (Refi)</h3>
+            <h3 class="text-xs font-bold text-blue-900 uppercase mb-3">${osIcon('landmark', {size:13})} Configuración 30 años (Refi)</h3>
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] font-medium text-slate-600 mb-0.5">LTV % del ARV</label>
@@ -344,7 +344,7 @@ function loanRender() {
 
             <!-- Impuestos + Seguro para calcular PITI real -->
             <div class="mt-3 pt-3 border-t border-blue-200">
-              <h4 class="text-[10px] font-bold text-blue-900 uppercase mb-2">🏠 Impuestos + Seguro (escrow mensual)</h4>
+              <h4 class="text-[10px] font-bold text-blue-900 uppercase mb-2">${osIcon('house', {size:12})} Impuestos + Seguro (escrow mensual)</h4>
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="block text-[10px] font-medium text-slate-600 mb-0.5">Property tax % anual del ARV</label>
@@ -379,7 +379,7 @@ function loanRender() {
 function loanRenderHmlResult(r) {
   return `
     <div class="bg-orange-500 text-white rounded-xl p-5">
-      <div class="text-xs font-bold text-orange-100 uppercase">⚡ HML te presta</div>
+      <div class="text-xs font-bold text-orange-100 uppercase">${osIcon('zap', {size:13})} HML te presta</div>
       <div class="text-4xl font-bold">${loanFmt(r.hml.loan)}</div>
       <div class="text-xs text-orange-100 mt-1">${loanState.hmlLtcPct}% de ${loanFmt(r.hml.base)} (precio + remodel)</div>
     </div>
@@ -401,7 +401,7 @@ function loanRenderHmlResult(r) {
       </table>
     </div>
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-950">
-      <strong>💡 Tips HML mayo 2026:</strong>
+      <strong>${osIcon('lightbulb', {size:13})} Tips HML mayo 2026:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
         <li>LTC actual market: 80-90%. Si te ofrecen menos, negocia.</li>
         <li>Rate 10-13% es estándar. Más alto = lender riesgoso.</li>
@@ -415,14 +415,14 @@ function loanRenderHmlResult(r) {
 function loanRenderConvResult(r) {
   return `
     <div class="bg-blue-600 text-white rounded-xl p-5">
-      <div class="text-xs font-bold text-blue-100 uppercase">🏛️ Banco te presta</div>
+      <div class="text-xs font-bold text-blue-100 uppercase">${osIcon('landmark', {size:13})} Banco te presta</div>
       <div class="text-4xl font-bold">${loanFmt(r.conv.loan)}</div>
       <div class="text-xs text-blue-100 mt-1">${loanState.convLtvPct}% del ARV ${loanFmt(loanState.arv)}</div>
     </div>
 
     <!-- PITI = lo que el dueño realmente paga cada mes -->
     <div class="bg-slate-900 text-white rounded-xl p-4">
-      <div class="text-xs font-bold text-slate-400 uppercase mb-1">💰 Pago mensual TOTAL (PITI)</div>
+      <div class="text-xs font-bold text-slate-400 uppercase mb-1">${osIcon('dollar', {size:13})} Pago mensual TOTAL (PITI)</div>
       <div class="text-4xl font-bold text-emerald-300">${loanFmt(r.conv.piti)}/mes</div>
       <div class="text-[10px] text-slate-400 mt-1">Esto es lo que vas a quedar pagando cada mes</div>
       <div class="mt-3 pt-3 border-t border-slate-700 space-y-1.5 text-xs">
@@ -438,7 +438,7 @@ function loanRenderConvResult(r) {
 
     <!-- Análisis DSCR (¿es buen rental?) -->
     <div class="bg-amber-50 border border-amber-300 rounded-lg p-3">
-      <div class="text-xs font-bold text-amber-900 uppercase mb-1">📊 Para que sea rentable necesitas</div>
+      <div class="text-xs font-bold text-amber-900 uppercase mb-1">${osIcon('chart', {size:13})} Para que sea rentable necesitas</div>
       <div class="text-2xl font-bold text-amber-900">${loanFmt(r.conv.dscrTarget)} /mes de renta</div>
       <div class="text-[10px] text-amber-800 mt-1">DSCR 1.20 = renta cubre 120% del PITI (estándar lender investor TX)</div>
     </div>
@@ -459,7 +459,7 @@ function loanRenderConvResult(r) {
     </div>
 
     <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-950">
-      <strong>💡 Refi a 30 años — mayo 2026:</strong>
+      <strong>${osIcon('lightbulb', {size:13})} Refi a 30 años — mayo 2026:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
         <li>DSCR loans investor: 7.25-8.0% (peor que owner-occupied)</li>
         <li>LTV 75% es estándar cash-out. 70% si DSCR < 1.2</li>
@@ -477,7 +477,7 @@ function loanRenderCompareResult(r) {
   const netInvestment = totalCashIn - netCashOutOrIn;
   return `
     <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-5">
-      <h3 class="text-sm font-bold text-purple-900 uppercase mb-3">🔄 BRRRR Cycle Completo</h3>
+      <h3 class="text-sm font-bold text-purple-900 uppercase mb-3">${osIcon('refresh', {size:14})} BRRRR Cycle Completo</h3>
       <div class="space-y-2 text-sm">
         <div class="flex justify-between border-b border-purple-200 pb-1"><span class="text-slate-600">1. HML te presta</span><strong>${loanFmt(r.hml.loan)}</strong></div>
         <div class="flex justify-between border-b border-purple-200 pb-1"><span class="text-slate-600">2. Cash que pones (down + rehab no cubierto)</span><strong class="text-red-700">${loanFmt(r.hml.cash)}</strong></div>
@@ -486,7 +486,7 @@ function loanRenderCompareResult(r) {
         <div class="flex justify-between border-b border-purple-200 pb-1"><span class="text-slate-600">5. Pagas el HML</span><strong>−${loanFmt(r.hml.loan)}</strong></div>
         <div class="flex justify-between border-b border-purple-200 pb-1"><span class="text-slate-600">6. Closing costs refi</span><strong class="text-red-700">−${loanFmt(r.conv.closingCost)}</strong></div>
         <div class="flex justify-between pt-2">
-          <span class="font-bold">💰 Cash-out al refi</span>
+          <span class="font-bold">${osIcon('dollar', {size:13})} Cash-out al refi</span>
           <strong class="text-xl ${netCashOutOrIn < 0 ? 'text-red-700' : 'text-emerald-700'}">${loanFmt(netCashOutOrIn)}</strong>
         </div>
       </div>
@@ -495,7 +495,7 @@ function loanRenderCompareResult(r) {
     <div class="bg-slate-900 text-white rounded-xl p-4">
       <div class="text-xs font-bold text-slate-400 uppercase mb-2">Cash neto invertido en el deal</div>
       <div class="text-3xl font-bold ${netInvestment < 0 ? 'text-emerald-400' : netInvestment < 10000 ? 'text-amber-400' : 'text-red-400'}">${loanFmt(netInvestment)}</div>
-      <div class="text-xs text-slate-400 mt-1">${netInvestment < 0 ? '✓ Sacas más cash del que metiste (BRRRR perfecto)' : netInvestment < 10000 ? '⚠️ Casi BRRRR perfecto' : '❌ Quedas con dinero atado'}</div>
+      <div class="text-xs text-slate-400 mt-1">${netInvestment < 0 ? '✓ Sacas más cash del que metiste (BRRRR perfecto)' : netInvestment < 10000 ? osIcon('alert', {size:12}) + ' Casi BRRRR perfecto' : osIcon('x-circle', {size:12}) + ' Quedas con dinero atado'}</div>
     </div>
 
     <div class="grid grid-cols-2 gap-2">
@@ -510,11 +510,11 @@ function loanRenderCompareResult(r) {
     </div>
 
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-950">
-      <strong>💡 BRRRR checks:</strong>
+      <strong>${osIcon('lightbulb', {size:13})} BRRRR checks:</strong>
       <ul class="mt-1 ml-4 list-disc space-y-0.5">
-        <li>${netCashOutOrIn >= 0 ? '✓' : '❌'} Cash-out positivo (sacas dinero al refi)</li>
-        <li>${r.conv.loan >= r.hml.loan + r.conv.closingCost ? '✓' : '❌'} Refi cubre HML + closing</li>
-        <li>${(loanState.purchasePrice + loanState.remodelCost) / loanState.arv < 0.75 ? '✓' : '❌'} Total in < 75% ARV (regla 70-75%)</li>
+        <li>${netCashOutOrIn >= 0 ? '✓' : osIcon('x-circle', {size:12})} Cash-out positivo (sacas dinero al refi)</li>
+        <li>${r.conv.loan >= r.hml.loan + r.conv.closingCost ? '✓' : osIcon('x-circle', {size:12})} Refi cubre HML + closing</li>
+        <li>${(loanState.purchasePrice + loanState.remodelCost) / loanState.arv < 0.75 ? '✓' : osIcon('x-circle', {size:12})} Total in < 75% ARV (regla 70-75%)</li>
         <li>Guarda esta propiedad — el pago refi va automático al Predictor de Cashflow</li>
       </ul>
     </div>

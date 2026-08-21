@@ -48,7 +48,7 @@
 
     // ═══ Empresa Rentas — Modelo Nuevo (sandbox) ═══
     'apptTKRYbx6gu701i': {
-      'tblisRfa2IW02ltCL': { n: '🏠 Casas', f: {
+      'tblisRfa2IW02ltCL': { n: 'Casas', f: {
         'fld1ZJXQndjw79IO1': 'Dirección', 'fldlgIZi2Tx30Z639': 'Zona', 'fldxHBhZP4JrTks29': 'Modelo de Negocio',
         'fldsr8FGN6y5OsaEr': 'Unidades', 'fldmRNmQdq6ocx3q2': 'Estado', 'fldueu9f3umYV27z7': 'Notas',
         'fld28PzWHJHFxmkVu': 'Inquilinos', 'fld0XI5S0sgkwvAXr': 'Reservas', 'fld0uhozeUiMLoB17': 'Pagos',
@@ -59,36 +59,36 @@
         'fldQt9g6M07E166Wr': '% Ocupación', 'fldvyb3pip9EI8Tef': 'Hipoteca mensual', 'fldKuVpYVzh7JzRP8': 'Código de acceso',
         'fldfhZBsTWv01bg2L': 'Tareas Mantenimiento', 'fldsovAQ8HLefRp4Y': 'Inicio Hipoteca', 'fldn2af5YZi9Y12Hj': 'Tipo Préstamo',
         'fldnQv6eSGaUTuAtD': 'Nota Hipoteca' } },
-      'tblXuFC9azHTZGjmE': { n: '👤 Inquilinos', f: {
+      'tblXuFC9azHTZGjmE': { n: 'Inquilinos', f: {
         'flddqJeRovK6Hoxx0': 'Nombre', 'fldr9V8dpcuFQhvS0': 'Teléfono', 'flde117ojmuCdVnQu': 'Estado Cliente',
         'fldUqcPdrxxwoVXLz': 'Tipo de Renta', 'fldkvSFigcof1c5Cg': 'Monto Renta', 'fldmK1GKgpS2Pm21c': 'Fecha Inicio',
         'fld4fnXiwSYRYEWHy': 'Fecha Fin', 'fldVz4dXzg8Pg8nn9': 'Método de Pago', 'fldeTQFmUfpeZNpZk': 'Casa',
         'fldF1ea5nvH0nHWaM': 'Reservas', 'fldFE1LFOjFsmzuXY': 'Pagos', 'fldjR53AYIjaopndK': 'Alerta Contrato',
         'fldjpVuBes0xpGN5c': 'Observación IA', 'fldUAKKmHnzl6q7FU': 'Unidades', 'fldJ4tTS1NEtWTKKw': 'Depósito',
         'fldOWBlHEeVoTpHHj': 'Tiempos de pago' } },
-      'tblzz3fokkBprEpIm': { n: '📅 Reservas', f: {
+      'tblzz3fokkBprEpIm': { n: 'Reservas', f: {
         'fld9fNiZbMNRVGioI': 'Reserva', 'fldFKmuQlwK3ABKtV': 'Unidad / Habitación', 'fldPj5rGjT0F71D18': 'Fecha Entrada',
         'fldjfrjwVTS9og5QF': 'Fecha Salida', 'flda3APWY41IFIkU0': 'Estado', 'fldBi4LqUYkX7Yu2f': 'Casa',
         'fldZJGnRFauzi8kM1': 'Inquilino', 'fldsGIfPe05k8Q2Wa': 'Pagos', 'fldPbGSnYMEhbX79X': 'Unidad (link)' } },
-      'tbl5p63dUEhrzgHVJ': { n: '💵 Pagos', f: {
-        'fldc3bGGY0JZMeODz': 'Pago', 'fld0RYuPMMUpcgnoF': 'Casa', 'fldyuK8LIIe6ucJ6b': '🚪 Unidades',
+      'tbl5p63dUEhrzgHVJ': { n: 'Pagos', f: {
+        'fldc3bGGY0JZMeODz': 'Pago', 'fld0RYuPMMUpcgnoF': 'Casa', 'fldyuK8LIIe6ucJ6b': 'Unidades',
         'fld4plr3PqxUksUgo': 'Pago realizado', 'fldpUSJ1HdZQmQPMH': 'Renta pactada - Contrato', 'flduMsIV5gZRIv1eU': 'Balance de pago',
         'fld6lAfD9vg7fUv6T': 'Fecha de Pago', 'fldZp3MbTaJMyFftZ': 'Mes', 'fld5MWlLjaCNxaJ1I': 'Año',
         'fldfrgInDS8MQp12Z': 'Plataforma', 'fldyrBFPPdTyDw2EJ': 'Comprobante', 'fld01OK8T8TJl8ZXb': 'Inquilino',
         'fldU0KUvfPEdpp1tY': 'Reserva', 'fldlvCJbf2CgTspx5': 'Revisar inquilino', 'fldxPjAl31sz3fLGF': 'Observación',
         'fldBVvODboUMNwqHR': 'Conciliación IA' } },
-      'tblGBQ5xn9Zp6YrTN': { n: '📤 Gastos X Casa', f: {
+      'tblGBQ5xn9Zp6YrTN': { n: 'Gastos X Casa', f: {
         'fld3anzEcnkjUd8Wg': 'Concepto', 'fldrCKw1ODHixzyi6': 'Tipo de Gasto', 'fldfjaeafdA2lS99K': 'Valor',
         'fldHnaieHa4XRCS7A': 'Fecha', 'fldc2AxqIU7xJldZE': 'Mes', 'fldtoc3jPdOZ5A2M3': 'Año',
         'fldFGenqtv8piockd': 'Factura', 'fld3NuV9K8Wxg86bL': 'Casa', 'fldhHLYaoS8VhfuTZ': 'Ámbito',
         'fldXvDCxeGqG6uwue': 'Observación', 'fldHYqdwU7Xr0q1ea': 'Enlace a Drive', 'fldRBQYhmIWsjUr6W': 'Responsable de pago' } },
-      'tblItO7iMZT9QS87y': { n: '🚪 Unidades', f: {
+      'tblItO7iMZT9QS87y': { n: 'Unidades', f: {
         'fld1YmPcUiBlHbcye': 'Unidad', 'fldq2nGAAzyFsYbUU': 'Tipo de Unidad', 'fldQUeZq6LlBDUTob': 'Etiqueta',
         'fldPXwcneyhx7GPfB': 'Estado', 'fldkVcVVoAInhf6H1': 'Casa', 'fld36cAgIi5WfX1Vm': 'Inquilino actual',
         'fldON9xnHpWgiuMz0': 'Reservas', 'fldUrTYKTmnJFMa9G': 'Cantidad de baños', 'fldgzt12iBgwvrJce': 'Tipo de baño',
         'fldVfGtDVG0MdKpeh': 'Mobiliario', 'fldgT2qWEHUJ8juCK': 'Renta objetivo', 'fldc6V8g3ezEmaTwQ': 'Enlace a Drive',
-        'fldvyq3nl4rwZPiF8': 'Accesos y códigos', 'fldqZKuz5F1VGFhr7': 'Observaciones', 'fldISqZ9ApqgPaHiZ': '💵 Pagos' } },
-      'tblfb63Yhn0NIMDNw': { n: '🔑 Accesos', f: {
+        'fldvyq3nl4rwZPiF8': 'Accesos y códigos', 'fldqZKuz5F1VGFhr7': 'Observaciones', 'fldISqZ9ApqgPaHiZ': 'Pagos' } },
+      'tblfb63Yhn0NIMDNw': { n: 'Accesos', f: {
         'fldiAGNHPO8ieYrcF': 'Servicio', 'fldCmDi12qdwmFD9c': 'Categoría', 'fldV2yIKzsCNnnRB3': 'Usuario o Correo',
         'fldzyp9gzUMexAZ5p': 'Clave', 'fldzsUenXndDo2ohg': 'Casa', 'fld4JiSfJ5ONWsZKC': 'Observación' } },
       'tbl9dJXwI9Vn3kjKy': { n: 'Gastos x Empresa', f: {

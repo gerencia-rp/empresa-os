@@ -455,6 +455,16 @@ Dos reemplazos puntuales en `pm/pm-main.js` (pedido exacto del CEO):
 - 🐛 **Fix duplicado en "Pasadas / Finalizadas"**: `pastOrFinished` usaba `(b.end_date || '') < today` — el string vacío ordena antes que cualquier fecha, así que TODA reserva sin fecha de salida (`end_date` null, ej. J'Onna Heath) caía también al grupo de pasadas y se mostraba duplicada. Ahora exige `end_date` presente: `(b.end_date && b.end_date < today)`.
 - ✅ node --check OK · `pmGenerateWelcomeGuide` verificada global (pm-main.js:7526-7531).
 
+## 22-jul · 🧾 COBRANZA: tabla de Inquilinos FUNCIONAL (ordenar + reordenar columnas)
+- **ANTES**: encabezados y celdas hardcodeados en el template; orden fijo por deuda total; columnas inmóviles.
+- **DESPUÉS**: modelo `CB_COLS` (8 columnas con `get` de orden + `cell` de render) — clic en encabezado ordena A→Z ↑ / Z→A ↓ / 3er clic vuelve al default (deuda total); las ordenables muestran ↕ tenue. Arrastrar un encabezado sobre otro reordena las columnas y el orden persiste en `localStorage` (`cb_col_order`, saneado contra columnas nuevas/borradas en `cbCols`). El clic en fila sigue expandiendo (`cbToggle`); la fila detalle usa `colspan` dinámico = nº de columnas visibles. `cbCtx` unifica el contexto por fila (open/último recordatorio/chips config).
+- **Exports en el orden visible**: CSV usa `cbCols()` + `CB_RAW` (valores crudos) con extras al final (total/estado/consentimiento/teléfono/email/link); el PDF arma la tabla con las columnas visibles (ult/config fuera del reporte, como antes).
+- Verificación: node --check · build · ci:gate 15/15.
+
+## 22-jul · 🧾 COBRANZA: tabla de Inquilinos con rejilla completa
+- La tabla de /cobros pasa a `.cbtable` (os/os.js): bordes en TODAS las celdas (columnas + filas marcadas), header sticky uppercase, números tabulares a la derecha, zebra suave cada 2 filas de datos (`:nth-child(4n-1)` porque cada inquilino ocupa fila + posible detalle) y hover.
+- os/os-cobros.js: `<table class="cbtable">` + la fila expandible gana `class="cb-detail"` (fondo propio, excluida de zebra/hover).
+
 ## 20-jul · 📊 GASTOS: tablas ordenables por columna (Por Casa + Operativos)
 - `pmExpenseTable` (compartida por las sub-pestañas Por Casa y Operativos) ganó encabezados clickeables: 1er clic A→Z ↑, 2º Z→A ↓, 3º vuelve al orden por defecto. Columnas: Mes gasto (billing_ym), Fecha, Casa, Categoría, Monto (numérico), Pagado, Notas — Factura y Acc. quedan fijas.
 - Estado `expSortKey/expSortDir` en pmaState + `pmExpenseSortVal/pmExpensesSorted/pmExpenseSort` (localeCompare es, sensitivity base). La tabla de Nómina es aparte — pendiente si se pide.

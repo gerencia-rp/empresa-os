@@ -58,10 +58,10 @@ CONTEXTO DE MARCA:
     const quick = QUICK.map(q => `<button onclick="agenteQuick(${QUICK.indexOf(q)})" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300 hover:border-accent/40 shrink-0">${q.label}</button>`).join('');
     out.innerHTML = `
       <div class="flex items-center justify-between mb-3">
-        <div><h2 class="font-display text-xl font-bold text-accent">💬 Agente · Operador con Método</h2><p class="text-xs text-zinc-500">Chat con todo tu contexto de marca cargado</p></div>
+        <div><h2 class="font-display text-xl font-bold text-accent">${osIcon('message')} Agente · Operador con Método</h2><p class="text-xs text-zinc-500">Chat con todo tu contexto de marca cargado</p></div>
         <div class="flex gap-1">
           <button onclick="agenteNueva()" class="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700">＋ Nueva</button>
-          <button onclick="agenteBorrar()" class="text-xs px-2.5 py-1.5 rounded-lg bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">🗑</button>
+          <button onclick="agenteBorrar()" class="text-xs px-2.5 py-1.5 rounded-lg bg-bordeaux/40 text-red-200 hover:bg-bordeaux/60">${osIcon('trash')}</button>
         </div>
       </div>
       <div class="flex gap-2 overflow-x-auto pb-2 mb-2">${quick}</div>
@@ -117,10 +117,10 @@ CONTEXTO DE MARCA:
     const el = document.getElementById('ag-actions'); if (!el) return;
     const tema = (lastUserText || '').slice(0, 140).replace(/"/g, '');
     el.innerHTML =
-      `<button onclick="agenteToStudio('${tema.replace(/'/g, "\\'")}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">🎯 Generar en Studio</button>` +
-      `<button onclick="document.querySelector('[data-tab=sistema]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">🛠️ Herramientas</button>` +
-      `<button onclick="document.querySelector('[data-tab=biblioteca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">📚 Biblioteca</button>` +
-      `<button onclick="document.querySelector('[data-tab=calendario]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">📅 Calendario</button>`;
+      `<button onclick="agenteToStudio('${tema.replace(/'/g, "\\'")}')" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-accent/15 text-accent hover:bg-accent/25">${osIcon('target')} Generar en Studio</button>` +
+      `<button onclick="document.querySelector('[data-tab=sistema]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">${osIcon('wrench')} Herramientas</button>` +
+      `<button onclick="document.querySelector('[data-tab=biblioteca]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">${osIcon('book')} Biblioteca</button>` +
+      `<button onclick="document.querySelector('[data-tab=calendario]').click()" class="text-[11px] px-2.5 py-1.5 rounded-lg bg-primary/40 border border-zinc-800 text-zinc-300">${osIcon('calendar')} Calendario</button>`;
   }
 
   // API global

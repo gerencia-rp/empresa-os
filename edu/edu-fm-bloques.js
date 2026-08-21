@@ -885,14 +885,14 @@ function fmRenderDiagPlanLegacy() {
 
   // Documentos para profundizar
   const docsPorPerfil = {
-    1: ['📘 Índice Maestro', '🏛️ E0 Fundación (TODO)', '📚 Anexo A (caso de estudio)', '🧠 Anexo C (mindset + Top 20 errores)'],
-    2: ['🏛️ E0 Fundación (foco 0.1)', '🧠 Anexo C (mindset crítico)', '🗺️ Estados del Estudiante (Perfil #2)'],
-    3: ['🧠 Anexo C.7 (plan acción bloqueado)', '🔍 E1.4 (ofertas y negociación)', '🗺️ Estados (Perfil #3)'],
-    4: ['🚀 E5 completo (escalar)', '🧠 Anexo C (FAQ E5)', '🗺️ Estados (Perfil #4)'],
-    5: ['🔍 E1.1.1 (Buy Box renta)', '🏗️ E2.1 (HML + DSCR refi)', '🗺️ Estados (Perfil #5)'],
-    6: ['🚀 E5.2.2 (sistema lead gen)', '🏗️ E2.3 (wholesalers)', '🗺️ Estados (Perfil #6)'],
-    7: ['🧠 Anexo C.6 (glosario)', '🏛️ E0 (foco legal/fiscal)', '🗺️ Estados (Perfil #7)'],
-    8: ['🏗️ E2.1.3 (private money)', '🧠 Anexo C (mindset del lender)', '🗺️ Estados (Perfil #8)']
+    1: ['Índice Maestro', 'E0 Fundación (TODO)', 'Anexo A (caso de estudio)', 'Anexo C (mindset + Top 20 errores)'],
+    2: ['E0 Fundación (foco 0.1)', 'Anexo C (mindset crítico)', 'Estados del Estudiante (Perfil #2)'],
+    3: ['Anexo C.7 (plan acción bloqueado)', 'E1.4 (ofertas y negociación)', 'Estados (Perfil #3)'],
+    4: ['E5 completo (escalar)', 'Anexo C (FAQ E5)', 'Estados (Perfil #4)'],
+    5: ['E1.1.1 (Buy Box renta)', 'E2.1 (HML + DSCR refi)', 'Estados (Perfil #5)'],
+    6: ['E5.2.2 (sistema lead gen)', 'E2.3 (wholesalers)', 'Estados (Perfil #6)'],
+    7: ['Anexo C.6 (glosario)', 'E0 (foco legal/fiscal)', 'Estados (Perfil #7)'],
+    8: ['E2.1.3 (private money)', 'Anexo C (mindset del lender)', 'Estados (Perfil #8)']
   };
 
   const p = r.perfil;
@@ -909,7 +909,7 @@ function fmRenderDiagPlanLegacy() {
               <div class="text-xs font-bold text-${p.color}-700 tracking-wider mb-1">PERFIL IDENTIFICADO · #${p.num}</div>
               <h2 class="text-2xl font-bold text-slate-900">${p.emoji} ${p.nombre}</h2>
             </div>
-            <button onclick="fmDiagReset()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-700 hover:bg-slate-50">🔄 Repetir</button>
+            <button onclick="fmDiagReset()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-700 hover:bg-slate-50">${osIcon('refresh')} Repetir</button>
           </div>
           <div class="grid grid-cols-2 gap-3 mt-4">
             <div class="bg-white bg-opacity-60 rounded-lg p-3">
@@ -926,7 +926,7 @@ function fmRenderDiagPlanLegacy() {
         <!-- Fortalezas -->
         ${r.fortalezas.length ? `
           <div class="bg-white rounded-xl border border-emerald-200 p-5 mb-4">
-            <h3 class="font-bold text-emerald-900 mb-3">✅ Fortalezas que ya tenés</h3>
+            <h3 class="font-bold text-emerald-900 mb-3">${osIcon('check-circle')} Fortalezas que ya tenés</h3>
             <ul class="space-y-1.5 text-sm text-slate-700">
               ${r.fortalezas.map(f => `<li class="flex items-start gap-2"><span class="text-emerald-600 mt-0.5">✓</span><span>${f}</span></li>`).join('')}
             </ul>
@@ -936,7 +936,7 @@ function fmRenderDiagPlanLegacy() {
         <!-- Gaps prioritarios -->
         ${tareasAhora.length ? `
           <div class="bg-white rounded-xl border border-amber-200 p-5 mb-4">
-            <h3 class="font-bold text-amber-900 mb-3">⚡ Gaps prioritarios (próximas 4 semanas)</h3>
+            <h3 class="font-bold text-amber-900 mb-3">${osIcon('zap')} Gaps prioritarios (próximas 4 semanas)</h3>
             <div class="space-y-2">
               ${tareasAhora.map((g, i) => `
                 <div class="flex items-start gap-3 p-3 bg-amber-50 rounded-lg">
@@ -956,32 +956,32 @@ function fmRenderDiagPlanLegacy() {
 
         <!-- Quick Win -->
         <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-5 mb-4">
-          <h3 class="font-bold text-blue-900 mb-2">🎯 Quick Win — Semana 1</h3>
+          <h3 class="font-bold text-blue-900 mb-2">${osIcon('target')} Quick Win — Semana 1</h3>
           <p class="text-sm text-blue-900">${quickWinPorPerfil[p.num]}</p>
         </div>
 
         <!-- 4 columnas: Contactos / Plataformas / Calculadoras / Lectura -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 class="font-bold text-slate-900 mb-3 text-sm">📇 Contactos a activar <span class="text-xs font-normal text-slate-500">(Documento A)</span></h3>
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">${osIcon('folder')} Contactos a activar <span class="text-xs font-normal text-slate-500">(Documento A)</span></h3>
             <ul class="space-y-1.5 text-sm text-slate-700">
               ${(contactosPorPerfil[p.num] || []).map(c => `<li class="flex items-start gap-2"><span class="text-blue-600 mt-0.5">•</span><span>${c}</span></li>`).join('')}
             </ul>
           </div>
           <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 class="font-bold text-slate-900 mb-3 text-sm">🛠️ Plataformas a setupear <span class="text-xs font-normal text-slate-500">(Documento B)</span></h3>
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">${osIcon('wrench')} Plataformas a setupear <span class="text-xs font-normal text-slate-500">(Documento B)</span></h3>
             <ul class="space-y-1.5 text-sm text-slate-700">
               ${(plataformasPorPerfil[p.num] || []).map(s => `<li class="flex items-start gap-2"><span class="text-indigo-600 mt-0.5">•</span><span>${s}</span></li>`).join('')}
             </ul>
           </div>
           <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 class="font-bold text-slate-900 mb-3 text-sm">🧮 Calculadoras <span class="text-xs font-normal text-slate-500">(Anexo B)</span></h3>
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">${osIcon('calculator')} Calculadoras <span class="text-xs font-normal text-slate-500">(Anexo B)</span></h3>
             <ul class="space-y-1.5 text-sm text-slate-700">
               ${(calculadorasPorPerfil[p.num] || []).map(c => `<li class="flex items-start gap-2"><span class="text-cyan-600 mt-0.5">•</span><span>${c}</span></li>`).join('')}
             </ul>
           </div>
           <div class="bg-white rounded-xl border border-slate-200 p-5">
-            <h3 class="font-bold text-slate-900 mb-3 text-sm">📚 Lectura recomendada</h3>
+            <h3 class="font-bold text-slate-900 mb-3 text-sm">${osIcon('book')} Lectura recomendada</h3>
             <ul class="space-y-1.5 text-sm text-slate-700">
               ${(docsPorPerfil[p.num] || []).map(d => `<li class="flex items-start gap-2"><span class="text-fuchsia-600 mt-0.5">•</span><span>${d}</span></li>`).join('')}
             </ul>
@@ -990,16 +990,16 @@ function fmRenderDiagPlanLegacy() {
 
         <!-- Acciones finales -->
         <div class="bg-slate-900 text-white rounded-xl p-5">
-          <h3 class="font-bold mb-2">📝 Resumen ejecutivo</h3>
+          <h3 class="font-bold mb-2">${osIcon('pencil-line')} Resumen ejecutivo</h3>
           <p class="text-sm text-slate-200 mb-4">
             Sos perfil <strong>#${p.num} (${p.nombre})</strong>, ubicado en etapa <strong>${r.etapa}</strong>.
             Tu cronograma esperado es de <strong>${r.cronograma}</strong>.
             Empezá por el Quick Win esta semana y los ${tareasAhora.length} gaps prioritarios en el próximo mes.
           </p>
           <div class="flex gap-2 flex-wrap">
-            <button onclick="fmDiagOpenLibrary()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">📚 Abrir Biblioteca</button>
-            <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">🖨️ Imprimir Plan</button>
-            <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">📋 Copiar Plan</button>
+            <button onclick="fmDiagOpenLibrary()" class="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-medium hover:bg-slate-100">${osIcon('book')} Abrir Biblioteca</button>
+            <button onclick="fmDiagPrintPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">${osIcon('printer')} Imprimir Plan</button>
+            <button onclick="fmDiagCopyPlan()" class="px-4 py-2 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-medium hover:bg-slate-700">${osIcon('clipboard')} Copiar Plan</button>
           </div>
         </div>
 

@@ -17,12 +17,13 @@ const CG = {
 window.CG = CG;
 
 // ─── TIPOS de tarea (color + etiqueta), derivados de task_type/título ───
+// `emoji` queda SOLO para salidas de texto plano (WhatsApp / <option>); `icon` = Lucide para la UI.
 const CG_TIPOS = {
-  turnover:      { label: 'Turnover',         emoji: '🧹', chip: 'bg-blue-100 text-blue-800',       dot: 'bg-blue-500',    bar: '#3b82f6' },
-  recepcion:     { label: 'Recepción',        emoji: '🛎️', chip: 'bg-amber-100 text-amber-800',     dot: 'bg-amber-500',   bar: '#f59e0b' },
-  post_remo:     { label: 'Post-Remodelación',emoji: '🔨', chip: 'bg-purple-100 text-purple-800',   dot: 'bg-purple-500',  bar: '#a855f7' },
-  mantenimiento: { label: 'Mantenimiento',    emoji: '🔧', chip: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-500', bar: '#10b981' },
-  recado:        { label: 'Recado',           emoji: '🛒', chip: 'bg-slate-200 text-slate-700',     dot: 'bg-slate-500',   bar: '#64748b' },
+  turnover:      { label: 'Turnover',         emoji: '🧹', icon: 'sparkles', chip: 'bg-blue-100 text-blue-800',       dot: 'bg-blue-500',    bar: '#3a5be0' },
+  recepcion:     { label: 'Recepción',        emoji: '🛎️', icon: 'bell',     chip: 'bg-amber-100 text-amber-800',     dot: 'bg-amber-500',   bar: '#f59e0b' },
+  post_remo:     { label: 'Post-Remodelación',emoji: '🔨', icon: 'hammer',   chip: 'bg-purple-100 text-purple-800',   dot: 'bg-purple-500',  bar: '#a855f7' },
+  mantenimiento: { label: 'Mantenimiento',    emoji: '🔧', icon: 'wrench',   chip: 'bg-emerald-100 text-emerald-800', dot: 'bg-emerald-500', bar: '#059669' },
+  recado:        { label: 'Recado',           emoji: '🛒', icon: 'package',  chip: 'bg-slate-200 text-slate-700',     dot: 'bg-slate-500',   bar: '#6f7785' },
 };
 function cgTipoKey(t) {
   const tt = (t.task_type || '').toLowerCase();
@@ -64,7 +65,7 @@ async function openCronograma(sys) {
   // Si viene de un módulo viejo (Juan/Limpieza), pre-filtra por ese equipo.
   CG.fEquipo = sys && sys._equipo ? sys._equipo : 'all';
   CG.fZona = 'all'; CG.fTipo = 'all';
-  openModal(`📅 ${sys.name || 'Cronograma'}`, '<div id="cg-root" class="p-1">Cargando…</div>');
+  openModal(`${sys.name || 'Cronograma'}`, '<div id="cg-root" class="p-1">Cargando…</div>');
   const box = document.querySelector('#modal > div');
   if (box) { box.classList.remove('max-w-3xl'); box.classList.add('max-w-7xl'); }
   await cgLoadAll();
@@ -115,10 +116,10 @@ function cgOpenTasks() { return CG.tasks.filter(cgIsOpen); }
 function cgRender() {
   const root = document.getElementById('cg-root');
   if (!root) return;
-  if (CG.loading) { root.innerHTML = '<div class="p-8 text-center text-slate-500">⏳ Cargando cronograma…</div>'; return; }
+  if (CG.loading) { root.innerHTML = '<div class="p-8 text-center text-slate-500">' + kitLoading('Cargando cronograma…') + '</div>'; return; }
   if (CG.loadError) {
     root.innerHTML = `<div class="p-6"><div class="bg-red-50 border-2 border-red-200 rounded-xl p-5 text-center">
-      <div class="text-4xl mb-2">⚠️</div><div class="font-bold text-red-900 mb-1">No pude cargar el cronograma</div>
+      <div class="mb-2 text-red-700">${osIcon('alert', { size: 36 })}</div><div class="font-bold text-red-900 mb-1">No pude cargar el cronograma</div>
       <div class="text-sm text-red-700 mb-3">${cgEsc(CG.loadError)}</div>
       <button onclick="cgReload()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-4 py-2 rounded">Reintentar</button></div></div>`;
     return;
@@ -156,24 +157,24 @@ function cgHeader(overdueN, todayN, backlogN) {
     <div class="space-y-2 mb-3">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-1.5 flex-wrap">
-          ${tab('hoy', '☀️ Hoy', overdueN ? `${todayN}·${overdueN}⚠` : todayN)}
-          ${tab('semana', '📆 Semana', '')}
-          ${tab('backlog', '📥 Backlog', backlogN)}
+          ${tab('hoy', osIcon('sun', { size: 13 }) + ' Hoy', overdueN ? `${todayN}·${overdueN}${osIcon('alert', { size: 10 })}` : todayN)}
+          ${tab('semana', osIcon('calendar-days', { size: 13 }) + ' Semana', '')}
+          ${tab('backlog', osIcon('inbox', { size: 13 }) + ' Backlog', backlogN)}
         </div>
         <div class="flex items-center gap-1.5 flex-wrap">
-          <button onclick="cgArmarDia()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Ordena el día por zona con turnover + vencidas, almuerzo y desplazamientos automáticos">🧭 Armar día</button>
-          <button onclick="cgEnviar()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg" title="Compartir el día por WhatsApp o imprimir">📤 Enviar a Juan / equipo</button>
-          <button onclick="cgReload()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-500 text-xs px-2 py-1.5 rounded-lg" title="Recargar">🔄</button>
+          <button onclick="cgArmarDia()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Ordena el día por zona con turnover + vencidas, almuerzo y desplazamientos automáticos">${osIcon('compass', { size: 13 })} Armar día</button>
+          <button onclick="cgEnviar()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg" title="Compartir el día por WhatsApp o imprimir">${osIcon('send', { size: 13 })} Enviar a Juan / equipo</button>
+          <button onclick="cgReload()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-500 text-xs px-2 py-1.5 rounded-lg" title="Recargar">${osIcon('refresh', { size: 13 })}</button>
         </div>
       </div>
       <div class="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200 rounded-lg p-2">
         <span class="text-[11px] font-bold text-slate-500">Filtrar:</span>
-        <span class="text-[11px] text-slate-500">👥 Equipo</span>
+        <span class="text-[11px] text-slate-500">${osIcon('users', { size: 12 })} Equipo</span>
         ${sel('eq', CG.fEquipo, equipos, "CG.fEquipo=this.value;cgRender()", o => o === 'all' ? 'Todos' : (o.charAt(0).toUpperCase() + o.slice(1)))}
-        <span class="text-[11px] text-slate-500">📍 Zona</span>
+        <span class="text-[11px] text-slate-500">${osIcon('map-pin', { size: 12 })} Zona</span>
         ${sel('zo', CG.fZona, zonas, "CG.fZona=this.value;cgRender()", o => o === 'all' ? 'Todas' : cgZoneLabel(o === 'sin' ? null : o))}
-        <span class="text-[11px] text-slate-500">🏷️ Tipo</span>
-        ${sel('ti', CG.fTipo, ['all', ...Object.keys(CG_TIPOS)], "CG.fTipo=this.value;cgRender()", o => o === 'all' ? 'Todos' : (CG_TIPOS[o].emoji + ' ' + CG_TIPOS[o].label))}
+        <span class="text-[11px] text-slate-500">${osIcon('filter', { size: 12 })} Tipo</span>
+        ${sel('ti', CG.fTipo, ['all', ...Object.keys(CG_TIPOS)], "CG.fTipo=this.value;cgRender()", o => o === 'all' ? 'Todos' : CG_TIPOS[o].label)}
         ${(CG.fEquipo !== 'all' || CG.fZona !== 'all' || CG.fTipo !== 'all') ? `<button onclick="CG.fEquipo='all';CG.fZona='all';CG.fTipo='all';cgRender()" class="text-[11px] text-amber-700 font-bold hover:underline">✕ Limpiar</button>` : ''}
         <span class="ml-auto flex items-center gap-2 text-[10px] text-slate-400">${Object.values(CG_TIPOS).map(v => `<span class="flex items-center gap-1"><span class="${v.dot} w-2 h-2 rounded-full"></span>${v.label}</span>`).join('')}</span>
       </div>
@@ -195,18 +196,18 @@ function cgTaskCard(t, opts = {}) {
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-1.5 flex-wrap">
           ${time}
-          <span class="text-sm font-bold text-slate-900 ${done ? 'line-through' : ''}">${tp.emoji} ${cgEsc(cleanTitle).slice(0, 60)}</span>
+          <span class="text-sm font-bold text-slate-900 ${done ? 'line-through' : ''}">${osIcon(tp.icon, { size: 13 })} ${cgEsc(cleanTitle).slice(0, 60)}</span>
         </div>
         <div class="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap mt-0.5">
-          ${loc ? `<span>🏠 ${cgEsc(loc).slice(0, 44)}</span>` : ''}
+          ${loc ? `<span>${osIcon('house', { size: 11 })} ${cgEsc(loc).slice(0, 44)}</span>` : ''}
           <span class="${tp.chip} px-1.5 rounded font-bold text-[10px]">${tp.label}</span>
-          ${z ? `<span class="bg-slate-100 text-slate-600 px-1.5 rounded text-[10px]">📍 ${cgZoneLabel(z)}</span>` : ''}
-          <span class="bg-slate-100 text-slate-600 px-1.5 rounded text-[10px]">👤 ${cgEsc(eq)}</span>
-          ${t.travel_time ? `<span class="text-amber-600 text-[10px]">🚗 +${t.travel_time}min</span>` : ''}
+          ${z ? `<span class="bg-slate-100 text-slate-600 px-1.5 rounded text-[10px]">${osIcon('map-pin', { size: 10 })} ${cgZoneLabel(z)}</span>` : ''}
+          <span class="bg-slate-100 text-slate-600 px-1.5 rounded text-[10px]">${osIcon('user', { size: 10 })} ${cgEsc(eq)}</span>
+          ${t.travel_time ? `<span class="text-amber-600 text-[10px]">${osIcon('truck', { size: 10 })} +${t.travel_time}min</span>` : ''}
         </div>
       </div>
       <div class="flex items-center gap-1 flex-shrink-0">
-        <button onclick="cgReschedule('${t.id}')" class="text-slate-400 hover:text-slate-700 text-xs px-1.5 py-1 rounded hover:bg-slate-100" title="Reprogramar">📅</button>
+        <button onclick="cgReschedule('${t.id}')" class="text-slate-400 hover:text-slate-700 text-xs px-1.5 py-1 rounded hover:bg-slate-100" title="Reprogramar">${osIcon('calendar', { size: 13 })}</button>
       </div>
     </div>`;
 }
@@ -228,20 +229,20 @@ function cgRenderHoy(open) {
       ${overdue.length ? `
       <div>
         <div class="flex items-center gap-2 mb-2">
-          <span class="text-sm font-bold text-red-700">⚠️ Atrasadas (${overdue.length})</span>
+          <span class="text-sm font-bold text-red-700">${osIcon('alert', { size: 14 })} Atrasadas (${overdue.length})</span>
           <button onclick="cgRescheduleAllOverdue()" class="text-[11px] bg-red-600 hover:bg-red-700 text-white font-bold px-2.5 py-1 rounded-lg">Reprogramar todas a hoy</button>
         </div>
         <div class="space-y-1.5">${overdue.map(t => cgTaskCard(t, { showTime: false })).join('')}</div>
       </div>` : ''}
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-bold text-slate-800">☀️ Hoy · ${fecha} (${hoy.length})</span>
+          <span class="text-sm font-bold text-slate-800">${osIcon('sun', { size: 14 })} Hoy · ${fecha} (${hoy.length})</span>
           ${hoy.length ? `<span class="text-[11px] text-slate-500">${cgSumDur(hoy)} de trabajo${cgSumTravel(hoy) ? ` · ${cgSumTravel(hoy)} de viajes` : ''}</span>` : ''}
         </div>
         ${hoy.length ? `<div class="space-y-1.5">${hoy.map(t => cgTaskCard(t, { showTime: true })).join('')}</div>`
           : `<div class="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-400">
-              <div class="text-3xl mb-1">📭</div><div class="text-sm">No hay tareas para hoy.</div>
-              <button onclick="cgArmarDia()" class="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg">🧭 Armar el día</button>
+              <div class="mb-1">${osIcon('inbox', { size: 28 })}</div><div class="text-sm">No hay tareas para hoy.</div>
+              <button onclick="cgArmarDia()" class="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg">${osIcon('compass', { size: 13 })} Armar el día</button>
             </div>`}
       </div>
     </div>`;
@@ -269,7 +270,7 @@ function cgRenderSemana(open) {
       return `<div class="bg-white border ${isToday ? 'border-emerald-400 ring-1 ring-emerald-200' : 'border-slate-200'} rounded-lg p-2 min-h-[120px]">
         <div class="text-[11px] font-bold ${isToday ? 'text-emerald-700' : 'text-slate-500'} mb-1.5">${DOW[i]} ${d.slice(8, 10)}${isToday ? ' · HOY' : ''} ${dt.length ? `<span class="text-slate-400">(${dt.length})</span>` : ''}</div>
         <div class="space-y-1">
-          ${dt.map(t => { const tp = cgTipo(t); return `<div class="text-[10px] px-1.5 py-1 rounded ${tp.chip} truncate ${t.status === 'completado' ? 'opacity-50 line-through' : ''}" title="${cgEsc(t.title)}">${tp.emoji} ${cgEsc((t.title || '').replace(/^[^\p{L}\p{N}]+/u, '')).slice(0, 22)}</div>`; }).join('') || '<div class="text-[10px] text-slate-300 italic">—</div>'}
+          ${dt.map(t => { const tp = cgTipo(t); return `<div class="text-[10px] px-1.5 py-1 rounded ${tp.chip} truncate ${t.status === 'completado' ? 'opacity-50 line-through' : ''}" title="${cgEsc(t.title)}">${osIcon(tp.icon, { size: 10 })} ${cgEsc((t.title || '').replace(/^[^\p{L}\p{N}]+/u, '')).slice(0, 22)}</div>`; }).join('') || '<div class="text-[10px] text-slate-300 italic">—</div>'}
         </div>
       </div>`;
     }).join('')}
@@ -281,14 +282,14 @@ function cgRenderSemana(open) {
 // ════════════════════════════════════════════════════════════════
 function cgRenderBacklog(open) {
   const backlog = open.filter(t => !t.scheduled_date);
-  if (!backlog.length) return `<div class="p-8 text-center text-slate-400"><div class="text-3xl mb-1">✅</div><div class="text-sm">Backlog vacío. Todo está agendado.</div></div>`;
+  if (!backlog.length) return `<div class="p-8 text-center text-slate-400"><div class="mb-1">${osIcon('check-circle', { size: 28 })}</div><div class="text-sm">Backlog vacío. Todo está agendado.</div></div>`;
   const byTipo = {};
   backlog.forEach(t => { const k = cgTipoKey(t); (byTipo[k] = byTipo[k] || []).push(t); });
   return `<div class="p-1 space-y-3">
-    <div class="text-[11px] text-slate-500">${backlog.length} tareas sin fecha. Reprogramalas (📅) o usá "Armar día" para agendarlas.</div>
+    <div class="text-[11px] text-slate-500">${backlog.length} tareas sin fecha. Reprogramalas (${osIcon('calendar', { size: 11 })}) o usá "Armar día" para agendarlas.</div>
     ${Object.entries(byTipo).sort((a, b) => b[1].length - a[1].length).map(([k, list]) => `
       <div>
-        <div class="text-[11px] uppercase font-bold text-slate-600 mb-1.5">${CG_TIPOS[k].emoji} ${CG_TIPOS[k].label} (${list.length})</div>
+        <div class="text-[11px] uppercase font-bold text-slate-600 mb-1.5">${osIcon(CG_TIPOS[k].icon, { size: 12 })} ${CG_TIPOS[k].label} (${list.length})</div>
         <div class="space-y-1.5">${list.map(t => cgTaskCard(t)).join('')}</div>
       </div>`).join('')}
   </div>`;
@@ -408,14 +409,14 @@ function cgDiaTexto() {
   const hoy = cgFiltered(cgOpenTasks()).filter(t => t.scheduled_date === today)
     .sort((a, b) => (a.start_at || '99').localeCompare(b.start_at || '99'));
   const fecha = new Date(today + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-  let out = `📅 Cronograma ${fecha}\n`;
-  if (CG.fEquipo !== 'all') out += `👥 Equipo: ${CG.fEquipo}\n`;
+  let out = `Cronograma ${fecha}\n`;
+  if (CG.fEquipo !== 'all') out += `Equipo: ${CG.fEquipo}\n`;
   out += `\n`;
   if (!hoy.length) { out += 'Sin tareas.'; return out; }
   let lastZone = null;
   hoy.forEach(t => {
     const z = cgZone(t);
-    if (z !== lastZone) { out += `\n📍 ${cgZoneLabel(z)}\n`; lastZone = z; }
+    if (z !== lastZone) { out += `\n${cgZoneLabel(z)}\n`; lastZone = z; }
     const hh = t.start_at ? String(t.start_at).slice(11, 16) + ' ' : '';
     const tp = cgTipo(t);
     const loc = [cgPropName(t.property_id), cgUnitName(t.unit_id)].filter(Boolean).join(' · ');

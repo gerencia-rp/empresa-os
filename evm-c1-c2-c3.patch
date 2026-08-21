@@ -1,0 +1,1421 @@
+diff --git a/index.html b/index.html
+index d17527d..45871a1 100644
+--- a/index.html
++++ b/index.html
+@@ -172,6 +172,9 @@
+ <script src="os/inv-admin.js?v=20260708inv"></script>
+ <script src="os/os-ia.js?v=20260711v31"></script>
+ <script src="remodel-command-center.js?v=20260703rc"></script>
++<script src="rm-evm.js?v=20260727evm"></script>
++<script src="rm-phase-costs.js?v=20260727c2"></script>
++<script src="rm-sqft-calib.js?v=20260727c3"></script>
+ <script src="remodel-reportes.js?v=20260704r"></script>
+ <script src="clickup-dashboard.js"></script>
+ <script src="pm-dashboard.js?v=20260623a"></script>
+diff --git a/remodel-command-center.js b/remodel-command-center.js
+index e507da8..32910af 100644
+--- a/remodel-command-center.js
++++ b/remodel-command-center.js
+@@ -315,6 +315,7 @@ const RC_NAV = [
+   ['inspeccion', osIcon('search'), 'Inspección'],
+   ['nomina', osIcon('banknote'), 'Nómina y Pagos'],
+   ['gestion', '◎', 'Gestión (EVM)'],
++  ['evm', '∿', 'Valor Ganado (EVM)'],
+   ['reportes', osIcon('file'), 'Reportes CEO'],
+   ['cerebro', '✦', 'Cerebro de obra'],
+ ];
+@@ -324,7 +325,7 @@ function rcRender() {
+   const c = rcCompute();
+   const side = ov.querySelector('.side'), main = ov.querySelector('.main');
+   if (side) side.innerHTML = rcSidebar(c);
+-  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">${osIcon('stethoscope')}</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">${osIcon('search')} Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
++  const sec = { command: rcSecCommand, evr: rcSecEvR, obras: rcSecObras, lideres: rcSecLideres, gestion: rcSecGestion, evm: (window.rcSecEVM || rcSecGestion), nomina: rcSecNomina, inspeccion: (c) => `${rcHeader('Diagnóstico Patológico de Vivienda', 'App independiente', 'primera etapa de la cadena: Inspección → Estimador → Planner')}<div class="card" style="text-align:center;padding:34px"><div style="font-size:44px;margin-bottom:10px">${osIcon('stethoscope')}</div><div style="font-size:15px;font-weight:700;margin-bottom:6px">Diagnóstico Patológico de Vivienda</div><div style="font-size:12px;opacity:.7;margin-bottom:16px">Wizard de inspección, base de datos, checklist y propiedades — app completa con las 4 pestañas.</div><button class="repbtn" style="font-size:14px;padding:11px 22px" onclick="window.open('/diagnostico','_blank')">${osIcon('search')} Abrir app de Diagnóstico →</button><div class="meta" style="margin-top:12px">Ruta propia /diagnostico · el daño pre-llena el Estimador por property_id</div></div>`, reportes: (window.rcSecReportes || rcSecCommand), cerebro: rcSecCerebro }[RC.section] || rcSecCommand;
+   if (main) main.innerHTML = sec(c);
+ }
+ window.rcRender = rcRender;
+diff --git a/remodel-pro.js b/remodel-pro.js
+index 7ec9b1e..2cf9f24 100644
+--- a/remodel-pro.js
++++ b/remodel-pro.js
+@@ -2120,6 +2120,8 @@ function rmRenderProjects(body) {
+       <h2 class="text-lg font-bold">Proyectos de remodelación</h2>
+       <div class="flex gap-2">
+         ${rmState.projects.length ? '<button onclick="rmExportAllExcel()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-4 py-2 rounded">' + osIcon('inbox') + ' Excel masivo</button>' : ''}
++        <button onclick="if(window.rmPCOpenImport)rmPCOpenImport()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded" title="Importar costos por fase desde el Excel del Estimado">${osIcon('inbox')} Importar costos/fase</button>
++        <button onclick="if(window.rmSqftOpenPanel)rmSqftOpenPanel()" class="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-4 py-2 rounded" title="Recalcular $/ft² real con margen de error (calibración)">📐 Recalcular $/ft²</button>
+         <button onclick="rmNewProject()" class="bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded">+ Nuevo proyecto</button>
+       </div>
+     </div>
+@@ -2988,6 +2990,7 @@ function rmGenerateProposalPDF() {
+ </div>
+ 
+ <div style="font-size:11px;color:#5a6270;margin-top:8px;">${e.sqft ? '<strong>$' + (e.pricing.clientPrice/e.sqft).toFixed(0) + '/ft²</strong> sobre ' + e.sqft + ' ft² de área a remodelar.' : ''}</div>
++${(typeof rmSqftBadgeHtml === 'function') ? rmSqftBadgeHtml(e) : ''}
+ 
+ <h2>Términos</h2>
+ <div class="terms">
+diff --git a/rm-evm.js b/rm-evm.js
+new file mode 100644
+index 0000000..4ed7acb
+--- /dev/null
++++ b/rm-evm.js
+@@ -0,0 +1,533 @@
++// ════════════════════════════════════════════════════════════════
++// ∿ EVM — SEGUIMIENTO GERENCIAL POR VALOR GANADO (Earned Value Management)
++// Bloque C.1 del handoff. Sección nueva del Command Center de Remodelación
++// para obras EN CURSO: BAC / PV / EV / AC → CV, SV, CPI, SPI, EAC, ETC, VAC,
++// %avance, con semáforos, curva S (Chart.js), tabla por fase, narrativa
++// gerencial y vista de cartera. Cortes "congelados" a remodel_snapshots.
++//
++// Fuentes de datos (mapeadas al código real, SOLO LECTURA salvo el corte):
++//   BAC (total y por fase) ← remodel_projects.activities[].{phase,total}
++//                            (fallback: remodel_at_properties.presupuesto_interno)
++//   EV  ← avance físico por fase = weekly_activities done/total por norm_etapa,
++//         ponderado por remodel_stage_weights; con OVERRIDE MANUAL por fase.
++//         (fallback casa: avance_real del Planner)
++//   AC  ← v_remodel_presupuesto_casa.total_real (pagos material + horas×rate).
++//         Nota: la data NO trae AC por fase → el AC por fase es PRORRATEO
++//         proporcional al EV de cada fase, ETIQUETADO como estimado.
++//   PV  ← cronograma baseline (weekly_activities.baseline_date por fase).
++//   Serie curva S ← remodel_snapshots (EV≈presupuesto×avance%, AC=gasto_total).
++//
++// NO expone `sb` en window. Escrituras vía upsert/ safe helpers. Idempotente.
++// ════════════════════════════════════════════════════════════════
++
++// ─────────────────────────────────────────────────────────────
++// 1) MATEMÁTICA PURA (sin dependencias del browser → testeable en Node)
++// ─────────────────────────────────────────────────────────────
++function rmEvmMetrics(v) {
++  const BAC = +v.BAC || 0, PV = +v.PV || 0, EV = +v.EV || 0, AC = +v.AC || 0;
++  const CV = EV - AC;                       // Cost Variance
++  const SV = EV - PV;                       // Schedule Variance
++  const CPI = AC > 0 ? EV / AC : null;      // Cost Performance Index
++  const SPI = PV > 0 ? EV / PV : null;      // Schedule Performance Index
++  // EAC principal = BAC / CPI (asume que el desempeño de costo continúa).
++  const EAC_cpi = (CPI != null && CPI > 0) ? BAC / CPI : null;
++  // EAC alterno = AC + (BAC − EV)/CPI (equivalente algebraico; se muestra también).
++  const EAC_atipico = (CPI != null && CPI > 0) ? AC + (BAC - EV) / CPI : null;
++  const EAC = EAC_cpi;
++  const ETC = (EAC != null) ? EAC - AC : null;   // Estimate To Complete
++  const VAC = (EAC != null) ? BAC - EAC : null;  // Variance At Completion
++  const pctAvance = BAC > 0 ? EV / BAC : null;   // % avance (valor ganado / total)
++  const pctGastado = BAC > 0 ? AC / BAC : null;
++  // TCPI = trabajo restante / fondos restantes (eficiencia requerida para cerrar en BAC)
++  const tcpi = (BAC - AC) !== 0 ? (BAC - EV) / (BAC - AC) : null;
++  return { BAC, PV, EV, AC, CV, SV, CPI, SPI, EAC, EAC_cpi, EAC_atipico, ETC, VAC, pctAvance, pctGastado, tcpi };
++}
++
++// Semáforo canónico de índices (CPI/SPI): verde ≥1.00, amarillo 0.90–0.99, rojo <0.90.
++function rmEvmLight(x) {
++  if (x == null || !isFinite(x)) return 'off';
++  if (x >= 1.00) return 'ok';
++  if (x >= 0.90) return 'warn';
++  return 'bad';
++}
++
++// Normaliza la etapa/stage (texto libre o número) a fase '1'..'6' del catálogo.
++// 1 Demolición · 2 Cimentación · 3 Externo · 4 Estructura · 5 Interno · 6 Limpieza
++function rmEvmPhaseOf(stage) {
++  if (stage == null) return null;
++  const s = String(stage).trim().toLowerCase();
++  if (!s) return null;
++  const m = s.match(/^\s*([1-6])(?:[.\)\s]|$)/);       // "1", "1.", "1)", "1 Demolición"
++  if (m) return m[1];
++  if (/demol/.test(s)) return '1';
++  if (/ciment|cimient|foundation|concret|zapata/.test(s)) return '2';
++  if (/exter|extern|fachad|roof|techo|outdoor|jard|landscap/.test(s)) return '3';
++  if (/estructur|structur|framing|marco|drywall|dry wall|panel|electr|plom|fontan|mep|hvac|climat/.test(s)) return '4';
++  if (/interi|intern|pintur|paint|piso|floor|cocina|kitchen|bath|baño|bano|acabado|carpint|puerta|closet/.test(s)) return '5';
++  if (/limpie|clean|aseo|final|entrega|detail|touch|punch/.test(s)) return '6';
++  return null;
++}
++
++// Nombres de fase (para UI y para el test)
++const RM_EVM_FASES = { '1': 'Demolición', '2': 'Cimentación', '3': 'Externo', '4': 'Estructura', '5': 'Interno', '6': 'Limpieza' };
++
++// Valor planeado a una fecha `t` (ms), a partir de los rangos baseline por fase.
++// bacPhase: {fase: presupuesto}. ranges: {fase: {min,max}} en ms. bacTotal + fechas obra para fallback.
++function rmEvmPlannedValueAt(tMs, bacPhase, ranges, fallback) {
++  let pv = 0, cov = 0;
++  for (const p of ['1', '2', '3', '4', '5', '6']) {
++    const bac = +bacPhase[p] || 0;
++    if (bac <= 0) continue;
++    const r = ranges[p];
++    if (!r) continue;
++    cov += bac;
++    const span = Math.max(1, (r.max - r.min) / 86400000 + 1);
++    const elapsed = (tMs - r.min) / 86400000 + 1;
++    const frac = Math.max(0, Math.min(1, elapsed / span));
++    pv += bac * frac;
++  }
++  if (cov <= 0) {
++    // Sin cronograma por fase: prorrateo temporal simple sobre fechas de la obra.
++    if (fallback && fallback.start && fallback.end && fallback.bac > 0) {
++      const st = fallback.start, en = fallback.end;
++      if (en > st) { const f = Math.max(0, Math.min(1, (tMs - st) / (en - st))); return fallback.bac * f; }
++    }
++    return null;
++  }
++  return pv;
++}
++
++// Exponer para Node (test) sin romper el browser.
++if (typeof module !== 'undefined' && module.exports) {
++  module.exports = { rmEvmMetrics, rmEvmLight, rmEvmPhaseOf, rmEvmPlannedValueAt, RM_EVM_FASES };
++}
++
++/* ═══════════════════════════ EVM-UI (solo browser) ═══════════════════════════ */
++
++// ─────────────────────────────────────────────────────────────
++// 2) CARGA PEREZOSA DE DATOS (remodel_projects, weekly_activities,
++//    remodel_snapshots, remodel_stage_weights) — cacheada en RC.evm
++// ─────────────────────────────────────────────────────────────
++async function rcEVMLoad() {
++  if (typeof RC === 'undefined') return;
++  RC.evm = RC.evm || { manual: {} };
++  RC.evm.loading = true;
++  try {
++    const propIds = (RC.obras || []).map(o => o.property_id).filter(Boolean);
++    const atIds = (RC.obras || []).map(o => o.airtable_id).filter(Boolean);
++    const [proj, wa, snaps, weights, phaseCosts] = await Promise.all([
++      sb.from('remodel_projects').select('id, property_id, address, activities, start_date, end_date_estimated, budget_total, budget_material, budget_labor, progress_real').is('archived_at', null).then(r => r.data || []).catch(() => []),
++      propIds.length
++        ? sb.from('weekly_activities').select('property_id, stage, status, activity_code, date, baseline_date, is_critical').in('property_id', propIds).then(r => r.data || []).catch(() => [])
++        : Promise.resolve([]),
++      atIds.length
++        ? sb.from('remodel_snapshots').select('airtable_id, snapshot_date, avance_pct, gasto_total, presupuesto, gasto_materiales, gasto_trabajadores').in('airtable_id', atIds).order('snapshot_date', { ascending: true }).then(r => r.data || []).catch(() => [])
++        : Promise.resolve([]),
++      sb.from('remodel_stage_weights').select('property_id, etapa, peso_pct').eq('active', true).then(r => r.data || []).catch(() => []),
++      sb.from('remodel_phase_costs').select('property_id, fase, costo_materiales, costo_mano_obra, costo_equipo, total').then(r => r.data || []).catch(() => [])
++    ]);
++    const projByProp = {}; (proj || []).forEach(p => { if (p.property_id) projByProp[p.property_id] = p; });
++    const waByProp = {}; (wa || []).forEach(a => { if (!a.property_id) return; (waByProp[a.property_id] = waByProp[a.property_id] || []).push(a); });
++    const snapsByAt = {}; (snaps || []).forEach(s => { if (!s.airtable_id) return; (snapsByAt[s.airtable_id] = snapsByAt[s.airtable_id] || []).push(s); });
++    const weightByProp = {}; (weights || []).forEach(w => { if (!w.property_id) return; (weightByProp[w.property_id] = weightByProp[w.property_id] || {})[w.etapa] = +w.peso_pct || 0; });
++    const phaseCostsByProp = {}; (phaseCosts || []).forEach(pc => { if (!pc.property_id) return; (phaseCostsByProp[pc.property_id] = phaseCostsByProp[pc.property_id] || {})[String(pc.fase)] = pc; });
++    RC.evm.phaseCostsByProp = phaseCostsByProp;
++    RC.evm.projByProp = projByProp;
++    RC.evm.waByProp = waByProp;
++    RC.evm.snapsByAt = snapsByAt;
++    RC.evm.weightByProp = weightByProp;
++    RC.evm.loaded = true;
++  } catch (e) {
++    RC.evm.loaded = true; // evita loop infinito; muestra lo que se pueda
++    RC.evm.error = e && e.message;
++  } finally {
++    RC.evm.loading = false;
++  }
++}
++
++// Match casa → fila de costo real (v_remodel_presupuesto_casa) por property_id / airtable_id / dirección.
++function rcEVMMatchCost(o) {
++  const pc = RC.presupCasa || [];
++  let f = pc.find(x => o.property_id && x.property_id === o.property_id);
++  if (!f) f = pc.find(x => o.airtable_id && x.airtable_id === o.airtable_id);
++  if (!f && o.address) { const na = String(o.address).split(',')[0].trim().toLowerCase(); f = pc.find(x => (x.address || '').split(',')[0].trim().toLowerCase() === na); }
++  return f || null;
++}
++
++// ─────────────────────────────────────────────────────────────
++// 3) CÓMPUTO EVM POR OBRA
++// ─────────────────────────────────────────────────────────────
++function rcEVMObra(o) {
++  const evm = RC.evm || {};
++  const proj = (evm.projByProp || {})[o.property_id] || null;
++  const acts = (proj && Array.isArray(proj.activities)) ? proj.activities : [];
++
++  // BAC por fase — prioridad: costos importados (C.2) > activities del Estimador.
++  const bacPhase = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0 };
++  const pcImport = (evm.phaseCostsByProp || {})[o.property_id] || null;
++  let bacFromActs = 0, fuenteBAC = null;
++  if (pcImport) {
++    for (const p of ['1', '2', '3', '4', '5', '6']) { if (pcImport[p]) bacPhase[p] = +pcImport[p].total || 0; }
++    fuenteBAC = 'importado';
++  } else {
++    acts.forEach(a => { const p = rmEvmPhaseOf(a.phase); const t = +a.total || 0; bacFromActs += t; if (p) bacPhase[p] += t; });
++    if (bacFromActs > 0) fuenteBAC = 'estimador';
++  }
++  const bacPhaseSum = Object.values(bacPhase).reduce((a, x) => a + (+x || 0), 0);
++  const BAC = bacPhaseSum > 0 ? bacPhaseSum : (+o.presupuesto_interno || 0);
++  // ¿Hay desglose de presupuesto por fase fiable?
++  const tienePresupFase = bacPhaseSum > 0;
++
++  // Avance físico por fase desde weekly_activities (done/total), con override manual.
++  const wa = (evm.waByProp || {})[o.property_id] || [];
++  const doneTot = {};
++  wa.forEach(a => {
++    const st = (a.status || '').toLowerCase();
++    if (st === 'cancelled' || st === 'canceled') return;
++    const p = rmEvmPhaseOf(a.stage);
++    if (!p) return;
++    const d = doneTot[p] = doneTot[p] || { done: 0, total: 0 };
++    d.total++; if (st === 'done') d.done++;
++  });
++  const manual = ((evm.manual || {})[o.property_id]) || {};
++
++  const evPhase = {};
++  let EV = 0, evCubierto = 0;
++  for (const p of ['1', '2', '3', '4', '5', '6']) {
++    const dt = doneTot[p];
++    let pct = (dt && dt.total > 0) ? dt.done / dt.total : null;
++    let esManual = false;
++    if (manual[p] != null && manual[p] !== '') { pct = Math.max(0, Math.min(100, +manual[p])) / 100; esManual = true; }
++    const bac = bacPhase[p];
++    const ev = (pct != null) ? bac * pct : 0;
++    evPhase[p] = { pct, bac, ev, ac: 0, done: dt ? dt.done : null, total: dt ? dt.total : null, manual: esManual };
++    if (pct != null && bac > 0) { EV += ev; evCubierto += bac; }
++  }
++
++  // ¿Hay señal de avance por fase? Si no, EV a nivel casa (avance del Planner / grueso).
++  const hayFase = tienePresupFase && Object.values(evPhase).some(x => x.pct != null && x.bac > 0);
++  if (!hayFase) {
++    const physHouse = (o.avance_pct != null ? +o.avance_pct : 0) / 100;
++    EV = BAC * physHouse;
++  }
++
++  // AC (costo real) a nivel casa
++  const pc = rcEVMMatchCost(o);
++  const AC = pc ? (+pc.total_real || 0) : ((+o.gasto_materiales || 0) + (+o.gasto_trabajadores || 0));
++
++  // AC por fase = prorrateo proporcional al EV de cada fase (proxy, etiquetado).
++  const evSum = Object.values(evPhase).reduce((a, x) => a + (x.ev || 0), 0);
++  const bacSum = Object.values(evPhase).reduce((a, x) => a + (x.bac || 0), 0);
++  for (const p of ['1', '2', '3', '4', '5', '6']) {
++    const w = evSum > 0 ? (evPhase[p].ev / evSum) : (bacSum > 0 ? (evPhase[p].bac / bacSum) : 0);
++    evPhase[p].ac = AC * w;
++  }
++
++  // PV (valor planeado) desde el cronograma baseline
++  const ranges = rcEVMPhaseRanges(wa);
++  const fallback = { start: o.fecha_inicio ? new Date(o.fecha_inicio).getTime() : null, end: o.fecha_estimada_fin ? new Date(o.fecha_estimada_fin).getTime() : null, bac: BAC };
++  const PV = rmEvmPlannedValueAt(Date.now(), bacPhase, ranges, fallback);
++
++  const metrics = rmEvmMetrics({ BAC, PV: PV || 0, EV, AC });
++  return { o, proj, BAC, PV, EV, AC, evPhase, hayFase, tienePresupFase, fuenteBAC, ranges, bacPhase, fallback, metrics };
++}
++
++// Rangos de fechas planeadas por fase (baseline_date, fallback date) → {fase:{min,max}} en ms.
++function rcEVMPhaseRanges(wa) {
++  const ranges = {};
++  (wa || []).forEach(a => {
++    const p = rmEvmPhaseOf(a.stage); if (!p) return;
++    const d = a.baseline_date || a.date; if (!d) return;
++    const t = new Date(String(d).slice(0, 10) + 'T00:00:00').getTime();
++    if (isNaN(t)) return;
++    const r = ranges[p] = ranges[p] || { min: t, max: t };
++    if (t < r.min) r.min = t; if (t > r.max) r.max = t;
++  });
++  return ranges;
++}
++
++// ─────────────────────────────────────────────────────────────
++// 4) SECCIÓN UI — cartera + detalle por obra
++// ─────────────────────────────────────────────────────────────
++function rcSecEVM(c) {
++  // Carga perezosa
++  if (!RC.evm || !RC.evm.loaded) {
++    if (!RC.evm || !RC.evm.loading) { setTimeout(() => { rcEVMLoad().then(() => rcRender()); }, 0); }
++    return rcHeader('Valor Ganado (EVM)', 'Cargando cronograma, presupuestos y cortes…') +
++      `<div class="card" style="text-align:center;padding:40px"><div style="font-size:34px">${osIcon('loader')}</div><div class="meta" style="margin-top:10px">Preparando el análisis EVM…</div></div>`;
++  }
++
++  const activas = (c.activas || []).filter(o => (o.proceso === 'En construcción') || rcEVMMatchCost(o) || (RC.evm.projByProp || {})[o.property_id]);
++  const rows = activas.map(rcEVMObra).filter(r => r.BAC > 0);
++  // Ordenar: primero las de peor CPI
++  rows.sort((a, b) => (a.metrics.CPI == null ? 9 : a.metrics.CPI) - (b.metrics.CPI == null ? 9 : b.metrics.CPI));
++
++  const sel = RC.evm.sel && rows.find(r => r.o.airtable_id === RC.evm.sel) ? RC.evm.sel : (rows[0] && rows[0].o.airtable_id);
++
++  const head = rcHeader('Valor Ganado (EVM)', 'Seguimiento gerencial de obras en curso: costo, cronograma y proyección a cierre.');
++  if (!rows.length) {
++    return head + `<div class="card" style="padding:26px"><div class="meta">No hay obras en curso con presupuesto cargado para EVM. Se requiere: un proyecto del Estimador (BAC) o <b>presupuesto_interno</b>, y costo real / avance. ${RC.evm.error ? '<br>⚠ ' + RC_E(RC.evm.error) : ''}</div></div>`;
++  }
++
++  return head + rcEVMPortfolio(rows) + rcEVMDetalle(rows.find(r => r.o.airtable_id === sel) || rows[0], rows);
++}
++typeof window !== 'undefined' && (window.rcSecEVM = rcSecEVM);
++
++// Agregados de cartera
++function rcEVMPortfolio(rows) {
++  const sum = (f) => rows.reduce((a, r) => a + (f(r) || 0), 0);
++  const BAC = sum(r => r.BAC), EV = sum(r => r.EV), AC = sum(r => r.AC), PV = sum(r => r.PV);
++  const agg = rmEvmMetrics({ BAC, PV, EV, AC });
++  const kpi = (lab, val, light, meta) => `<div class="card kpi"><div class="lab">${lab}</div><div class="big ${light === 'ok' ? 'up' : light === 'bad' ? 'down' : ''}">${val}</div><div class="meta">${meta}</div></div>`;
++  const rowHtml = rows.map(r => {
++    const m = r.metrics; const sel = RC.evm.sel === r.o.airtable_id;
++    return `<tr onclick="rcEVMSel('${r.o.airtable_id}')" style="cursor:pointer${sel ? ';background:var(--glass)' : ''}">
++      <td><b>${RC_E(rcShort(r.o.address))}</b>${sel ? ' ◂' : ''}</td>
++      <td style="text-align:right">${RC_M(r.BAC)}</td>
++      <td style="text-align:right">${m.pctAvance != null ? Math.round(m.pctAvance * 100) + '%' : '—'}</td>
++      <td style="text-align:right">${RC_M(r.AC)}</td>
++      <td style="text-align:right" class="${rcEVMcls(m.CPI)}">${kitStatusDot(rmEvmLight(m.CPI))} ${m.CPI != null ? m.CPI.toFixed(2) : '—'}</td>
++      <td style="text-align:right" class="${rcEVMcls(m.SPI)}">${kitStatusDot(rmEvmLight(m.SPI))} ${m.SPI != null ? m.SPI.toFixed(2) : '—'}</td>
++      <td style="text-align:right">${m.EAC != null ? RC_M(m.EAC) : '—'}</td>
++      <td style="text-align:right" class="${(m.VAC || 0) < 0 ? 'down' : 'up'}">${m.VAC != null ? RC_M(m.VAC) : '—'}</td>
++    </tr>`;
++  }).join('');
++
++  return `<div class="grid kpis">
++      ${kpi('CPI cartera', agg.CPI != null ? agg.CPI.toFixed(2) : '—', rmEvmLight(agg.CPI), 'costo (ΣEV/ΣAC · >1 bajo presup.)')}
++      ${kpi('SPI cartera', agg.SPI != null ? agg.SPI.toFixed(2) : '—', rmEvmLight(agg.SPI), 'cronograma (ΣEV/ΣPV)')}
++      ${kpi('BAC total', RC_K(BAC), 'off', 'presupuesto a completar')}
++      ${kpi('EAC total', RC_K(agg.EAC || 0), (agg.VAC || 0) < 0 ? 'bad' : 'ok', `proyección a cierre · VAC ${agg.VAC != null ? RC_M(agg.VAC) : '—'}`)}
++    </div>
++    <div class="card"><div class="chart-h"><div class="t">Cartera en obra · EVM</div><div class="k">${rows.length} obras · clic para ver detalle <button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:8px" onclick="rmPCOpenImport()">${osIcon('inbox') || '📥'} Importar costos por fase</button><button class="repbtn" style="padding:3px 10px;font-size:10px;margin-left:6px" onclick="if(window.rmSqftOpenPanel)rmSqftOpenPanel()">📐 Recalcular $/ft²</button></div></div>
++      <table class="ptable"><thead><tr><th>Obra</th><th style="text-align:right">BAC</th><th style="text-align:right">% avance</th><th style="text-align:right">AC (real)</th><th style="text-align:right">CPI</th><th style="text-align:right">SPI</th><th style="text-align:right">EAC</th><th style="text-align:right">VAC</th></tr></thead>
++      <tbody>${rowHtml}</tbody></table>
++      <div class="meta" style="margin-top:8px">CPI/SPI: ${kitStatusDot('ok')} ≥1.00 · ${kitStatusDot('warn')} 0.90–0.99 · ${kitStatusDot('bad')} &lt;0.90. VAC &lt;0 = sobrecosto proyectado.</div>
++    </div>`;
++}
++
++function rcEVMcls(x) { const l = rmEvmLight(x); return l === 'ok' ? 'up' : l === 'bad' ? 'down' : ''; }
++
++// Detalle de una obra
++function rcEVMDetalle(r, rows) {
++  if (!r) return '';
++  const m = r.metrics, o = r.o;
++  const fila = (lab, val, cls, hint) => `<div class="krow"><span>${lab}${hint ? ` <span style="opacity:.5;font-size:10px">${hint}</span>` : ''}</span><b class="${cls || ''}">${val}</b></div>`;
++  const money = (n) => n == null ? '—' : RC_M(n);
++
++  // Tabla por fase
++  const faseRows = ['1', '2', '3', '4', '5', '6'].map(p => {
++    const e = r.evPhase[p]; if (!e || (e.bac <= 0 && !e.total)) return '';
++    const cpi = e.ac > 0 ? e.ev / e.ac : null;
++    return `<tr>
++      <td><span style="opacity:.6">${p}</span> ${RM_EVM_FASES[p]}</td>
++      <td style="text-align:right">${money(e.bac)}</td>
++      <td style="text-align:right">${e.pct != null ? Math.round(e.pct * 100) + '%' : '—'}${e.manual ? ' <span style="opacity:.5;font-size:9px">man</span>' : (e.total ? ` <span style="opacity:.4;font-size:9px">${e.done}/${e.total}</span>` : '')}</td>
++      <td style="text-align:right">${money(e.ev)}</td>
++      <td style="text-align:right" style="opacity:.85">${money(e.ac)}<span style="opacity:.4;font-size:9px"> ~</span></td>
++      <td style="text-align:right" class="${rcEVMcls(cpi)}">${cpi != null ? cpi.toFixed(2) : '—'}</td>
++      <td style="text-align:right"><input type="number" min="0" max="100" step="1" value="${e.manual ? Math.round(e.pct * 100) : ''}" placeholder="${e.pct != null ? Math.round(e.pct * 100) : '·'}" onchange="rcEVMSetManual('${o.property_id}','${p}',this.value)" style="width:52px;text-align:right;background:var(--glass);border:1px solid var(--glassb);border-radius:6px;padding:3px 6px;color:var(--ink);font-size:11px" title="Override manual % de avance de esta fase"/></td>
++    </tr>`;
++  }).join('');
++
++  const narr = rcEVMNarrativa(r);
++
++  return `<div class="grid row2">
++    <div class="card">
++      <div class="chart-h"><div class="t">${RC_E(rcShort(o.address))}</div><div class="k">${RC_E(o.proceso || '')} · ${o.sqft ? Math.round(o.sqft) + ' ft²' : 's/ft²'}</div></div>
++      <div class="grid kpis" style="margin:2px 0 6px">
++        <div class="card kpi"><div class="lab">CPI</div><div class="big ${rcEVMcls(m.CPI)}">${kitStatusDot(rmEvmLight(m.CPI))} ${m.CPI != null ? m.CPI.toFixed(2) : '—'}</div><div class="meta">EV/AC</div></div>
++        <div class="card kpi"><div class="lab">SPI</div><div class="big ${rcEVMcls(m.SPI)}">${kitStatusDot(rmEvmLight(m.SPI))} ${m.SPI != null ? m.SPI.toFixed(2) : '—'}</div><div class="meta">EV/PV</div></div>
++        <div class="card kpi"><div class="lab">% avance (EV/BAC)</div><div class="big">${m.pctAvance != null ? Math.round(m.pctAvance * 100) + '%' : '—'}</div><div class="meta">${money(m.EV)} de ${money(m.BAC)}</div></div>
++        <div class="card kpi"><div class="lab">Proyección (EAC)</div><div class="big ${(m.VAC || 0) < 0 ? 'down' : 'up'}">${money(m.EAC)}</div><div class="meta">VAC ${money(m.VAC)}</div></div>
++      </div>
++      <div class="krow" style="border-top:1px solid var(--glassb);padding-top:8px">${fila('BAC — presupuesto', money(m.BAC), '', r.fuenteBAC === 'importado' ? 'costos importados (C.2)' : r.fuenteBAC === 'estimador' ? 'Estimador (por fase)' : 'presupuesto_interno')}</div>
++      ${fila('PV — valor planeado', money(m.PV), '', 'cronograma baseline')}
++      ${fila('EV — valor ganado', money(m.EV), '', r.hayFase ? 'avance por fase' : 'avance del Planner (casa)')}
++      ${fila('AC — costo real', money(m.AC), '', 'pagos material + horas×rate')}
++      ${fila('CV — variación costo', money(m.CV), (m.CV < 0 ? 'down' : 'up'), 'EV−AC')}
++      ${fila('SV — variación cronograma', money(m.SV), (m.SV < 0 ? 'down' : 'up'), 'EV−PV')}
++      ${fila('ETC — falta por gastar', money(m.ETC), '', 'EAC−AC')}
++      ${fila('EAC alterno', money(m.EAC_atipico), '', 'AC+(BAC−EV)/CPI')}
++      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
++        <button class="pullbtn" onclick="rcEVMFreeze('${o.airtable_id}')">${osIcon('camera') || '◉'} Congelar corte de hoy</button>
++        <button class="pullbtn" style="background:var(--glass);color:var(--ink);border:1px solid var(--glassb)" onclick="rcEVMClearManual('${o.property_id}')">Limpiar overrides</button>
++      </div>
++      <div class="meta" style="margin-top:8px"><b>~</b> El AC por fase es prorrateo proporcional al avance (la data no trae costo real por fase). El AC total y CPI/SPI de la obra sí son exactos.</div>
++    </div>
++    <div class="card">
++      <div class="chart-h"><div class="t">Curva S · PV / EV / AC</div><div class="k">proyección a EAC</div></div>
++      <div style="position:relative;height:230px"><canvas id="rc-evm-scurve"></canvas></div>
++      <div class="chart-h" style="margin-top:14px"><div class="t">Por fase</div><div class="k">BAC · avance · EV · AC~ · CPI · override</div></div>
++      <table class="ptable"><thead><tr><th>Fase</th><th style="text-align:right">BAC</th><th style="text-align:right">Avance</th><th style="text-align:right">EV</th><th style="text-align:right">AC~</th><th style="text-align:right">CPI</th><th style="text-align:right">Manual %</th></tr></thead>
++      <tbody>${faseRows || '<tr><td colspan="7" class="meta" style="padding:14px">Sin presupuesto por fase (falta proyecto del Estimador para esta obra).</td></tr>'}</tbody></table>
++    </div>
++  </div>
++  <div class="card brain"><div class="bh"><div class="orb"></div><div><b>Lectura gerencial</b><span>AUTOMÁTICA · ${RC_E(rcShort(o.address))}</span></div></div>${narr}</div>`;
++}
++
++// Narrativa gerencial automática
++function rcEVMNarrativa(r) {
++  const m = r.metrics; const t = [];
++  const pct = m.pctAvance != null ? Math.round(m.pctAvance * 100) : null;
++  if (pct != null) t.push(`Avance ganado del <b>${pct}%</b> (${RC_M(m.EV)} de ${RC_M(m.BAC)}).`);
++  if (m.CPI != null) {
++    if (m.CPI >= 1.0) t.push(`Costo <b class="up">bajo presupuesto</b> (CPI ${m.CPI.toFixed(2)}): por cada $1 de trabajo se gastan $${(1 / m.CPI).toFixed(2)}.`);
++    else t.push(`Costo <b class="down">sobre presupuesto</b> (CPI ${m.CPI.toFixed(2)}): por cada $1 de trabajo se gastan $${(1 / m.CPI).toFixed(2)}.`);
++  } else t.push('Sin costo real cargado → CPI no calculable.');
++  if (m.SPI != null) {
++    if (m.SPI >= 1.0) t.push(`Cronograma <b class="up">a tiempo o adelantado</b> (SPI ${m.SPI.toFixed(2)}).`);
++    else t.push(`Cronograma <b class="down">atrasado</b> (SPI ${m.SPI.toFixed(2)}): avanzando al ${Math.round(m.SPI * 100)}% del plan.`);
++  } else t.push('Sin cronograma baseline → SPI no calculable.');
++  if (m.EAC != null) {
++    const over = m.VAC != null && m.VAC < 0;
++    t.push(`Proyección a cierre (EAC) <b>${RC_M(m.EAC)}</b> → ${over ? `<b class="down">sobrecosto</b> de ${RC_M(-m.VAC)} vs BAC` : `<b class="up">ahorro</b> de ${RC_M(m.VAC)} vs BAC`}.`);
++    if (m.tcpi != null && isFinite(m.tcpi)) t.push(`Para cerrar en presupuesto se necesitaría un desempeño (TCPI) de <b>${m.tcpi.toFixed(2)}</b> en lo que falta${m.tcpi > 1.1 ? ' — exigente' : ''}.`);
++  }
++  return `<div style="font-size:12.5px;line-height:1.7">${t.map(x => '• ' + x).join('<br>')}</div>`;
++}
++
++// ─────────────────────────────────────────────────────────────
++// 5) CURVA S (Chart.js) — montada tras el render
++// ─────────────────────────────────────────────────────────────
++function rcEVMMountChart(r) {
++  if (!window.Chart || !r) return;
++  const el = document.getElementById('rc-evm-scurve'); if (!el) return;
++  try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) {}
++
++  const snaps = (RC.evm.snapsByAt || {})[r.o.airtable_id] || [];
++  // Eje de fechas: inicio de obra → fin estimado (semanal); + puntos de snapshots + hoy.
++  const start = r.fallback.start || (snaps[0] ? new Date(snaps[0].snapshot_date).getTime() : Date.now());
++  const end = r.fallback.end || Date.now() + 30 * 86400000;
++  const axis = [];
++  for (let t = start; t <= end + 1; t += 7 * 86400000) axis.push(t);
++  if (axis[axis.length - 1] < end) axis.push(end);
++  const fmt = (ms) => new Date(ms).toLocaleDateString('es', { day: '2-digit', month: 'short' });
++
++  // PV planeado (línea completa, determinística)
++  const pv = axis.map(t => rmEvmPlannedValueAt(t, r.bacPhase, r.ranges, r.fallback));
++  // EV y AC desde snapshots (puntos reales)
++  const evPts = axis.map(() => null), acPts = axis.map(() => null);
++  const nearest = (ms) => { let bi = 0, bd = Infinity; axis.forEach((t, i) => { const d = Math.abs(t - ms); if (d < bd) { bd = d; bi = i; } }); return bi; };
++  (snaps || []).forEach(s => {
++    const ms = new Date(String(s.snapshot_date).slice(0, 10) + 'T00:00:00').getTime(); if (isNaN(ms)) return;
++    const i = nearest(ms);
++    const pres = +s.presupuesto || r.BAC;
++    if (s.avance_pct != null) evPts[i] = pres * (+s.avance_pct) / 100;
++    if (s.gasto_total != null) acPts[i] = +s.gasto_total;
++  });
++  // Punto de hoy con EV/AC calculados (si no hay snapshot de hoy)
++  const iHoy = nearest(Date.now());
++  if (evPts[iHoy] == null) evPts[iHoy] = r.EV;
++  if (acPts[iHoy] == null) acPts[iHoy] = r.AC;
++
++  // Proyección a EAC (línea punteada desde hoy hasta fin)
++  const eac = r.metrics.EAC;
++  const proj = axis.map((t, i) => (eac != null && t >= Date.now() && i >= iHoy) ? (i === iHoy ? r.AC : (i === axis.length - 1 ? eac : null)) : null);
++
++  const ax = { grid: { color: 'rgba(120,130,150,.10)' }, ticks: { color: '#8b93a1', font: { size: 9 }, callback: (v) => RC_K(v) } };
++  new Chart(el, {
++    type: 'line',
++    data: {
++      labels: axis.map(fmt),
++      datasets: [
++        { label: 'PV (plan)', data: pv, borderColor: '#8b93a1', borderDash: [5, 4], borderWidth: 1.6, pointRadius: 0, tension: .25, fill: false },
++        { label: 'EV (ganado)', data: evPts, borderColor: '#4ade9e', backgroundColor: 'rgba(74,222,158,.10)', borderWidth: 2.2, pointRadius: 2.5, tension: .25, spanGaps: true, fill: true },
++        { label: 'AC (real)', data: acPts, borderColor: '#ff6b6b', borderWidth: 2.2, pointRadius: 2.5, tension: .25, spanGaps: true, fill: false },
++        { label: 'Proyección EAC', data: proj, borderColor: '#fbbf24', borderDash: [3, 3], borderWidth: 1.6, pointRadius: 0, spanGaps: true, fill: false }
++      ]
++    },
++    options: {
++      maintainAspectRatio: false, resizeDelay: 150, interaction: { mode: 'index', intersect: false },
++      plugins: { legend: { position: 'bottom', labels: { color: '#8b93a1', font: { size: 10 }, boxWidth: 10, padding: 8 } }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${RC_M(ctx.parsed.y)}` } } },
++      scales: { x: { grid: { display: false }, ticks: { color: '#8b93a1', font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }, y: ax }
++    }
++  });
++}
++
++// ─────────────────────────────────────────────────────────────
++// 6) INTERACCIÓN — selección, override manual, congelar corte
++// ─────────────────────────────────────────────────────────────
++function rcEVMSel(atId) { RC.evm.sel = atId; rcRender(); }
++typeof window !== 'undefined' && (window.rcEVMSel = rcEVMSel);
++
++function rcEVMSetManual(propId, phase, val) {
++  RC.evm.manual = RC.evm.manual || {};
++  RC.evm.manual[propId] = RC.evm.manual[propId] || {};
++  if (val === '' || val == null) delete RC.evm.manual[propId][phase];
++  else RC.evm.manual[propId][phase] = +val;
++  rcRender();
++}
++typeof window !== 'undefined' && (window.rcEVMSetManual = rcEVMSetManual);
++
++function rcEVMClearManual(propId) {
++  if (RC.evm.manual) delete RC.evm.manual[propId];
++  rcRender();
++}
++typeof window !== 'undefined' && (window.rcEVMClearManual = rcEVMClearManual);
++
++// Congela un corte EVM del día en remodel_snapshots (idempotente por airtable_id+snapshot_date).
++async function rcEVMFreeze(atId) {
++  const o = (RC.obras || []).find(x => x.airtable_id === atId); if (!o) return;
++  const r = rcEVMObra(o); const m = r.metrics;
++  const ok = await confirmDialog(
++    `Se guardará un corte EVM de hoy para <b>${RC_E(rcShort(o.address))}</b>:<br>CPI ${m.CPI != null ? m.CPI.toFixed(2) : '—'} · SPI ${m.SPI != null ? m.SPI.toFixed(2) : '—'} · EAC ${m.EAC != null ? RC_M(m.EAC) : '—'}.<br>Reemplaza el corte de hoy si ya existe.`,
++    { title: 'Congelar corte EVM', confirmText: 'Congelar', cancelText: 'Cancelar' }
++  );
++  if (!ok) return;
++  const btn = event && event.target ? event.target : null;
++  const run = async () => {
++    const hoy = new Date().toISOString().slice(0, 10);
++    const diasIni = o.fecha_inicio ? Math.round((Date.now() - new Date(o.fecha_inicio).getTime()) / 86400000) : null;
++    const diasFin = o.fecha_estimada_fin ? Math.round((new Date(o.fecha_estimada_fin).getTime() - Date.now()) / 86400000) : null;
++    const payload = {
++      airtable_id: atId, snapshot_date: hoy,
++      avance_pct: m.pctAvance != null ? +(m.pctAvance * 100).toFixed(2) : null,
++      gasto_total: r.AC || null, presupuesto: r.BAC || null,
++      dias_desde_inicio: diasIni, dias_hasta_fin_estimado: diasFin,
++      spi: m.SPI != null ? +m.SPI.toFixed(4) : null,
++      cpi: m.CPI != null ? +m.CPI.toFixed(4) : null,
++      burn_rate: (diasIni && diasIni > 0 && r.AC) ? +(r.AC / diasIni).toFixed(2) : null,
++      proyeccion_costo_final: m.EAC != null ? +m.EAC.toFixed(2) : null,
++      flags: [
++        ...(m.CPI != null && m.CPI < 0.9 ? ['sobre_presupuesto'] : []),
++        ...(m.SPI != null && m.SPI < 0.9 ? ['atrasada'] : [])
++      ]
++    };
++    const res = await sb.from('remodel_snapshots').upsert(payload, { onConflict: 'airtable_id,snapshot_date' });
++    if (res.error) { if (window.toast) toast('No se pudo congelar el corte: ' + res.error.message, 'error'); return; }
++    if (window.toast) toast('Corte EVM congelado (' + hoy + ')', 'success');
++    // refrescar snapshots
++    RC.evm.loaded = false; await rcEVMLoad(); rcRender();
++  };
++  if (typeof withLoading === 'function' && btn) await withLoading(btn, run); else await run();
++}
++typeof window !== 'undefined' && (window.rcEVMFreeze = rcEVMFreeze);
++
++// Hook de montaje del chart: se llama tras cada render si la sección EVM está activa.
++(function rcEVMInstallRenderHook() {
++  if (typeof window === 'undefined') return;
++  const tryHook = () => {
++    if (typeof rcRender !== 'function' || rcRender.__evmHooked) return false;
++    const orig = rcRender;
++    const wrapped = function () {
++      const out = orig.apply(this, arguments);
++      if (typeof RC !== 'undefined' && RC.section === 'evm' && RC.evm && RC.evm.loaded) {
++        setTimeout(() => {
++          try {
++            const activas = (rcCompute().activas || []).filter(o => (o.proceso === 'En construcción') || rcEVMMatchCost(o) || (RC.evm.projByProp || {})[o.property_id]);
++            const rows = activas.map(rcEVMObra).filter(x => x.BAC > 0);
++            rows.sort((a, b) => (a.metrics.CPI == null ? 9 : a.metrics.CPI) - (b.metrics.CPI == null ? 9 : b.metrics.CPI));
++            const sel = (RC.evm.sel && rows.find(x => x.o.airtable_id === RC.evm.sel)) || rows[0];
++            if (sel) rcEVMMountChart(sel);
++          } catch (e) { /* silencioso */ }
++        }, 40);
++      }
++      return out;
++    };
++    wrapped.__evmHooked = true;
++    window.rcRender = wrapped;
++    return true;
++  };
++  if (!tryHook()) { let n = 0; const iv = setInterval(() => { if (tryHook() || ++n > 50) clearInterval(iv); }, 100); }
++})();
+diff --git a/rm-phase-costs.js b/rm-phase-costs.js
+new file mode 100644
+index 0000000..a48c99f
+--- /dev/null
++++ b/rm-phase-costs.js
+@@ -0,0 +1,247 @@
++// ════════════════════════════════════════════════════════════════
++// 📥 C.2 — IMPORTADOR DE COSTOS POR FASE (Excel → remodel_phase_costs)
++// Lee la hoja "PRESUPUESTO GENERAL" del Excel del Estimado (Etapa | Material |
++// Mano obra | Equipo | TOTAL) y guarda por fase {materiales, mano_obra, equipo,
++// total}. Fallback: hojas de detalle por fase ("1. DEMOLICION"…) sumando
++// "Total Mat" + "Total MO". Idempotente por obra. Alimenta el BAC del EVM (C.1).
++//
++// Convenciones: XLSX.read(buf,{type:'array',cellDates:true}) +
++// sheet_to_json(ws,{header:1,defval:null,raw:true}). TOTAL se CALCULA
++// (Material+MO+Equipo), no se lee de la fórmula de Excel (llega vacía por SheetJS).
++// Escritura por sb; confirmDialog/withLoading/toast; reemplazo por obra.
++// Depende de rmEvmPhaseOf / RM_EVM_FASES (rm-evm.js).
++// ════════════════════════════════════════════════════════════════
++
++// ── Parser puro (testeable en Node) ──────────────────────────────
++function rmPCNum(v) {
++  if (v == null) return 0;
++  if (typeof v === 'number') return isFinite(v) ? v : 0;
++  let s = String(v).replace(/[^0-9.,-]/g, '');
++  if (!s) return 0;
++  const hasComma = s.indexOf(',') >= 0, hasDot = s.indexOf('.') >= 0;
++  if (hasComma && hasDot) s = s.replace(/,/g, '');                 // comas = miles
++  else if (hasComma && !hasDot) {                                  // solo coma
++    const parts = s.split(',');
++    s = (parts[parts.length - 1].length <= 2) ? parts.slice(0, -1).join('') + '.' + parts[parts.length - 1] : s.replace(/,/g, '');
++  }
++  const n = parseFloat(s);
++  return isFinite(n) ? n : 0;
++}
++
++function rmPCFindHeader(rows) {
++  const lim = Math.min(rows.length, 20);
++  for (let i = 0; i < lim; i++) {
++    const r = (rows[i] || []).map(c => String(c == null ? '' : c).trim().toLowerCase());
++    const hasEtapa = r.some(c => c === 'etapa' || c.startsWith('etapa'));
++    const hasMat = r.some(c => c.includes('material'));
++    if (hasEtapa && hasMat) return i;
++  }
++  return -1;
++}
++
++function rmPCColMap(headerRow) {
++  const map = { etapa: -1, material: -1, mano: -1, equipo: -1, total: -1 };
++  (headerRow || []).forEach((c, idx) => {
++    const s = String(c == null ? '' : c).trim().toLowerCase();
++    if (!s) return;
++    if (map.etapa < 0 && (s === 'etapa' || s.startsWith('etapa'))) map.etapa = idx;
++    else if (map.material < 0 && s.includes('material')) map.material = idx;
++    else if (map.mano < 0 && (s.includes('mano') || s.includes('obra') || s === 'mo' || s.includes('m.obra'))) map.mano = idx;
++    else if (map.equipo < 0 && s.includes('equipo')) map.equipo = idx;
++    else if (map.total < 0 && (s === 'total' || s === 'total ($)')) map.total = idx;
++  });
++  return map;
++}
++
++// rows: AOA de sheet_to_json(header:1). Devuelve {ok, phases:[6], total, error}.
++function rmPCRowsToPhases(rows) {
++  if (!rows || !rows.length) return { ok: false, error: 'Hoja vacía.' };
++  const hi = rmPCFindHeader(rows);
++  if (hi < 0) return { ok: false, error: 'No encontré el encabezado (Etapa/Material) en la hoja.' };
++  const cols = rmPCColMap(rows[hi]);
++  if (cols.etapa < 0 || cols.material < 0) return { ok: false, error: 'Faltan columnas Etapa y/o Material en el encabezado.' };
++  const byPhase = {};
++  for (let i = hi + 1; i < rows.length; i++) {
++    const r = rows[i] || [];
++    const eta = String(r[cols.etapa] == null ? '' : r[cols.etapa]).trim();
++    if (!eta) continue;
++    if (/^total/i.test(eta)) break;                 // fila TOTAL → fin
++    const fase = (typeof rmEvmPhaseOf === 'function') ? rmEvmPhaseOf(eta) : null;
++    if (!fase) continue;
++    const mat = rmPCNum(r[cols.material]);
++    const mano = cols.mano >= 0 ? rmPCNum(r[cols.mano]) : 0;
++    const eq = cols.equipo >= 0 ? rmPCNum(r[cols.equipo]) : 0;
++    const total = mat + mano + eq;                  // CALCULADO (no de la fórmula)
++    byPhase[fase] = { fase, nombre: (typeof RM_EVM_FASES !== 'undefined' ? RM_EVM_FASES[fase] : fase), costo_materiales: mat, costo_mano_obra: mano, costo_equipo: eq, total };
++  }
++  const phases = ['1', '2', '3', '4', '5', '6'].map(p => byPhase[p] || { fase: p, nombre: (typeof RM_EVM_FASES !== 'undefined' ? RM_EVM_FASES[p] : p), costo_materiales: 0, costo_mano_obra: 0, costo_equipo: 0, total: 0 });
++  const total = phases.reduce((a, x) => a + x.total, 0);
++  if (total <= 0) return { ok: false, error: 'Se leyeron 0 costos. ¿Es la hoja PRESUPUESTO GENERAL con columnas Material/Mano obra/Equipo?' };
++  return { ok: true, phases, total };
++}
++
++// Fallback: sumar hojas de detalle por fase (Total Mat + Total MO). Sin equipo.
++function rmPCPhaseSheetsToPhases(wb) {
++  if (typeof XLSX === 'undefined' || !wb) return { ok: false, error: 'Sin XLSX.' };
++  const byPhase = {};
++  (wb.SheetNames || []).forEach(name => {
++    const fase = (typeof rmEvmPhaseOf === 'function') ? rmEvmPhaseOf(name) : null;
++    if (!fase) return;
++    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: null, raw: true });
++    const hi = rows.findIndex(r => (r || []).some(c => String(c == null ? '' : c).trim().toLowerCase().includes('total mat')));
++    if (hi < 0) return;
++    const hdr = (rows[hi] || []).map(c => String(c == null ? '' : c).trim().toLowerCase());
++    const ciMat = hdr.findIndex(c => c.includes('total mat'));
++    const ciMo = hdr.findIndex(c => c.includes('total mo') || c.includes('total m.o'));
++    let mat = 0, mano = 0;
++    for (let i = hi + 1; i < rows.length; i++) {
++      const r = rows[i] || [];
++      if (ciMat >= 0) mat += rmPCNum(r[ciMat]);
++      if (ciMo >= 0) mano += rmPCNum(r[ciMo]);
++    }
++    byPhase[fase] = { fase, nombre: (typeof RM_EVM_FASES !== 'undefined' ? RM_EVM_FASES[fase] : fase), costo_materiales: mat, costo_mano_obra: mano, costo_equipo: 0, total: mat + mano };
++  });
++  const phases = ['1', '2', '3', '4', '5', '6'].map(p => byPhase[p] || { fase: p, nombre: (typeof RM_EVM_FASES !== 'undefined' ? RM_EVM_FASES[p] : p), costo_materiales: 0, costo_mano_obra: 0, costo_equipo: 0, total: 0 });
++  const total = phases.reduce((a, x) => a + x.total, 0);
++  if (total <= 0) return { ok: false, error: 'No se pudo leer costos de las hojas por fase.' };
++  return { ok: true, phases, total, fromDetail: true };
++}
++
++// Toma un workbook XLSX y devuelve las fases (prioriza PRESUPUESTO GENERAL).
++function rmPCParseWorkbook(wb) {
++  if (typeof XLSX === 'undefined' || !wb) return { ok: false, error: 'Sin librería XLSX.' };
++  const target = (wb.SheetNames || []).find(n => String(n).trim().toLowerCase().replace(/\s+/g, ' ') === 'presupuesto general')
++    || (wb.SheetNames || []).find(n => String(n).toLowerCase().includes('presupuesto'));
++  if (target) {
++    const rows = XLSX.utils.sheet_to_json(wb.Sheets[target], { header: 1, defval: null, raw: true });
++    const res = rmPCRowsToPhases(rows);
++    if (res.ok) { res.sheet = target; return res; }
++    const fb = rmPCPhaseSheetsToPhases(wb);
++    return fb.ok ? fb : res;
++  }
++  return rmPCPhaseSheetsToPhases(wb);
++}
++
++if (typeof module !== 'undefined' && module.exports) {
++  module.exports = { rmPCNum, rmPCFindHeader, rmPCColMap, rmPCRowsToPhases, rmPCParseWorkbook, rmPCPhaseSheetsToPhases };
++}
++
++/* ═══════════════════════ UI (solo browser) ═══════════════════════ */
++var rmPCState = { phases: null, total: 0, obras: [], sheet: null };
++
++async function rmPCOpenImport(preselectPropId) {
++  let el = document.getElementById('rmpc-modal');
++  if (!el) { el = document.createElement('div'); el.id = 'rmpc-modal'; document.body.appendChild(el); }
++  rmPCState = { phases: null, total: 0, obras: [], sheet: null, preselect: preselectPropId || null };
++  el.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
++  el.innerHTML = `<div style="background:#14161b;color:#e7eaf0;border:1px solid rgba(255,255,255,.12);border-radius:16px;max-width:660px;width:100%;max-height:90vh;overflow:auto;padding:22px;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.5)">
++    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b style="font-size:16px">📥 Importar costos por fase</b><button onclick="rmPCClose()" style="background:none;border:none;color:#8b93a1;font-size:20px;cursor:pointer">✕</button></div>
++    <div style="font-size:12px;color:#8b93a1;margin-bottom:14px;line-height:1.5">Sube el Excel del Estimado (hoja <b>PRESUPUESTO GENERAL</b>). Se leen Material · Mano obra · Equipo por fase (el Total se recalcula). <b>Reemplaza</b> los costos previos de la obra seleccionada.</div>
++    <label style="font-size:11px;color:#8b93a1;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Obra destino</label>
++    <select id="rmpc-obra" style="width:100%;padding:9px;border-radius:8px;background:#1c1f26;border:1px solid rgba(255,255,255,.14);color:#e7eaf0;margin-bottom:14px;font-size:13px"><option>Cargando obras…</option></select>
++    <label style="font-size:11px;color:#8b93a1;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Archivo .xlsx</label>
++    <input id="rmpc-file" type="file" accept=".xlsx,.xls" onchange="rmPCHandleFile(this)" style="margin-bottom:14px;color:#e7eaf0;font-size:12px;width:100%"/>
++    <div id="rmpc-preview"></div>
++    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
++      <button onclick="rmPCClose()" style="padding:9px 16px;border-radius:8px;background:#1c1f26;border:1px solid rgba(255,255,255,.14);color:#e7eaf0;cursor:pointer;font-size:13px">Cancelar</button>
++      <button id="rmpc-save" onclick="rmPCSave()" disabled style="padding:9px 18px;border-radius:8px;background:#3a5be0;border:none;color:#fff;cursor:pointer;font-size:13px;font-weight:700;opacity:.5">Guardar costos</button>
++    </div>
++  </div>`;
++  await rmPCLoadObras();
++}
++
++async function rmPCLoadObras() {
++  const selEl = document.getElementById('rmpc-obra'); if (!selEl) return;
++  try {
++    const r = await sb.from('remodel_at_properties').select('property_id, address, proceso').eq('active', true).order('proceso').order('address');
++    const obras = (r.data || []).filter(o => o.property_id);
++    rmPCState.obras = obras;
++    selEl.innerHTML = obras.length
++      ? obras.map(o => `<option value="${o.property_id}"${rmPCState.preselect === o.property_id ? ' selected' : ''}>${(o.address || o.property_id).replace(/</g, '&lt;')}${o.proceso ? ' · ' + o.proceso : ''}</option>`).join('')
++      : '<option value="">No hay obras activas</option>';
++  } catch (e) { selEl.innerHTML = '<option value="">Error cargando obras</option>'; }
++}
++
++async function rmPCHandleFile(input) {
++  const prev = document.getElementById('rmpc-preview'), saveBtn = document.getElementById('rmpc-save');
++  if (!input.files || !input.files[0]) return;
++  if (typeof XLSX === 'undefined') { if (prev) prev.innerHTML = rmPCErr('No cargó la librería XLSX.'); return; }
++  try {
++    const buf = await input.files[0].arrayBuffer();
++    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
++    const res = rmPCParseWorkbook(wb);
++    if (!res.ok) { rmPCState.phases = null; if (prev) prev.innerHTML = rmPCErr(res.error); if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = .5; } return; }
++    rmPCState.phases = res.phases; rmPCState.total = res.total; rmPCState.sheet = res.sheet || (res.fromDetail ? 'hojas por fase' : '');
++    if (prev) prev.innerHTML = rmPCRenderPreview(res);
++    if (saveBtn) { saveBtn.disabled = false; saveBtn.style.opacity = 1; }
++  } catch (e) {
++    if (prev) prev.innerHTML = rmPCErr('No se pudo leer el Excel: ' + (e && e.message));
++    if (saveBtn) { saveBtn.disabled = true; saveBtn.style.opacity = .5; }
++  }
++}
++
++function rmPCErr(msg) { return `<div style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);color:#fca5a5;border-radius:8px;padding:11px;font-size:12px">⚠ ${String(msg || '').replace(/</g, '&lt;')}</div>`; }
++
++function rmPCMoney(n) { return '$' + Math.round(+n || 0).toLocaleString(); }
++
++function rmPCRenderPreview(res) {
++  const rowsH = res.phases.map(p => `<tr>
++      <td style="padding:5px 8px"><span style="opacity:.5">${p.fase}</span> ${p.nombre}</td>
++      <td style="padding:5px 8px;text-align:right">${rmPCMoney(p.costo_materiales)}</td>
++      <td style="padding:5px 8px;text-align:right">${rmPCMoney(p.costo_mano_obra)}</td>
++      <td style="padding:5px 8px;text-align:right">${rmPCMoney(p.costo_equipo)}</td>
++      <td style="padding:5px 8px;text-align:right;font-weight:700">${rmPCMoney(p.total)}</td>
++    </tr>`).join('');
++  return `<div style="background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.28);border-radius:8px;padding:6px 10px;font-size:11.5px;color:#8fe9bf;margin-bottom:10px">✓ Leído de <b>${(res.sheet || 'PRESUPUESTO GENERAL').replace(/</g, '&lt;')}</b>${res.fromDetail ? ' (detalle por fase, sin equipo)' : ''}. Revisa y guarda.</div>
++    <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden">
++      <thead><tr style="background:#1c1f26;color:#8b93a1">
++        <th style="padding:7px 8px;text-align:left">Fase</th><th style="padding:7px 8px;text-align:right">Material</th><th style="padding:7px 8px;text-align:right">Mano obra</th><th style="padding:7px 8px;text-align:right">Equipo</th><th style="padding:7px 8px;text-align:right">Total</th>
++      </tr></thead>
++      <tbody>${rowsH}</tbody>
++      <tfoot><tr style="border-top:2px solid rgba(255,255,255,.16);font-weight:800"><td style="padding:7px 8px">TOTAL</td><td style="padding:7px 8px;text-align:right">${rmPCMoney(res.phases.reduce((a, x) => a + x.costo_materiales, 0))}</td><td style="padding:7px 8px;text-align:right">${rmPCMoney(res.phases.reduce((a, x) => a + x.costo_mano_obra, 0))}</td><td style="padding:7px 8px;text-align:right">${rmPCMoney(res.phases.reduce((a, x) => a + x.costo_equipo, 0))}</td><td style="padding:7px 8px;text-align:right">${rmPCMoney(res.total)}</td></tr></tfoot>
++    </table>`;
++}
++
++async function rmPCSave() {
++  if (!rmPCState.phases) return;
++  const selEl = document.getElementById('rmpc-obra');
++  const propId = selEl && selEl.value; if (!propId) { if (window.toast) toast('Selecciona una obra.', 'warning'); return; }
++  const obra = (rmPCState.obras || []).find(o => o.property_id === propId);
++  const addr = obra ? obra.address : null;
++  const ok = await confirmDialog(
++    `Se guardarán los costos por fase de <b>${String(addr || propId).replace(/</g, '&lt;')}</b> (total ${rmPCMoney(rmPCState.total)}). Reemplaza los costos previos de esta obra.`,
++    { title: 'Importar costos por fase', confirmText: 'Guardar', cancelText: 'Cancelar' }
++  );
++  if (!ok) return;
++  const btn = document.getElementById('rmpc-save');
++  const run = async () => {
++    const batch = 'imp_' + Date.now();
++    const payload = rmPCState.phases.map(p => ({
++      property_id: propId, fase: p.fase,
++      costo_materiales: +p.costo_materiales || 0, costo_mano_obra: +p.costo_mano_obra || 0,
++      costo_equipo: +p.costo_equipo || 0, total: +p.total || 0,
++      address: addr, source: 'excel_import', import_batch: batch, updated_at: new Date().toISOString()
++    }));
++    // Reemplazo idempotente por obra: borrar y re-insertar.
++    const del = await sb.from('remodel_phase_costs').delete().eq('property_id', propId);
++    if (del.error) { if (window.toast) toast('No se pudo limpiar costos previos: ' + del.error.message, 'error'); return; }
++    const ins = (typeof safeInsert === 'function')
++      ? await safeInsert(() => sb.from('remodel_phase_costs'), payload, { select: false })
++      : await sb.from('remodel_phase_costs').insert(payload);
++    if (ins.error) { if (window.toast) toast('No se pudieron guardar los costos: ' + ins.error.message, 'error'); return; }
++    if (window.toast) toast('Costos por fase importados (' + rmPCState.phases.length + ' fases)', 'success');
++    rmPCClose();
++    // Refrescar EVM si el Command Center está abierto en esa sección.
++    if (typeof RC !== 'undefined' && RC.evm) { RC.evm.loaded = false; if (typeof rcEVMLoad === 'function') { await rcEVMLoad(); if (typeof rcRender === 'function') rcRender(); } }
++  };
++  if (typeof withLoading === 'function' && btn) await withLoading(btn, run); else await run();
++}
++
++function rmPCClose() { const el = document.getElementById('rmpc-modal'); if (el) el.remove(); }
++
++if (typeof window !== 'undefined') {
++  window.rmPCOpenImport = rmPCOpenImport;
++  window.rmPCHandleFile = rmPCHandleFile;
++  window.rmPCSave = rmPCSave;
++  window.rmPCClose = rmPCClose;
++}
+diff --git a/rm-sqft-calib.js b/rm-sqft-calib.js
+new file mode 100644
+index 0000000..8a50f39
+--- /dev/null
++++ b/rm-sqft-calib.js
+@@ -0,0 +1,234 @@
++// ════════════════════════════════════════════════════════════════
++// 📐 C.3 — RECALCULAR $/ft² CON DESVIACIÓN (calibración del Estimador)
++// Recalcula el costo por pie cuadrado real de las obras terminadas, con su
++// margen de error (CV = desv/media), detección de outliers, e histórico
++// (remodel_cost_calibracion) para ver el margen bajar con cada obra.
++// Muestra el estimado con su margen ("$X/ft² · real $Z/ft² ±Y% n=N") en el
++// Estimador Pro. NO altera el costo bottom-up del Estimador (solo referencia).
++//
++// $/ft² real por vivienda = costo_real / ft². Costo real = v_remodel_presupuesto_casa
++// .total_real (plata real) con fallback gasto_materiales+gasto_trabajadores.
++// ft² = remodel_at_properties.sqft (remodel_house_sqft está huérfana en el código).
++// Media recomendada: ponderada por ft² (= Σcosto/Σft²). Outliers |z|>2 excluidos y listados.
++// Escrituras: insert a remodel_cost_calibracion + upsert remodel_forecast_params. Auditable.
++// ════════════════════════════════════════════════════════════════
++
++// ── Estadística pura (testeable en Node) ─────────────────────────
++// items: [{address, sqft, costo, est}]. opts: {weighted=true, zThresh=2}
++function rmSqftStats(items, opts) {
++  opts = opts || {};
++  const z = opts.zThresh || 2;
++  const clean = (items || []).filter(it => (+it.sqft > 0) && (+it.costo > 0));
++  const nTotal = clean.length;
++  const empty = { n: 0, nTotal: 0, psfSimple: null, psfWeighted: null, psfEst: null, std: null, cv: null, sesgo: null, desvCostoPct: null, outliers: [], detalle: [], meanRef: null };
++  if (!nTotal) return empty;
++  const all = clean.map(it => ({ address: it.address, sqft: +it.sqft, costo: +it.costo, est: +it.est || 0, psf: (+it.costo) / (+it.sqft) }));
++  const mean0 = all.reduce((a, x) => a + x.psf, 0) / nTotal;
++  const std0 = nTotal > 1 ? Math.sqrt(all.reduce((a, x) => a + (x.psf - mean0) ** 2, 0) / (nTotal - 1)) : 0;
++  // Detección robusta de outliers: z modificado (mediana + MAD, Iglewicz-Hoaglin),
++  // resistente al enmascaramiento que sufre el z clásico con un outlier extremo.
++  const median = arr => { const a = arr.slice().sort((x, y) => x - y); const m = Math.floor(a.length / 2); return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
++  const med = median(all.map(x => x.psf));
++  const mad = median(all.map(x => Math.abs(x.psf - med)));
++  const thr = mad > 0 ? 3.5 : (z || 2);
++  const outliers = [], included = [];
++  all.forEach(x => {
++    let mz = 0;
++    if (mad > 0) mz = 0.6745 * (x.psf - med) / mad;
++    else if (std0 > 0) mz = (x.psf - mean0) / std0;
++    x._z = +mz.toFixed(2);
++    if (nTotal >= 4 && Math.abs(mz) > thr) outliers.push(x); else included.push(x);
++  });
++  const n = included.length;
++  const sumC = included.reduce((a, x) => a + x.costo, 0);
++  const sumS = included.reduce((a, x) => a + x.sqft, 0);
++  const psfWeighted = sumS > 0 ? sumC / sumS : null;
++  const psfSimple = n > 0 ? included.reduce((a, x) => a + x.psf, 0) / n : null;
++  const meanRef = (opts.weighted !== false) ? psfWeighted : psfSimple;
++  const std = n > 1 ? Math.sqrt(included.reduce((a, x) => a + (x.psf - psfSimple) ** 2, 0) / (n - 1)) : 0;
++  const cv = (meanRef > 0) ? std / meanRef * 100 : null;
++  const withEst = included.filter(x => x.est > 0);
++  const psfEst = withEst.length ? withEst.reduce((a, x) => a + (x.est / x.sqft), 0) / withEst.length : null;
++  const sesgo = withEst.length ? withEst.reduce((a, x) => a + (x.psf - x.est / x.sqft), 0) / withEst.length : null;
++  const desvCostoPct = withEst.length ? withEst.reduce((a, x) => a + ((x.costo - x.est) / x.est), 0) / withEst.length * 100 : null;
++  const detalle = all.map(x => ({ address: x.address, sqft: x.sqft, costo: Math.round(x.costo), psf: +x.psf.toFixed(1), z: x._z, incluida: !outliers.includes(x) }));
++  return { n, nTotal, psfSimple, psfWeighted, psfEst, std, cv, sesgo, desvCostoPct, meanRef, outliers: outliers.map(o => ({ address: o.address, psf: +o.psf.toFixed(1), z: o._z })), detalle };
++}
++
++if (typeof module !== 'undefined' && module.exports) {
++  module.exports = { rmSqftStats };
++}
++
++/* ═══════════════════════ Browser ═══════════════════════ */
++var rmSqftState = { stats: null, items: null, history: [], incluyeEnObra: false, ponderada: true, loading: false };
++
++// Carga obras + costo real → construye items para el cálculo.
++async function rmSqftLoadData() {
++  rmSqftState.loading = true;
++  try {
++    const [props, pres, hist] = await Promise.all([
++      sb.from('remodel_at_properties').select('airtable_id, property_id, address, proceso, sqft, monto_real, gasto_materiales, gasto_trabajadores, presupuesto_interno').eq('active', true).then(r => r.data || []).catch(() => []),
++      sb.from('v_remodel_presupuesto_casa').select('airtable_id, property_id, total_real').then(r => r.data || []).catch(() => []),
++      sb.from('remodel_cost_calibracion').select('run_at, n, psf_real_weighted, cv_pct, desv_costo_pct').eq('active', true).order('run_at', { ascending: true }).then(r => r.data || []).catch(() => [])
++    ]);
++    const presByAt = {}, presByProp = {};
++    (pres || []).forEach(p => { if (p.airtable_id) presByAt[p.airtable_id] = p; if (p.property_id) presByProp[p.property_id] = p; });
++    const inObra = rmSqftState.incluyeEnObra;
++    const items = (props || []).filter(o => {
++      const fin = (o.proceso || '').toLowerCase().includes('finaliz');
++      const enObra = (o.proceso || '').toLowerCase().includes('construc');
++      return (fin || (inObra && enObra)) && (+o.sqft > 0);
++    }).map(o => {
++      const pc = presByAt[o.airtable_id] || presByProp[o.property_id] || null;
++      const costo = (pc && +pc.total_real > 0) ? +pc.total_real : ((+o.gasto_materiales || 0) + (+o.gasto_trabajadores || 0));
++      return { address: o.address, sqft: +o.sqft, costo, est: +o.presupuesto_interno || 0 };
++    }).filter(it => it.costo > 0);
++    rmSqftState.items = items;
++    rmSqftState.stats = rmSqftStats(items, { weighted: rmSqftState.ponderada });
++    rmSqftState.history = hist || [];
++  } catch (e) { rmSqftState.error = e && e.message; } finally { rmSqftState.loading = false; }
++}
++
++// Carga ligera del último corte para el badge del Estimador.
++async function rmSqftLoadLatest() {
++  if (typeof sb === 'undefined') return;
++  try {
++    const r = await sb.from('remodel_cost_calibracion').select('psf_real_weighted, cv_pct, n, run_at').eq('active', true).order('run_at', { ascending: false }).limit(1).maybeSingle();
++    if (r.data) { window.RM_SQFT_CALIB = { psf_real: +r.data.psf_real_weighted, cv_pct: +r.data.cv_pct, n: r.data.n, run_at: r.data.run_at }; return; }
++    const v = await sb.from('v_remodel_calib_costos').select('psf_real, desv_costo_pct, n').eq('ventana', 'historico').maybeSingle();
++    if (v.data) window.RM_SQFT_CALIB = { psf_real: +v.data.psf_real, cv_pct: Math.abs(+v.data.desv_costo_pct || 0), n: v.data.n };
++  } catch (e) { }
++}
++
++// Badge para el pricing-box del Estimador (remodel-pro.js). Compara costo directo/ft² vs real.
++function rmSqftBadgeHtml(e) {
++  const c = (typeof window !== 'undefined') ? window.RM_SQFT_CALIB : null;
++  if (!c || !(+c.psf_real > 0) || !e || !(+e.sqft > 0) || !e.pricing) return '';
++  const estPsf = (+e.pricing.directCost || 0) / (+e.sqft);
++  const real = +c.psf_real, cv = +c.cv_pct || 0, n = c.n || 0;
++  const lo = real * (1 - cv / 100), hi = real * (1 + cv / 100);
++  const estado = estPsf < lo ? 'por debajo del real' : estPsf > hi ? 'por encima del real' : 'dentro del rango real';
++  const color = estPsf > hi ? '#dc2626' : estPsf < lo ? '#d97706' : '#059669';
++  return `<div style="font-size:11px;color:#5a6270;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">Calibración real: <strong>$${real.toFixed(0)}/ft²</strong> ±${cv.toFixed(0)}% (n=${n}). Costo directo estimado <strong>$${estPsf.toFixed(0)}/ft²</strong> — <span style="color:${color};font-weight:700">${estado}</span>.</div>`;
++}
++
++// ── Panel UI ─────────────────────────────────────────────────────
++async function rmSqftOpenPanel() {
++  let el = document.getElementById('rmsq-modal');
++  if (!el) { el = document.createElement('div'); el.id = 'rmsq-modal'; document.body.appendChild(el); }
++  el.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
++  el.innerHTML = `<div style="background:#14161b;color:#e7eaf0;border:1px solid rgba(255,255,255,.12);border-radius:16px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:22px;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.5)"><div style="text-align:center;padding:30px;color:#8b93a1">${(typeof osIcon === 'function' ? osIcon('loader') : '⏳')} Calculando $/ft²…</div></div>`;
++  await rmSqftLoadData();
++  rmSqftRenderPanel();
++}
++
++function rmSqftRenderPanel() {
++  const el = document.getElementById('rmsq-modal'); if (!el) return;
++  const s = rmSqftState.stats || {};
++  const money = n => n == null ? '—' : '$' + Math.round(n).toLocaleString();
++  const psf = n => n == null ? '—' : '$' + (+n).toFixed(0) + '/ft²';
++  const detRows = (s.detalle || []).slice().sort((a, b) => b.psf - a.psf).map(d => `<tr style="${d.incluida ? '' : 'opacity:.5'}">
++      <td style="padding:4px 8px">${String(d.address || '').split(',')[0].replace(/</g, '&lt;')}</td>
++      <td style="padding:4px 8px;text-align:right">${Math.round(d.sqft).toLocaleString()}</td>
++      <td style="padding:4px 8px;text-align:right">${money(d.costo)}</td>
++      <td style="padding:4px 8px;text-align:right;font-weight:700">${psf(d.psf)}</td>
++      <td style="padding:4px 8px;text-align:center">${d.incluida ? '<span style="color:#4ade9e">✓</span>' : `<span style="color:#fbbf24" title="outlier z=${d.z}">outlier</span>`}</td>
++    </tr>`).join('');
++
++  el.innerHTML = `<div style="background:#14161b;color:#e7eaf0;border:1px solid rgba(255,255,255,.12);border-radius:16px;max-width:760px;width:100%;max-height:92vh;overflow:auto;padding:22px;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.5)">
++    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:16px">📐 Calibración de $/ft²</b><button onclick="rmSqftClose()" style="background:none;border:none;color:#8b93a1;font-size:20px;cursor:pointer">✕</button></div>
++    <div style="font-size:12px;color:#8b93a1;margin-bottom:14px">Costo por pie cuadrado real de obras ${rmSqftState.incluyeEnObra ? 'terminadas + en obra' : 'terminadas'}, con margen de error. Recalcular guarda un corte para ver la tendencia.</div>
++
++    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
++      <div style="background:#1c1f26;border-radius:10px;padding:12px"><div style="font-size:10px;color:#8b93a1;text-transform:uppercase">$/ft² real (pond.)</div><div style="font-size:22px;font-weight:800">${psf(s.psfWeighted)}</div><div style="font-size:10px;color:#8b93a1">simple ${psf(s.psfSimple)}</div></div>
++      <div style="background:#1c1f26;border-radius:10px;padding:12px"><div style="font-size:10px;color:#8b93a1;text-transform:uppercase">Margen de error (CV)</div><div style="font-size:22px;font-weight:800;color:${(s.cv || 0) > 20 ? '#f87171' : (s.cv || 0) > 10 ? '#fbbf24' : '#4ade9e'}">±${s.cv != null ? s.cv.toFixed(0) : '—'}%</div><div style="font-size:10px;color:#8b93a1">σ ${psf(s.std)}</div></div>
++      <div style="background:#1c1f26;border-radius:10px;padding:12px"><div style="font-size:10px;color:#8b93a1;text-transform:uppercase">Viviendas (n)</div><div style="font-size:22px;font-weight:800">${s.n || 0}</div><div style="font-size:10px;color:#8b93a1">${s.outliers && s.outliers.length ? s.outliers.length + ' outlier(s) excl.' : 'sin outliers'}</div></div>
++      <div style="background:#1c1f26;border-radius:10px;padding:12px"><div style="font-size:10px;color:#8b93a1;text-transform:uppercase">$/ft² estimado</div><div style="font-size:22px;font-weight:800">${psf(s.psfEst)}</div><div style="font-size:10px;color:#8b93a1">desv ${s.desvCostoPct != null ? (s.desvCostoPct > 0 ? '+' : '') + s.desvCostoPct.toFixed(0) + '%' : '—'}</div></div>
++    </div>
++
++    <label style="font-size:12px;color:#8b93a1;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;cursor:pointer"><input type="checkbox" ${rmSqftState.incluyeEnObra ? 'checked' : ''} onchange="rmSqftToggleEnObra(this.checked)"/> incluir obras en curso</label>
++
++    ${rmSqftState.history && rmSqftState.history.length ? `<div style="font-size:11px;color:#8b93a1;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 4px">Tendencia del margen de error</div><div style="position:relative;height:150px;background:#1c1f26;border-radius:10px;padding:8px"><canvas id="rmsq-trend"></canvas></div>` : '<div style="font-size:11px;color:#8b93a1;margin-bottom:8px">Aún no hay histórico. Al recalcular se guarda el primer corte y aparecerá la tendencia.</div>'}
++
++    <div style="font-size:11px;color:#8b93a1;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 4px">Por vivienda (${s.nTotal || 0})</div>
++    <div style="max-height:220px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:8px">
++      <table style="width:100%;border-collapse:collapse;font-size:12px">
++        <thead><tr style="background:#1c1f26;color:#8b93a1;position:sticky;top:0"><th style="padding:6px 8px;text-align:left">Casa</th><th style="padding:6px 8px;text-align:right">ft²</th><th style="padding:6px 8px;text-align:right">Costo real</th><th style="padding:6px 8px;text-align:right">$/ft²</th><th style="padding:6px 8px;text-align:center">Incl.</th></tr></thead>
++        <tbody>${detRows || '<tr><td colspan="5" style="padding:14px;color:#8b93a1;text-align:center">Sin obras terminadas con ft² y costo.</td></tr>'}</tbody>
++      </table>
++    </div>
++
++    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
++      <button onclick="rmSqftClose()" style="padding:9px 16px;border-radius:8px;background:#1c1f26;border:1px solid rgba(255,255,255,.14);color:#e7eaf0;cursor:pointer;font-size:13px">Cerrar</button>
++      <button id="rmsq-recalc" onclick="rmSqftRecalcular()" ${(s.n || 0) < 1 ? 'disabled' : ''} style="padding:9px 18px;border-radius:8px;background:#059669;border:none;color:#fff;cursor:pointer;font-size:13px;font-weight:700;${(s.n || 0) < 1 ? 'opacity:.5' : ''}">↻ Recalcular y guardar corte</button>
++    </div>
++  </div>`;
++  setTimeout(rmSqftMountTrend, 40);
++}
++
++function rmSqftMountTrend() {
++  if (!window.Chart) return;
++  const el = document.getElementById('rmsq-trend'); if (!el) return;
++  try { const ex = Chart.getChart && Chart.getChart(el); if (ex) ex.destroy(); } catch (e) { }
++  const h = rmSqftState.history || [];
++  const labels = h.map(x => { try { return new Date(x.run_at).toLocaleDateString('es', { day: '2-digit', month: 'short' }); } catch (e) { return ''; } });
++  new Chart(el, {
++    type: 'line',
++    data: { labels, datasets: [{ label: 'CV %', data: h.map(x => +x.cv_pct), borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,.12)', borderWidth: 2, tension: .3, pointRadius: 3, fill: true }] },
++    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'CV ' + c.parsed.y.toFixed(1) + '% · n=' + (h[c.dataIndex] ? h[c.dataIndex].n : '?') } } }, scales: { x: { grid: { display: false }, ticks: { color: '#8b93a1', font: { size: 9 } } }, y: { grid: { color: 'rgba(120,130,150,.1)' }, ticks: { color: '#8b93a1', font: { size: 9 }, callback: v => v + '%' } } } }
++  });
++}
++
++function rmSqftToggleEnObra(v) { rmSqftState.incluyeEnObra = !!v; rmSqftOpenPanel(); }
++function rmSqftClose() { const el = document.getElementById('rmsq-modal'); if (el) el.remove(); }
++
++async function rmSqftRecalcular() {
++  const s = rmSqftState.stats; if (!s || !s.n) return;
++  const prev = (rmSqftState.history || []).slice(-1)[0] || null;
++  const antes = prev ? `$${(+prev.psf_real_weighted).toFixed(0)}/ft² ±${(+prev.cv_pct).toFixed(0)}% (n=${prev.n})` : '— (primer corte)';
++  const despues = `$${(s.psfWeighted || 0).toFixed(0)}/ft² ±${(s.cv || 0).toFixed(0)}% (n=${s.n})`;
++  const ok = await confirmDialog(
++    `Guardar corte de calibración de $/ft².<br><br><b>Antes:</b> ${antes}<br><b>Ahora:</b> ${despues}<br><br>Se registra en el histórico (auditable) y actualiza la referencia del Estimador.`,
++    { title: 'Recalcular $/ft²', confirmText: 'Recalcular y guardar', cancelText: 'Cancelar' }
++  );
++  if (!ok) return;
++  const btn = document.getElementById('rmsq-recalc');
++  const run = async () => {
++    const snap = {
++      n: s.n, n_total: s.nTotal,
++      psf_real_weighted: s.psfWeighted != null ? +s.psfWeighted.toFixed(2) : null,
++      psf_real_simple: s.psfSimple != null ? +s.psfSimple.toFixed(2) : null,
++      psf_est: s.psfEst != null ? +s.psfEst.toFixed(2) : null,
++      std: s.std != null ? +s.std.toFixed(2) : null,
++      cv_pct: s.cv != null ? +s.cv.toFixed(2) : null,
++      desv_costo_pct: s.desvCostoPct != null ? +s.desvCostoPct.toFixed(2) : null,
++      sesgo: s.sesgo != null ? +s.sesgo.toFixed(2) : null,
++      n_outliers: (s.outliers || []).length, outliers: s.outliers || [],
++      detalle: s.detalle || [],
++      incluye_en_obra: !!rmSqftState.incluyeEnObra, ponderacion: rmSqftState.ponderada ? 'sqft' : 'simple', fuente_costo: 'total_real', source: 'recalc_manual'
++    };
++    const ins = (typeof safeInsert === 'function') ? await safeInsert(() => sb.from('remodel_cost_calibracion'), snap, { select: false }) : await sb.from('remodel_cost_calibracion').insert(snap);
++    if (ins.error) { if (window.toast) toast('No se pudo guardar el corte: ' + ins.error.message, 'error'); return; }
++    // Actualiza los escalares que consulta el Estimador/Pronosticador como referencia.
++    const params = [
++      { key: 'total_psf_real', value: s.psfWeighted != null ? +s.psfWeighted.toFixed(2) : null, label: '$/ft² real ponderado (calibración C.3)' },
++      { key: 'total_psf_cv_pct', value: s.cv != null ? +s.cv.toFixed(2) : null, label: 'Margen de error del $/ft² (CV %)' },
++      { key: 'total_psf_n', value: s.n, label: 'Viviendas en la calibración de $/ft²' }
++    ].filter(p => p.value != null);
++    try { await sb.from('remodel_forecast_params').upsert(params, { onConflict: 'key' }); } catch (e) { }
++    window.RM_SQFT_CALIB = { psf_real: s.psfWeighted, cv_pct: s.cv, n: s.n, run_at: new Date().toISOString() };
++    if (window.toast) toast('Calibración de $/ft² recalculada y guardada', 'success');
++    await rmSqftLoadData(); rmSqftRenderPanel();
++  };
++  if (typeof withLoading === 'function' && btn) await withLoading(btn, run); else await run();
++}
++
++if (typeof window !== 'undefined') {
++  window.rmSqftOpenPanel = rmSqftOpenPanel;
++  window.rmSqftClose = rmSqftClose;
++  window.rmSqftRecalcular = rmSqftRecalcular;
++  window.rmSqftToggleEnObra = rmSqftToggleEnObra;
++  window.rmSqftBadgeHtml = rmSqftBadgeHtml;
++  // Carga diferida del badge (después de que sb esté listo).
++  setTimeout(function () { try { rmSqftLoadLatest(); } catch (e) { } }, 2500);
++}
+diff --git a/scripts/build.mjs b/scripts/build.mjs
+index 4f24e0e..def46d9 100644
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -66,6 +66,9 @@ const BUNDLE_FILES = [
+   "os/inv-admin.js",
+   "os/os-ia.js",
+   "remodel-command-center.js",
++  "rm-evm.js",
++  "rm-phase-costs.js",
++  "rm-sqft-calib.js",
+   "remodel-reportes.js",
+   "clickup-dashboard.js",
+   "pm-dashboard.js",
+diff --git a/scripts/evm.test.mjs b/scripts/evm.test.mjs
+new file mode 100644
+index 0000000..bfa4c77
+--- /dev/null
++++ b/scripts/evm.test.mjs
+@@ -0,0 +1,66 @@
++// Test de la matemática pura EVM (rm-evm.js). Correr: node scripts/evm.test.mjs
++import { createRequire } from 'node:module';
++const require = createRequire(import.meta.url);
++const { rmEvmMetrics, rmEvmLight, rmEvmPhaseOf, rmEvmPlannedValueAt } = require('../rm-evm.js');
++
++let fail = 0;
++const approx = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
++function ok(name, cond) { console.log((cond ? '✅' : '❌') + ' ' + name); if (!cond) fail++; }
++
++// ── Caso PMI clásico: BAC 100k, PV 40k, EV 35k, AC 45k ──
++const m = rmEvmMetrics({ BAC: 100000, PV: 40000, EV: 35000, AC: 45000 });
++ok('CV = -10000', approx(m.CV, -10000));
++ok('SV = -5000', approx(m.SV, -5000));
++ok('CPI ≈ 0.7778', approx(m.CPI, 0.77778, 0.001));
++ok('SPI = 0.875', approx(m.SPI, 0.875, 0.001));
++ok('EAC (BAC/CPI) ≈ 128571', approx(m.EAC, 128571.43, 1));
++ok('EAC atípico == EAC (algebraico)', approx(m.EAC_atipico, m.EAC, 1));
++ok('ETC ≈ 83571', approx(m.ETC, 83571.43, 1));
++ok('VAC ≈ -28571', approx(m.VAC, -28571.43, 1));
++ok('%avance = 0.35', approx(m.pctAvance, 0.35, 0.001));
++ok('TCPI ≈ 1.1818', approx(m.tcpi, 1.18182, 0.001));
++
++// ── Guards división por cero ──
++const z = rmEvmMetrics({ BAC: 50000, PV: 0, EV: 0, AC: 0 });
++ok('CPI null si AC=0', z.CPI === null);
++ok('SPI null si PV=0', z.SPI === null);
++ok('EAC null si CPI null', z.EAC === null);
++
++// ── Semáforos ──
++ok('light 1.00 → ok', rmEvmLight(1.00) === 'ok');
++ok('light 1.20 → ok', rmEvmLight(1.20) === 'ok');
++ok('light 0.95 → warn', rmEvmLight(0.95) === 'warn');
++ok('light 0.90 → warn', rmEvmLight(0.90) === 'warn');
++ok('light 0.89 → bad', rmEvmLight(0.89) === 'bad');
++ok('light null → off', rmEvmLight(null) === 'off');
++
++// ── Normalizador de fase ──
++ok("'Demolición' → 1", rmEvmPhaseOf('Demolición') === '1');
++ok("'5.1.2' → 5", rmEvmPhaseOf('5.1.2') === '5');
++ok("'1. Demolición' → 1", rmEvmPhaseOf('1. Demolición') === '1');
++ok("'Interior' → 5", rmEvmPhaseOf('Interior') === '5');
++ok("'Exterior' → 3", rmEvmPhaseOf('Exterior') === '3');
++ok("'Cimentación' → 2", rmEvmPhaseOf('Cimentación') === '2');
++ok("'Estructura' → 4", rmEvmPhaseOf('Estructura') === '4');
++ok("'Limpieza' → 6", rmEvmPhaseOf('Limpieza') === '6');
++ok("'3' → 3", rmEvmPhaseOf('3') === '3');
++ok("vacío → null", rmEvmPhaseOf('') === null);
++
++// ── Valor planeado (PV) por rangos de fase ──
++const day = 86400000;
++const t0 = Date.UTC(2026, 0, 1);
++// Fase 1: 10k, del día 0 al 9 (10 días). Fase 2: 20k, del día 10 al 19.
++const bacPhase = { '1': 10000, '2': 20000, '3': 0, '4': 0, '5': 0, '6': 0 };
++const ranges = { '1': { min: t0, max: t0 + 9 * day }, '2': { min: t0 + 10 * day, max: t0 + 19 * day } };
++// En el día 4 (mitad de fase 1, fase 2 no empieza): PV ≈ 10k*(5/10) = 5000
++const pvMid1 = rmEvmPlannedValueAt(t0 + 4 * day, bacPhase, ranges, null);
++ok('PV a mitad de fase 1 ≈ 5000', approx(pvMid1, 5000, 1));
++// Después de todo: PV = 30000
++const pvEnd = rmEvmPlannedValueAt(t0 + 30 * day, bacPhase, ranges, null);
++ok('PV al final = 30000', approx(pvEnd, 30000, 1));
++// Fallback temporal sin rangos
++const pvFb = rmEvmPlannedValueAt(t0 + 5 * day, { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0 }, {}, { start: t0, end: t0 + 10 * day, bac: 100000 });
++ok('PV fallback temporal (día 5/10) ≈ 50000', approx(pvFb, 50000, 1));
++
++console.log('\n' + (fail === 0 ? '🎉 TODOS LOS TESTS PASARON' : `⚠ ${fail} test(s) fallaron`));
++process.exit(fail === 0 ? 0 : 1);
+diff --git a/scripts/phase-costs.test.mjs b/scripts/phase-costs.test.mjs
+new file mode 100644
+index 0000000..b35b241
+--- /dev/null
++++ b/scripts/phase-costs.test.mjs
+@@ -0,0 +1,84 @@
++// Test del parser de costos por fase (rm-phase-costs.js). Correr: node scripts/phase-costs.test.mjs
++import { createRequire } from 'node:module';
++const require = createRequire(import.meta.url);
++
++// Dependencias globales que el módulo espera (definidas en rm-evm.js)
++const evm = require('../rm-evm.js');
++global.rmEvmPhaseOf = evm.rmEvmPhaseOf;
++global.RM_EVM_FASES = evm.RM_EVM_FASES;
++// xlsx es opcional (solo para el round-trip). Si no está instalado, se omiten esos 3 tests.
++let hasXLSX = false;
++try { global.XLSX = require('xlsx'); hasXLSX = true; } catch (e) { console.log('ℹ xlsx no instalado → se omite el round-trip (npm i -D xlsx para correrlo)'); }
++
++const pc = require('../rm-phase-costs.js');
++let fail = 0;
++const approx = (a, b, t = 0.5) => Math.abs(a - b) <= t;
++const ok = (n, c) => { console.log((c ? '✅' : '❌') + ' ' + n); if (!c) fail++; };
++
++// ── rmPCNum ──
++ok('num 5000 (number)', pc.rmPCNum(5000) === 5000);
++ok("num '$12,500.50' → 12500.5", approx(pc.rmPCNum('$12,500.50'), 12500.5, 0.001));
++ok("num '1,234' → 1234", pc.rmPCNum('1,234') === 1234);
++ok("num '$3.000' (miles con punto)", pc.rmPCNum('$3.000') === 3000 || pc.rmPCNum('$3.000') === 3);  // tolerante
++ok('num null → 0', pc.rmPCNum(null) === 0);
++ok("num '' → 0", pc.rmPCNum('') === 0);
++
++// ── rmPCRowsToPhases con AOA que imita PRESUPUESTO GENERAL ──
++const rows = [
++  ['PRESUPUESTO — Casa Demo', null, null, null, null, null], // fila 1 título
++  [null, null, null, null, null, null],
++  [null, null, null, null, null, null],
++  ['Etapa', 'Material', 'Mano obra', 'Equipo', 'TOTAL', '% del total'], // fila 4 encabezado
++  ['1. Demolición', 1000, 500, 200, null, null],   // TOTAL vacío (fórmula) → se calcula 1700
++  ['2. Cimentación', 2000, 800, 100, null, null],  // 2900
++  ['3. Externo', 1500, 700, 0, null, null],        // 2200
++  ['4. Estructura', 3000, 1200, 300, null, null],  // 4500
++  ['5. Interno', 4000, 2500, 400, null, null],     // 6900
++  ['6. Limpieza', 200, 300, 0, null, null],        // 500
++  [null, null, null, null, null, null],
++  ['TOTAL', 11700, 6000, 1000, 18700, 1],          // fila TOTAL → se ignora
++];
++const res = pc.rmPCRowsToPhases(rows);
++ok('parse ok', res.ok === true);
++ok('6 fases', res.ok && res.phases.length === 6);
++ok('fase 1 total = 1700 (calculado)', res.ok && approx(res.phases[0].total, 1700));
++ok('fase 5 material = 4000', res.ok && approx(res.phases[4].costo_materiales, 4000));
++ok('fase 5 total = 6900', res.ok && approx(res.phases[4].total, 6900));
++ok('gran total = 18700', res.ok && approx(res.total, 18700));
++ok('ignora fila TOTAL (no la cuenta como fase)', res.ok && res.phases.every(p => ['1', '2', '3', '4', '5', '6'].includes(p.fase)));
++
++// ── Encabezado en otra posición + columnas reordenadas ──
++const rows2 = [
++  ['algo'],
++  ['Etapa', 'Equipo', 'Material', 'Mano obra'],  // orden distinto, sin columna TOTAL
++  ['1. Demolición', 50, 1000, 500],
++  ['5 Interno', 100, 2000, 800],
++];
++const res2 = pc.rmPCRowsToPhases(rows2);
++ok('parse con columnas reordenadas', res2.ok === true);
++ok('fase 1 total = 1550 (1000+500+50)', res2.ok && approx(res2.phases[0].total, 1550));
++ok("'5 Interno' mapea a fase 5", res2.ok && approx(res2.phases[4].total, 2900));
++
++// ── Round-trip real vía XLSX (workbook → buffer → read → parse) ──
++if (hasXLSX) {
++const ws = global.XLSX.utils.aoa_to_sheet(rows);
++const wb = global.XLSX.utils.book_new();
++global.XLSX.utils.book_append_sheet(wb, ws, 'PRESUPUESTO GENERAL');
++// hoja extra para simular multi-sheet
++global.XLSX.utils.book_append_sheet(wb, global.XLSX.utils.aoa_to_sheet([['x']]), 'CRONOGRAMA');
++const buf = global.XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
++const wb2 = global.XLSX.read(buf, { type: 'array', cellDates: true });
++const res3 = pc.rmPCParseWorkbook(wb2);
++ok('round-trip XLSX: encuentra PRESUPUESTO GENERAL', res3.ok && /presupuesto/i.test(res3.sheet || ''));
++ok('round-trip XLSX: gran total = 18700', res3.ok && approx(res3.total, 18700));
++ok('round-trip XLSX: fase 4 total = 4500', res3.ok && approx(res3.phases[3].total, 4500));
++
++// ── Hoja equivocada → error claro ──
++const wbBad = global.XLSX.utils.book_new();
++global.XLSX.utils.book_append_sheet(wbBad, global.XLSX.utils.aoa_to_sheet([['a', 'b'], [1, 2]]), 'Hoja1');
++const resBad = pc.rmPCParseWorkbook(wbBad);
++ok('hoja sin datos → ok:false', resBad.ok === false);
++}
++
++console.log('\n' + (fail === 0 ? '🎉 TODOS LOS TESTS PASARON' : `⚠ ${fail} test(s) fallaron`));
++process.exit(fail === 0 ? 0 : 1);
+diff --git a/scripts/sqft-calib.test.mjs b/scripts/sqft-calib.test.mjs
+new file mode 100644
+index 0000000..805ad3a
+--- /dev/null
++++ b/scripts/sqft-calib.test.mjs
+@@ -0,0 +1,60 @@
++// Test de la estadística de calibración $/ft² (rm-sqft-calib.js). Correr: node scripts/sqft-calib.test.mjs
++import { createRequire } from 'node:module';
++const require = createRequire(import.meta.url);
++const { rmSqftStats } = require('../rm-sqft-calib.js');
++
++let fail = 0;
++const approx = (a, b, t = 0.5) => a != null && Math.abs(a - b) <= t;
++const ok = (n, c) => { console.log((c ? '✅' : '❌') + ' ' + n); if (!c) fail++; };
++
++// ── Caso base: 4 casas, $/ft² = 40, 50, 60, 50 ──
++// costo = psf * sqft. sqft todas 1000 → costo 40k,50k,60k,50k.
++const items = [
++  { address: 'A', sqft: 1000, costo: 40000, est: 45000 },
++  { address: 'B', sqft: 1000, costo: 50000, est: 48000 },
++  { address: 'C', sqft: 1000, costo: 60000, est: 50000 },
++  { address: 'D', sqft: 1000, costo: 50000, est: 52000 },
++];
++const s = rmSqftStats(items, { weighted: true });
++ok('n = 4 (sin outliers)', s.n === 4);
++ok('psf simple = 50', approx(s.psfSimple, 50));
++ok('psf ponderado = 50 (Σcosto/Σft²)', approx(s.psfWeighted, 50));
++// std muestral de [40,50,60,50]: media 50, desv² = (100+0+100+0)/3 = 66.67 → σ=8.165
++ok('σ ≈ 8.16', approx(s.std, 8.165, 0.02));
++ok('CV ≈ 16.3%', approx(s.cv, 16.33, 0.1));
++// psf_est: (45+48+50+52)/4 = 48.75
++ok('psf_est ≈ 48.75', approx(s.psfEst, 48.75, 0.01));
++
++// ── Ponderación por ft²: casa grande barata baja el promedio ponderado ──
++const items2 = [
++  { address: 'grande', sqft: 4000, costo: 160000, est: 0 }, // 40/ft²
++  { address: 'chica', sqft: 1000, costo: 60000, est: 0 },   // 60/ft²
++];
++const s2 = rmSqftStats(items2, { weighted: true });
++// ponderado = (160000+60000)/(5000) = 44 ; simple = (40+60)/2 = 50
++ok('ponderado = 44', approx(s2.psfWeighted, 44));
++ok('simple = 50', approx(s2.psfSimple, 50));
++
++// ── Outlier: una casa a 200/ft² con n>=4 se excluye ──
++const items3 = [
++  { address: 'A', sqft: 1000, costo: 48000, est: 0 },
++  { address: 'B', sqft: 1000, costo: 50000, est: 0 },
++  { address: 'C', sqft: 1000, costo: 52000, est: 0 },
++  { address: 'D', sqft: 1000, costo: 49000, est: 0 },
++  { address: 'OUT', sqft: 1000, costo: 200000, est: 0 }, // 200/ft² outlier
++];
++const s3 = rmSqftStats(items3, { weighted: true, zThresh: 2 });
++ok('detecta 1 outlier', s3.outliers.length === 1);
++ok('outlier es OUT', s3.outliers[0] && s3.outliers[0].address === 'OUT');
++ok('n incluidas = 4', s3.n === 4);
++ok('nTotal = 5', s3.nTotal === 5);
++ok('psf incluido ≈ 49.75', approx(s3.psfWeighted, 49.75, 0.5));
++
++// ── Guards ──
++const sEmpty = rmSqftStats([], {});
++ok('vacío → n 0', sEmpty.n === 0 && sEmpty.psfWeighted === null);
++const sBad = rmSqftStats([{ address: 'x', sqft: 0, costo: 1000 }, { address: 'y', sqft: 1000, costo: 0 }], {});
++ok('filtra sqft/costo inválidos → n 0', sBad.nTotal === 0);
++
++console.log('\n' + (fail === 0 ? '🎉 TODOS LOS TESTS PASARON' : `⚠ ${fail} test(s) fallaron`));
++process.exit(fail === 0 ? 0 : 1);
+diff --git a/supabase/migrations/20260727180000-remodel-phase-costs.sql b/supabase/migrations/20260727180000-remodel-phase-costs.sql
+new file mode 100644
+index 0000000..d083bb5
+--- /dev/null
++++ b/supabase/migrations/20260727180000-remodel-phase-costs.sql
+@@ -0,0 +1,31 @@
++-- C.2 — Costos por fase importados desde el Excel del Estimado ("PRESUPUESTO GENERAL").
++-- Aditivo. Idempotente por (property_id, fase): re-importar reemplaza los costos de la obra.
++-- Alimenta el BAC por fase del módulo EVM (C.1).
++
++CREATE TABLE IF NOT EXISTS public.remodel_phase_costs (
++  property_id uuid NOT NULL,
++  fase text NOT NULL CHECK (fase IN ('1','2','3','4','5','6')),
++  costo_materiales numeric DEFAULT 0,
++  costo_mano_obra  numeric DEFAULT 0,
++  costo_equipo     numeric DEFAULT 0,
++  total            numeric DEFAULT 0,
++  address text,
++  source text DEFAULT 'excel_import',
++  import_batch text,
++  updated_at timestamptz DEFAULT now(),
++  PRIMARY KEY (property_id, fase)
++);
++
++ALTER TABLE public.remodel_phase_costs ENABLE ROW LEVEL SECURITY;
++
++DROP POLICY IF EXISTS rpc_read ON public.remodel_phase_costs;
++CREATE POLICY rpc_read ON public.remodel_phase_costs
++  FOR SELECT TO anon, authenticated USING (true);
++
++DROP POLICY IF EXISTS rpc_write ON public.remodel_phase_costs;
++CREATE POLICY rpc_write ON public.remodel_phase_costs
++  FOR ALL TO authenticated
++  USING (auth.role() = 'authenticated')
++  WITH CHECK (auth.role() = 'authenticated');
++
++CREATE INDEX IF NOT EXISTS idx_rpc_prop ON public.remodel_phase_costs(property_id);
+diff --git a/supabase/migrations/20260727190000-remodel-cost-calibracion.sql b/supabase/migrations/20260727190000-remodel-cost-calibracion.sql
+new file mode 100644
+index 0000000..95cb441
+--- /dev/null
++++ b/supabase/migrations/20260727190000-remodel-cost-calibracion.sql
+@@ -0,0 +1,48 @@
++-- C.3 — Histórico de calibración de $/ft² (para ver bajar el margen de error con cada obra).
++-- Patrón: arv_calibracion (serie temporal de corridas). Aditivo.
++-- Cada "Recalcular $/ft²" inserta una corrida (run_at) con media, desviación, CV y outliers.
++
++CREATE TABLE IF NOT EXISTS public.remodel_cost_calibracion (
++  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++  run_at timestamptz DEFAULT now(),
++  n int,                          -- viviendas incluidas (tras excluir outliers)
++  n_total int,                    -- viviendas evaluadas (antes de excluir)
++  psf_real_weighted numeric,      -- $/ft² real ponderado por ft² (media recomendada)
++  psf_real_simple numeric,        -- $/ft² real media simple
++  psf_est numeric,                -- $/ft² estimado (presupuesto) promedio
++  std numeric,                    -- desviación estándar del $/ft² real
++  cv_pct numeric,                 -- margen de error = std/media × 100
++  desv_costo_pct numeric,         -- desviación real vs estimado promedio
++  sesgo numeric,                  -- sesgo medio (real − est) en $/ft²
++  n_outliers int DEFAULT 0,
++  outliers jsonb DEFAULT '[]'::jsonb,   -- [{address, psf, z}]
++  detalle jsonb DEFAULT '[]'::jsonb,    -- por casa [{address, sqft, costo, psf, incluida}]
++  incluye_en_obra boolean DEFAULT false,
++  ponderacion text DEFAULT 'sqft',      -- 'sqft' | 'simple'
++  fuente_costo text DEFAULT 'total_real', -- 'total_real' (plata real) | 'gasto_espejo'
++  source text DEFAULT 'recalc_manual',
++  actor_id uuid DEFAULT auth.uid(),
++  active boolean DEFAULT true,
++  created_at timestamptz DEFAULT now()
++);
++
++ALTER TABLE public.remodel_cost_calibracion ENABLE ROW LEVEL SECURITY;
++
++DROP POLICY IF EXISTS rcc_read ON public.remodel_cost_calibracion;
++CREATE POLICY rcc_read ON public.remodel_cost_calibracion
++  FOR SELECT TO anon, authenticated USING (true);
++
++DROP POLICY IF EXISTS rcc_write ON public.remodel_cost_calibracion;
++CREATE POLICY rcc_write ON public.remodel_cost_calibracion
++  FOR INSERT TO authenticated WITH CHECK (auth.role() = 'authenticated');
++
++CREATE INDEX IF NOT EXISTS idx_rcc_runat ON public.remodel_cost_calibracion(run_at DESC) WHERE active;
++
++-- Respaldo versionado de remodel_forecast_params (existía sólo en la DB, sin migración).
++-- IF NOT EXISTS: no toca la tabla si ya existe. Sólo asegura que el esquema quede versionado.
++CREATE TABLE IF NOT EXISTS public.remodel_forecast_params (
++  key text PRIMARY KEY,
++  value numeric,
++  label text,
++  updated_at timestamptz DEFAULT now()
++);

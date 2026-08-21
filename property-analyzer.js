@@ -31,7 +31,7 @@ const paFmt = n => '$' + Math.round(n || 0).toLocaleString('en-US');
 async function openPropertyAnalyzer(sys) {
   paState.sys = sys;
   await Promise.all([loadProperties(), paLoadAnalyses()]);
-  openModal(`🔬 ${sys.name}`, '<div id="pa-root"></div>');
+  openModal(`${sys.name}`, '<div id="pa-root"></div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   paRender();
@@ -142,9 +142,9 @@ function paSetTab(t) { paState.tab = t; paRender(); }
 function paRender() {
   const root = document.getElementById('pa-root');
   const tabs = [
-    { id: 'new', label: '➕ Nuevo análisis' },
-    { id: 'result', label: '📊 Resultado' + (paState.currentAnalysisId ? ' (actual)' : '') },
-    { id: 'history', label: `📚 Historial (${paState.analyses.length})` }
+    { id: 'new', label: 'Nuevo análisis' },
+    { id: 'result', label: 'Resultado' + (paState.currentAnalysisId ? ' (actual)' : '') },
+    { id: 'history', label: `Historial (${paState.analyses.length})` }
   ];
   root.innerHTML = `
     <div class="flex gap-1 mb-4 border-b border-slate-200 -mx-6 px-6 overflow-x-auto">
@@ -165,14 +165,14 @@ function paRenderNew() {
     <div class="grid lg:grid-cols-2 gap-4">
       <div class="space-y-3">
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">📍 Datos básicos</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('map-pin')} Datos básicos</h3>
           <div class="grid grid-cols-2 gap-2">
             <div class="col-span-2">
               <label class="block text-[10px] font-medium text-slate-500 mb-0.5">Dirección completa *</label>
               <input value="${paState.address}" oninput="paState.address=this.value" placeholder="123 Main St, Austin TX 78745" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-semibold" />
             </div>
             <div class="col-span-2">
-              <label class="block text-[10px] font-medium text-slate-500 mb-0.5">🔗 Link Zillow/Redfin/MLS</label>
+              <label class="block text-[10px] font-medium text-slate-500 mb-0.5">${osIcon('link')} Link Zillow/Redfin/MLS</label>
               <input value="${paState.listing_url}" oninput="paState.listing_url=this.value" placeholder="https://zillow.com/..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
             </div>
             <div><label class="block text-[10px] text-slate-500 mb-0.5">Zip</label><input value="${paState.zip}" oninput="paState.zip=this.value" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" /></div>
@@ -185,7 +185,7 @@ function paRenderNew() {
         </div>
 
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">💰 Números propuestos</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('dollar')} Números propuestos</h3>
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-[10px] text-slate-500 mb-0.5">Precio compra</label>
@@ -203,7 +203,7 @@ function paRenderNew() {
         </div>
 
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">🎯 Estrategia</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('target')} Estrategia</h3>
           <select value="${paState.strategy}" onchange="paState.strategy=this.value" class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
             <option ${paState.strategy==='BRRRR'?'selected':''}>BRRRR (Buy-Rehab-Rent-Refi-Repeat)</option>
             <option ${paState.strategy==='Fix and Flip'?'selected':''}>Fix and Flip (revender)</option>
@@ -218,7 +218,7 @@ function paRenderNew() {
 
       <div class="space-y-3">
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">📋 Comparables (1 URL por línea)</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('clipboard')} Comparables (1 URL por línea)</h3>
           <textarea oninput="paState.comps_urls=this.value" rows="5" placeholder="https://zillow.com/comp1
 https://redfin.com/comp2
 https://realtor.com/comp3" class="w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono">${paState.comps_urls}</textarea>
@@ -226,12 +226,12 @@ https://realtor.com/comp3" class="w-full border border-slate-300 rounded px-3 py
         </div>
 
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">📝 Notas / observaciones</h3>
+          <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">${osIcon('pencil-line')} Notas / observaciones</h3>
           <textarea oninput="paState.notes=this.value" rows="6" placeholder="Condición visible (foundation, roof, plumbing), motivación del vendedor, plazo, dudas específicas que quieras que Claude resuelva..." class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${paState.notes}</textarea>
         </div>
 
         <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4">
-          <h3 class="text-sm font-bold text-purple-900 uppercase mb-2">🔬 ¿Qué va a hacer el análisis?</h3>
+          <h3 class="text-sm font-bold text-purple-900 uppercase mb-2">${osIcon('search')} ¿Qué va a hacer el análisis?</h3>
           <ul class="text-xs text-purple-900 space-y-1">
             <li>✓ Busca <strong>comps reales</strong> en Redfin/Zillow del último 6m</li>
             <li>✓ Valida tu ARV vs mercado real (Austin mayo 2026)</li>
@@ -242,7 +242,7 @@ https://realtor.com/comp3" class="w-full border border-slate-300 rounded px-3 py
             <li>✓ <strong>Lista de riesgos</strong> específicos + decisión final con score 1-10</li>
             <li>✓ Sugiere <strong>máximo precio razonable</strong> para negociar</li>
           </ul>
-          <button onclick="paLaunchAnalysis()" class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg">🚀 Ejecutar análisis profundo (60-120s)</button>
+          <button onclick="paLaunchAnalysis()" class="mt-3 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg">${osIcon('rocket')} Ejecutar análisis profundo (60-120s)</button>
         </div>
       </div>
     </div>
@@ -280,7 +280,7 @@ function paRenderResult() {
   if (a.status === 'pending' || a.status === 'analyzing') {
     body.innerHTML = `
       <div class="text-center py-16">
-        <div class="text-6xl mb-4 animate-pulse">🔬</div>
+        <div class="text-6xl mb-4 animate-pulse">${osIcon('search')}</div>
         <h3 class="text-xl font-bold text-slate-900">Analizando ${a.address}...</h3>
         <p class="text-sm text-slate-500 mt-2">Claude está buscando comps reales, validando precios, analizando crimen y schools, estimando rentas...</p>
         <p class="text-xs text-slate-400 mt-1">Esto toma 60-120s. La página se actualiza sola.</p>
@@ -292,9 +292,9 @@ function paRenderResult() {
   if (a.status === 'error') {
     body.innerHTML = `
       <div class="bg-red-50 border-2 border-red-300 rounded-xl p-6">
-        <h3 class="text-lg font-bold text-red-900">❌ Error en análisis</h3>
+        <h3 class="text-lg font-bold text-red-900">${osIcon('x-circle')} Error en análisis</h3>
         <p class="text-sm text-red-700 mt-2 font-mono">${a.error_message || 'Desconocido'}</p>
-        <button onclick="paRetry('${a.id}')" class="mt-4 bg-red-600 text-white px-4 py-2 rounded font-bold">🔄 Reintentar</button>
+        <button onclick="paRetry('${a.id}')" class="mt-4 bg-red-600 text-white px-4 py-2 rounded font-bold">${osIcon('refresh')} Reintentar</button>
       </div>
     `;
     return;
@@ -325,7 +325,7 @@ function paRenderResult() {
     <div class="grid lg:grid-cols-2 gap-4">
       <!-- LOCATION -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">📍 Ubicación</h3>
+        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">${osIcon('map-pin')} Ubicación</h3>
         ${r.location_analysis ? `
           <table class="w-full text-xs">
             <tbody>
@@ -342,7 +342,7 @@ function paRenderResult() {
 
       <!-- MARKET -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">📊 Mercado y ARV</h3>
+        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">${osIcon('chart')} Mercado y ARV</h3>
         ${r.market_analysis ? `
           <div class="mb-2">
             <div class="text-[10px] text-slate-500 uppercase font-bold">ARV validado por Claude</div>
@@ -368,20 +368,20 @@ function paRenderResult() {
 
       <!-- RENTA -->
       <div class="bg-white rounded-xl border border-slate-200 p-4 lg:col-span-2">
-        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">💵 Renta estimada por modelo</h3>
+        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">${osIcon('banknote')} Renta estimada por modelo</h3>
         ${r.market_analysis?.rent_estimates && r.financial_analysis?.cashflow_by_model ? `
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
             ${[
-              {key:'long_term', icon:'🏠', label:'Long-term'},
-              {key:'by_room', icon:'🛏️', label:'Por habitación'},
-              {key:'mid_term', icon:'🗓️', label:'Mid-term'},
+              {key:'long_term', icon:osIcon('house'), label:'Long-term'},
+              {key:'by_room', icon:osIcon('bed'), label:'Por habitación'},
+              {key:'mid_term', icon:osIcon('calendar-days'), label:'Mid-term'},
               {key:'short_term', icon:'✈️', label:'Short-term'}
             ].map(m => {
               const cf = r.financial_analysis.cashflow_by_model[m.key] || {};
               const isBest = r.financial_analysis.best_model === m.key;
               return `
                 <div class="rounded-lg p-3 border-2 ${isBest ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}">
-                  ${isBest ? '<div class="text-[10px] text-amber-700 font-bold mb-1">🏆 MEJOR</div>' : ''}
+                  ${isBest ? '<div class="text-[10px] text-amber-700 font-bold mb-1">' + osIcon('trophy') + ' MEJOR</div>' : ''}
                   <div class="text-base">${m.icon} <span class="text-xs font-bold">${m.label}</span></div>
                   <div class="text-[10px] text-slate-500 mt-1">Bruto: ${paFmt(cf.gross_rent)}/mes</div>
                   <div class="text-[10px] text-slate-500">Gastos: ${paFmt(cf.expenses)}/mes</div>
@@ -395,7 +395,7 @@ function paRenderResult() {
 
       <!-- REMODEL -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">🔨 Remodelación</h3>
+        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">${osIcon('hammer')} Remodelación</h3>
         ${r.remodel_analysis ? `
           <div class="mb-2">
             <div class="text-[10px] text-slate-500 uppercase">Scope recomendado</div>
@@ -412,7 +412,7 @@ function paRenderResult() {
             <div class="text-sm">${r.remodel_analysis.timeline_days || '?'} días</div>
           </div>
           ${r.remodel_analysis.hidden_costs_to_watch?.length ? `
-            <div class="mt-2 text-[10px] font-bold text-amber-700 uppercase">⚠️ Costos ocultos</div>
+            <div class="mt-2 text-[10px] font-bold text-amber-700 uppercase">${osIcon('alert')} Costos ocultos</div>
             <ul class="text-[10px] text-slate-600 ml-3 list-disc">
               ${r.remodel_analysis.hidden_costs_to_watch.map(c => `<li>${c}</li>`).join('')}
             </ul>
@@ -422,10 +422,10 @@ function paRenderResult() {
 
       <!-- FINANCIAL -->
       <div class="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">📈 Financial</h3>
+        <h3 class="text-sm font-bold text-slate-900 uppercase mb-3">${osIcon('trending-up')} Financial</h3>
         ${r.financial_analysis ? `
           <div class="mb-2 p-2 rounded ${r.financial_analysis.brrrr_check?.passes_brrrr_rule ? 'bg-emerald-50' : 'bg-red-50'}">
-            <div class="text-[10px] font-bold uppercase ${r.financial_analysis.brrrr_check?.passes_brrrr_rule ? 'text-emerald-700' : 'text-red-700'}">BRRRR check: ${r.financial_analysis.brrrr_check?.passes_brrrr_rule ? '✓ PASA' : '❌ NO PASA'}</div>
+            <div class="text-[10px] font-bold uppercase ${r.financial_analysis.brrrr_check?.passes_brrrr_rule ? 'text-emerald-700' : 'text-red-700'}">BRRRR check: ${r.financial_analysis.brrrr_check?.passes_brrrr_rule ? '✓ PASA' : 'NO PASA'}</div>
             <div class="text-[10px] text-slate-600 mt-0.5">${r.financial_analysis.brrrr_check?.explanation || ''}</div>
           </div>
           <table class="w-full text-xs">
@@ -444,7 +444,7 @@ function paRenderResult() {
       <div class="bg-white rounded-xl border border-slate-200 p-4 lg:col-span-2">
         <div class="grid lg:grid-cols-2 gap-4">
           <div>
-            <h3 class="text-sm font-bold text-red-700 uppercase mb-2">⚠️ Riesgos identificados</h3>
+            <h3 class="text-sm font-bold text-red-700 uppercase mb-2">${osIcon('alert')} Riesgos identificados</h3>
             <ul class="space-y-2 text-xs">
               ${(r.risks || []).map(rk => `
                 <li class="border-l-4 ${rk.severity==='high'?'border-red-500 bg-red-50':rk.severity==='medium'?'border-amber-500 bg-amber-50':'border-slate-300 bg-slate-50'} pl-2 py-1">
@@ -455,12 +455,12 @@ function paRenderResult() {
             </ul>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-emerald-700 uppercase mb-2">✅ Fortalezas</h3>
+            <h3 class="text-sm font-bold text-emerald-700 uppercase mb-2">${osIcon('check-circle')} Fortalezas</h3>
             <ul class="space-y-1 text-xs">
               ${(r.strengths || []).map(s => `<li class="border-l-4 border-emerald-400 bg-emerald-50 pl-2 py-1">${s}</li>`).join('') || '<li class="text-slate-400">—</li>'}
             </ul>
             ${r.recommendation?.deal_breakers?.length ? `
-              <h3 class="text-sm font-bold text-red-900 uppercase mt-3 mb-2">🚫 Deal breakers</h3>
+              <h3 class="text-sm font-bold text-red-900 uppercase mt-3 mb-2">${osIcon('ban')} Deal breakers</h3>
               <ul class="space-y-1 text-xs">
                 ${r.recommendation.deal_breakers.map(d => `<li class="border-l-4 border-red-700 bg-red-50 pl-2 py-1 font-bold">${d}</li>`).join('')}
               </ul>
@@ -472,7 +472,7 @@ function paRenderResult() {
       <!-- NEXT STEPS -->
       ${r.next_steps?.length ? `
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 lg:col-span-2">
-        <h3 class="text-sm font-bold text-blue-900 uppercase mb-2">👉 Próximos pasos</h3>
+        <h3 class="text-sm font-bold text-blue-900 uppercase mb-2">Próximos pasos</h3>
         <ol class="space-y-1 text-xs text-blue-950 list-decimal ml-4">
           ${r.next_steps.map(s => `<li>${s}</li>`).join('')}
         </ol>
@@ -501,8 +501,8 @@ function paRenderHistory() {
               <td class="py-2 px-2 text-right">${paFmt(r.recommendation?.max_offer_price)}</td>
               <td class="py-2 px-2 text-right text-xs text-slate-500">${new Date(a.created_at).toLocaleDateString()}</td>
               <td class="py-2 px-2 text-right whitespace-nowrap">
-                <button onclick="paViewAnalysis('${a.id}')" class="text-xs text-slate-600 hover:text-slate-900 mr-1">👁️ Ver</button>
-                <button onclick="paDeleteAnalysis('${a.id}')" class="text-xs text-red-600 hover:text-red-800">🗑</button>
+                <button onclick="paViewAnalysis('${a.id}')" class="text-xs text-slate-600 hover:text-slate-900 mr-1">${osIcon('eye')} Ver</button>
+                <button onclick="paDeleteAnalysis('${a.id}')" class="text-xs text-red-600 hover:text-red-800">${osIcon('trash')}</button>
               </td>
             </tr>`;
           }).join('') || '<tr><td colspan="7" class="text-center text-slate-400 py-8">Sin análisis previos</td></tr>'}

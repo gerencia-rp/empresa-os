@@ -30,26 +30,26 @@ function rmRenderGantt(body) {
 
   body.innerHTML = `
     <div class="flex items-end justify-between mb-3 flex-wrap gap-2">
-      <h2 class="text-lg font-bold">📅 Cronograma ${cpmOn?'CPM real':'lineal'} — ${rmState.editName || 'Proyecto'}</h2>
+      <h2 class="text-lg font-bold">${osIcon('calendar')} Cronograma ${cpmOn?'CPM real':'lineal'} — ${rmState.editName || 'Proyecto'}</h2>
       <div class="flex items-center gap-2 flex-wrap">
         <!-- S3-G3 Toggle CPM -->
         <div class="inline-flex border border-slate-300 rounded-lg overflow-hidden text-xs">
-          <button onclick="rmState.cpmMode=false; rmRenderTab()" class="px-3 py-1.5 font-semibold ${!cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">📊 Lineal por fase</button>
-          <button onclick="rmState.cpmMode=true; rmRenderTab()" class="px-3 py-1.5 font-semibold ${cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">🔀 CPM avanzado</button>
+          <button onclick="rmState.cpmMode=false; rmRenderTab()" class="px-3 py-1.5 font-semibold ${!cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('chart')} Lineal por fase</button>
+          <button onclick="rmState.cpmMode=true; rmRenderTab()" class="px-3 py-1.5 font-semibold ${cpmOn?'bg-slate-900 text-white':'bg-white text-slate-600 hover:bg-slate-50'}">${osIcon('network')} CPM avanzado</button>
         </div>
-        ${rmState.currentProject ? `<button onclick="rmSyncToPlanner()" class="bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Genera las actividades día a día en el Planner Semanal según estas etapas y días">📅 Enviar al Planner →</button>` : ''}
+        ${rmState.currentProject ? `<button onclick="rmSyncToPlanner()" class="bg-gradient-to-r from-emerald-700 to-emerald-900 hover:opacity-90 text-white text-xs font-bold px-3 py-1.5 rounded-lg" title="Genera las actividades día a día en el Planner Semanal según estas etapas y días">${osIcon('calendar')} Enviar al Planner →</button>` : ''}
       </div>
     </div>
-    ${cpmOn && cpmErr ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 mb-3">⚠️ ${cpmErr}. Revisá las dependencias en el tab Catálogo (probablemente hay un ciclo).</div>` : ''}
+    ${cpmOn && cpmErr ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900 mb-3">${osIcon('alert')} ${cpmErr}. Revisá las dependencias en el tab Catálogo (probablemente hay un ciclo).</div>` : ''}
     ${cpmOn && !cpmErr ? `
-      <div class="bg-purple-50 border border-purple-200 rounded p-2 text-xs text-purple-950 mb-3">
+      <div class="bg-stone-100 border border-stone-300 rounded p-2 text-xs text-stone-800 mb-3">
         <strong>Modo CPM activo.</strong> El sistema calcula el cronograma respetando dependencias (depends_on). Actividades en ruta crítica (rojo) no tienen slack — atrasos acá atrasan todo el proyecto. Editá dependencias en el tab Catálogo.
       </div>
     ` : ''}
     <div class="grid grid-cols-4 gap-3 mb-4">
       <div class="bg-slate-50 rounded p-2"><div class="text-[10px] text-slate-500 uppercase font-bold">Sin inspecciones</div><div class="text-lg font-bold">${baseDays} días</div>${cpmOn?`<div class="text-[9px] text-slate-500">CPM (vs ${e.totalDays}d lineal)</div>`:''}</div>
       <div class="bg-amber-50 rounded p-2"><div class="text-[10px] text-amber-700 uppercase font-bold">+ Inspecciones</div><div class="text-lg font-bold text-amber-700">+${Math.ceil(inspectionDays)} días</div></div>
-      <div class="bg-blue-50 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">+ Lead times max</div><div class="text-lg font-bold text-blue-700">+${Math.max(0, ...leadTimeAlerts.map(l=>l.lead_days))} días</div><div class="text-[9px] text-slate-500">en paralelo a obra</div></div>
+      <div class="bg-blue-50 rounded p-2"><div class="text-[10px] text-blue-700 uppercase font-bold">+ Lead times max</div><div class="text-lg font-bold text-blue-700">+${Math.max(0, ...leadTimeAlerts.map(l=>l.lead_days))} días</div><div class="text-[9px] text-blue-600">en paralelo a obra</div></div>
       <div class="bg-emerald-50 rounded p-2"><div class="text-[10px] text-emerald-700 uppercase font-bold">Realista total</div><div class="text-lg font-bold text-emerald-700">${realisticTotal} días</div><div class="text-[9px]">${rmFmtDate(rmAddDays(new Date(rmState.editStartDate), realisticTotal))}</div></div>
     </div>
 
@@ -82,7 +82,7 @@ function rmRenderGantt(body) {
 
     <!-- INSPECCIONES OBLIGATORIAS -->
     <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-      <h3 class="text-xs font-bold uppercase text-amber-900 mb-2">🔍 Inspecciones obligatorias (no las olvides)</h3>
+      <h3 class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('search')} Inspecciones obligatorias (no las olvides)</h3>
       <table class="w-full text-xs">
         <thead><tr class="text-amber-800"><th class="text-left py-1">Inspección</th><th class="text-left py-1">Cuándo</th><th class="text-right py-1">Espera</th></tr></thead>
         <tbody>
@@ -94,26 +94,26 @@ function rmRenderGantt(body) {
           }).join('')}
         </tbody>
       </table>
-      <p class="text-[10px] text-amber-700 mt-2">⚠️ Si una inspección no pasa, todo el cronograma se mueve. Programa con 1 semana de buffer.</p>
+      <p class="text-[10px] text-amber-700 mt-2">${osIcon('alert')} Si una inspección no pasa, todo el cronograma se mueve. Programa con 1 semana de buffer.</p>
     </div>
 
     <!-- LEAD TIMES MATERIALES -->
     ${leadTimeAlerts.length ? `
     <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-      <h3 class="text-xs font-bold uppercase text-blue-900 mb-2">⏱️ Lead times de materiales — ORDENA TEMPRANO</h3>
+      <h3 class="text-xs font-bold uppercase text-blue-900 mb-2">${osIcon('clock')} Lead times de materiales — ORDENA TEMPRANO</h3>
       <table class="w-full text-xs">
         <thead><tr class="text-blue-800"><th class="text-left py-1">Material</th><th class="text-right py-1">Días de espera</th><th class="text-left py-1 pl-3">Ordenar antes del día</th></tr></thead>
         <tbody>
           ${leadTimeAlerts.map(l => `<tr class="border-t border-blue-200"><td class="py-1.5">${l.activity}</td><td class="py-1.5 text-right font-bold">${l.lead_days}d</td><td class="py-1.5 pl-3 text-emerald-700 font-bold">Día 1 del proyecto</td></tr>`).join('')}
         </tbody>
       </table>
-      <p class="text-[10px] text-blue-700 mt-2">💡 Ordenar materiales de lead time largo al inicio del proyecto = correr en paralelo con demo/estructura.</p>
+      <p class="text-[10px] text-blue-700 mt-2">${osIcon('lightbulb')} Ordenar materiales de lead time largo al inicio del proyecto = correr en paralelo con demo/estructura.</p>
     </div>` : ''}
 
     <!-- CRITICAL PATH NOTES -->
-    <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
-      <h3 class="text-xs font-bold uppercase text-purple-900 mb-2">📐 Notas de ingeniería (CPM)</h3>
-      <ul class="text-xs text-purple-950 space-y-1 list-disc ml-4">
+    <div class="bg-stone-100 border border-stone-300 rounded-xl p-4">
+      <h3 class="text-xs font-bold uppercase text-stone-800 mb-2">${osIcon('ruler')} Notas de ingeniería (CPM)</h3>
+      <ul class="text-xs text-stone-800 space-y-1 list-disc ml-4">
         <li><strong>Ruta crítica:</strong> Demo → Cimentación → Estructura → Rough-in → Inspección → Drywall → Pisos → Cabinets → Countertops (wait 1 sem) → Tile → Trim → Paint → Fixtures → Inspección final</li>
         <li><strong>Exterior</strong> puede correr en paralelo con interior si crew ≥ 4 personas. Tu crew: ${rmState.crewSize}</li>
         <li><strong>Countertops</strong> necesitan template + fabricación (~7-10 días). Programar después de cabinets instalados.</li>
@@ -217,7 +217,7 @@ function rmRenderGanttCPM(e) {
 
     <!-- Critical path detallado -->
     <div class="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-      <h3 class="text-xs font-bold uppercase text-red-900 mb-2">🔴 Critical path (${e.cpm.criticalPath.length} actividades)</h3>
+      <h3 class="text-xs font-bold uppercase text-red-900 mb-2">${kitStatusDot('bad')} Critical path (${e.cpm.criticalPath.length} actividades)</h3>
       <div class="text-[11px] text-red-950">Cualquier atraso en estas actividades atrasa todo el proyecto:</div>
       <ol class="mt-1 text-[11px] list-decimal ml-5 space-y-0.5">
         ${e.cpm.criticalPath.map(c => {
@@ -233,7 +233,7 @@ function rmRenderGanttCPM(e) {
 // ─── TAB: CALIBRACIÓN ───
 function rmRenderCalibration(body) {
   body.innerHTML = `
-    <h2 class="text-lg font-bold mb-2">🎯 Casas calibradoras (5 proyectos reales)</h2>
+    <h2 class="text-lg font-bold mb-2">${osIcon('target')} Casas calibradoras (5 proyectos reales)</h2>
     <p class="text-xs text-slate-500 mb-3">Data real de obras finalizadas. Calibra el modelo del estimador.</p>
     <div class="overflow-x-auto border border-slate-200 rounded-lg mb-4">
       <table class="w-full text-xs">

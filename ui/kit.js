@@ -49,10 +49,11 @@ function kitHero(titulo, valor, sub, color) {
 // ─── VERDICT: banda de decisión (semáforo + acción) — ADN ARV Pro ───
 // nivel: 'go' | 'revisar' | 'nogo' · titulo: la decisión en humano · accion: qué hacer ahora
 function kitVerdict(nivel, titulo, accion) {
-  const map = { go: ['var(--pos)', '✅'], revisar: ['var(--amber)', '⚠️'], nogo: ['var(--neg)', '⛔'] };
+  const map = { go: ['var(--pos)', 'check-circle'], revisar: ['var(--amber)', 'alert'], nogo: ['var(--neg)', 'ban'] };
   const [c, ico] = map[nivel] || map.revisar;
+  const icoHtml = (typeof osIcon === 'function') ? osIcon(ico, { size: 22, color: c }) : '';
   return '<div style="display:flex;align-items:center;gap:14px;background:color-mix(in srgb, ' + c + ' 10%, transparent);border:1px solid color-mix(in srgb, ' + c + ' 35%, transparent);border-radius:16px;padding:14px 18px;margin-bottom:16px;flex-wrap:wrap">'
-    + '<span style="font-size:22px">' + ico + '</span>'
+    + '<span style="display:inline-flex">' + icoHtml + '</span>'
     + '<div style="flex:1;min-width:200px"><div style="font-size:14.5px;font-weight:800;color:' + c + '">' + titulo + '</div>'
     + (accion ? '<div style="font-size:12px;color:var(--txt2);margin-top:2px">' + accion + '</div>' : '') + '</div></div>';
 }
@@ -133,12 +134,19 @@ function kitInputSm(lab, val, onchangeExpr, opts) {  // compacto para grillas "A
 // ─── BADGES / ESTADOS ───
 function kitBadge(txt, kind) { return '<span class="badge ' + (kind === 'ok' ? 'b-ok' : kind === 'neg' ? 'b-red' : 'b-warn') + '">' + txt + '</span>'; }
 function kitEmpty(icon, msg, cta) {
-  return '<div class="ui-empty"><div style="font-size:36px;margin-bottom:8px">' + (icon || '📭') + '</div><div>' + msg + '</div>'
+  // icon: nombre de osIcon ('inbox', 'search', …). Legacy: si llega un emoji se ignora y va 'inbox'.
+  const name = (icon && typeof osIcon === 'function' && window.OS_ICONS && OS_ICONS[icon]) ? icon : 'inbox';
+  const ico = (typeof osIcon === 'function') ? osIcon(name, { size: 34, color: 'var(--mut2)' }) : '';
+  return '<div class="ui-empty"><div style="margin-bottom:8px">' + ico + '</div><div>' + msg + '</div>'
     + (cta ? '<div style="margin-top:12px">' + cta + '</div>' : '') + '</div>';
 }
-function kitLoading(msg) { return '<div class="ui-empty">⏳ ' + (msg || 'Cargando…') + '</div>'; }
+function kitLoading(msg) {
+  // Loader de marca (spinner verde + texto). Skeleton: kitSkeletonRows(n) de ui/icons.js.
+  return '<div class="ui-loading"><div class="ui-spinner"></div><div>' + (msg || 'Cargando…') + '</div></div>';
+}
 function kitError(msg, retryExpr) {
-  return '<div class="ui-error">⚠️ ' + kitEsc(msg) + (retryExpr ? ' <button class="btn-ghost" style="margin-left:8px;padding:4px 10px;font-size:11px" onclick="' + retryExpr + '">↻ Reintentar</button>' : '') + '</div>';
+  const ico = (typeof osIcon === 'function') ? osIcon('alert', { size: 14 }) + ' ' : '';
+  return '<div class="ui-error">' + ico + kitEsc(msg) + (retryExpr ? ' <button class="btn-ghost" style="margin-left:8px;padding:4px 10px;font-size:11px" onclick="' + retryExpr + '">↻ Reintentar</button>' : '') + '</div>';
 }
 
 // exposición global (arquitectura vanilla del OS)

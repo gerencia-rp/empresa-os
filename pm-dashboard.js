@@ -40,7 +40,7 @@ const PM_COACH_URL = `${window.SUPABASE_URL}/functions/v1/pm-coaching-prompts`;
 
 async function openPMDashboard(sys) {
   pmState.sys = sys;
-  openModal(`🎯 ${sys.name}`, '<div id="pm-root">Cargando...</div>');
+  openModal(`${sys.name}`, '<div id="pm-root">Cargando...</div>');
   document.querySelector('#modal > div').classList.remove('max-w-3xl');
   document.querySelector('#modal > div').classList.add('max-w-7xl');
   await pmLoadAll();
@@ -192,27 +192,27 @@ function pmRender() {
 
   // Tabs adaptados según vista (Holding vs Empresa)
   const tabs = isHolding ? [
-    ['pulse', '📊 Cross-Empresa'],
-    ['performance', '🏆 Performance'],
-    ['okrs', '🎯 OKRs'],
-    ['oneOnOnes', '💬 1-on-1s'],
-    ['coaching', '🧠 Coaching IA'],
-    ['risks', '⚠️ Riesgos'],
-    ['compliance', '📜 Compliance'],
-    ['deps', '🔗 Dependencias'],
-    ['reports', '📈 Reportes IA'],
-    ['whatsapp', '📱 WhatsApp'],
-    ['companies', '🏛️ Empresas']
+    ['pulse', 'Cross-Empresa'],
+    ['performance', 'Performance'],
+    ['okrs', 'OKRs'],
+    ['oneOnOnes', '1-on-1s'],
+    ['coaching', 'Coaching IA'],
+    ['risks', 'Riesgos'],
+    ['compliance', 'Compliance'],
+    ['deps', 'Dependencias'],
+    ['reports', 'Reportes IA'],
+    ['whatsapp', 'WhatsApp'],
+    ['companies', 'Empresas']
   ] : [
-    ['pulse', '📊 Pulse'],
-    ['tasks', '📋 Tareas ClickUp'],
-    ['team', '👥 Equipo'],
-    ['heatmap', '🔥 Bottlenecks'],
-    ['okrs', '🎯 OKRs'],
-    ['decisiones', '✅ Decisiones'],
-    ['risks', '⚠️ Riesgos'],
-    ['compliance', '📜 Compliance'],
-    ['oneOnOnes', '💬 1-on-1s']
+    ['pulse', 'Pulse'],
+    ['tasks', 'Tareas ClickUp'],
+    ['team', 'Equipo'],
+    ['heatmap', 'Bottlenecks'],
+    ['okrs', 'OKRs'],
+    ['decisiones', 'Decisiones'],
+    ['risks', 'Riesgos'],
+    ['compliance', 'Compliance'],
+    ['oneOnOnes', '1-on-1s']
   ];
 
   root.innerHTML = `
@@ -222,13 +222,13 @@ function pmRender() {
       <div class="mb-2 pb-2 border-b border-slate-200">
         <div class="flex items-center gap-2 overflow-x-auto sm:flex-wrap pb-1">
           <span class="text-[10px] font-bold uppercase text-slate-500 mr-1 whitespace-nowrap">Empresa:</span>
-          <button onclick="pmSetCompany('holding')" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold ${isHolding ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">🏛️ Holding</button>
+          <button onclick="pmSetCompany('holding')" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold ${isHolding ? 'bg-slate-900 text-white shadow' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${osIcon('landmark')} Holding</button>
           ${cos.map(c => `
             <button onclick="pmSetCompany('${c.id}')" class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${cur===c.id ? `bg-${c.color||'slate'}-600 text-white shadow` : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">${c.icon} ${c.name}</button>
           `).join('')}
           <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500 flex-shrink-0">
-            ${curCo ? `<span class="hidden sm:inline">Space: <code class="bg-slate-100 px-1.5 py-0.5 rounded">${curCo.clickup_space_id || '⚠️'}</code></span>` : ''}
-            <button onclick="withLoading(this, pmTriggerSync)" title="Sincronizar ClickUp ahora" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold whitespace-nowrap">🔄 Sync</button>
+            ${curCo ? `<span class="hidden sm:inline">Space: <code class="bg-slate-100 px-1.5 py-0.5 rounded">${curCo.clickup_space_id || osIcon('alert')}</code></span>` : ''}
+            <button onclick="withLoading(this, pmTriggerSync)" title="Sincronizar ClickUp ahora" class="bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold whitespace-nowrap">${osIcon('refresh')} Sync</button>
           </div>
         </div>
       </div>
@@ -276,7 +276,7 @@ async function pmTriggerSync() {
     });
     const r = await res.json();
     if (r.ok) {
-      alert(`✅ Sync completado.\n${r.tasks_synced} tasks, ${r.companies_synced} empresas, ${r.alerts} alertas.\n${(r.per_company||[]).map(c => '• '+c.company+': '+c.tasks+' tasks').join('\n')}`);
+      alert(`Sync completado.\n${r.tasks_synced} tasks, ${r.companies_synced} empresas, ${r.alerts} alertas.\n${(r.per_company||[]).map(c => '• '+c.company+': '+c.tasks+' tasks').join('\n')}`);
     } else {
       alert('Error: ' + r.error);
     }
@@ -309,7 +309,7 @@ function pmRenderScorecard() {
         <div class="bg-violet-50 border border-violet-200 rounded-xl p-3">
           <div class="text-[10px] text-violet-700 uppercase font-bold">Bus factor</div>
           <div class="text-3xl font-bold text-violet-900">${s.bus_factor_pct||0}%</div>
-          <div class="text-[10px] text-violet-700">${(s.bus_factor_pct||0)>=60?'🚨 riesgo alto':(s.bus_factor_pct||0)>=40?'⚠️ atento':'✓ ok'}</div>
+          <div class="text-[10px] text-violet-700">${(s.bus_factor_pct||0)>=60?'riesgo alto':(s.bus_factor_pct||0)>=40?'atento':'✓ ok'}</div>
         </div>
 
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -334,7 +334,7 @@ function pmRenderScorecard() {
       </div>
 
       <div class="bg-slate-900 text-white rounded-xl p-3 text-xs">
-        💡 <strong>Cómo leer:</strong> Esta pantalla cruza las 5 áreas en tiempo real. Si bus factor &gt; 60% o vencidas &gt; 10 → conviene revisar antes de seguir. Click cualquier número va al sistema fuente (próximamente).
+        ${osIcon('lightbulb')} <strong>Cómo leer:</strong> Esta pantalla cruza las 5 áreas en tiempo real. Si bus factor &gt; 60% o vencidas &gt; 10 → conviene revisar antes de seguir. Click cualquier número va al sistema fuente (próximamente).
       </div>
     </div>
   `;
@@ -347,11 +347,11 @@ function pmRenderWhatsApp() {
   const msgs = pmState.messages || [];
   return `
     <div class="space-y-3">
-      <!-- 🚀 Envío automático con Cloud API + compositor rápido -->
+      <!-- Envío automático con Cloud API + compositor rápido -->
       <div class="bg-gradient-to-br from-blue-500 to-indigo-700 text-white rounded-xl p-4 shadow-lg">
         <div class="flex items-center justify-between gap-3 flex-wrap mb-3">
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">⚡ Envío 100% automático</div>
+            <div class="text-[10px] font-bold uppercase opacity-80 tracking-wider">${osIcon('zap')} Envío 100% automático</div>
             <div class="text-base font-bold mt-0.5">Compositor rápido + Cloud API (Meta)</div>
             <div class="text-xs opacity-90 mt-1">Mismas credenciales que Educación. Una sola app de Meta para los dos sistemas.</div>
           </div>
@@ -375,13 +375,13 @@ function pmRenderWhatsApp() {
 
       <!-- Config global -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">⚙️ Config del bot</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('settings')} Config del bot</div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
           <div>
             <label class="block text-[10px] text-slate-500">Activo</label>
             <select onchange="pmConfigUpdate('active', this.value === 'true')" class="w-full border border-slate-300 rounded px-2 py-1">
-              <option value="false" ${!cfg.active?'selected':''}>⏸ Pausado</option>
-              <option value="true" ${cfg.active?'selected':''}>🟢 Activo</option>
+              <option value="false" ${!cfg.active?'selected':''}>${osIcon('pause')} Pausado</option>
+              <option value="true" ${cfg.active?'selected':''}>${kitStatusDot('ok')} Activo</option>
             </select>
           </div>
           <div>
@@ -401,7 +401,7 @@ function pmRenderWhatsApp() {
             <input value="${cfg.group_chat_id || ''}" placeholder="ej. 5215512345678" onchange="pmConfigUpdate('group_chat_id', this.value)" class="w-full border border-slate-300 rounded px-2 py-1" />
           </div>
           <div class="flex items-end">
-            <button onclick="withLoading(this, pmRunDailyPushNow)" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded">⚡ Correr push ahora</button>
+            <button onclick="withLoading(this, pmRunDailyPushNow)" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded">${osIcon('zap')} Correr push ahora</button>
           </div>
         </div>
       </div>
@@ -409,7 +409,7 @@ function pmRenderWhatsApp() {
       <!-- Recipients -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div class="bg-slate-100 px-3 py-2 flex justify-between items-center">
-          <span class="text-xs font-bold uppercase text-slate-700">👥 Destinatarios (${recipients.length})</span>
+          <span class="text-xs font-bold uppercase text-slate-700">${osIcon('users')} Destinatarios (${recipients.length})</span>
           <button onclick="pmAddRecipient()" class="text-[10px] bg-slate-900 hover:bg-slate-700 text-white px-2 py-1 rounded font-bold">+ Agregar</button>
         </div>
         ${recipients.length === 0 ? `<div class="p-6 text-center text-xs text-slate-400">Sin destinatarios. Agregá los crews/leaders que reciben el daily.</div>` : `
@@ -423,8 +423,8 @@ function pmRenderWhatsApp() {
                   <td class="p-2 font-semibold">${r.full_name}</td>
                   <td class="p-2 font-mono text-[10px]">${r.phone_number}</td>
                   <td class="p-2 text-slate-600">${r.clickup_username || '—'}</td>
-                  <td class="p-2 text-center">${r.receives_daily_push ? '✅' : '—'}</td>
-                  <td class="p-2 text-center">${r.receives_daily_close ? '✅' : '—'}</td>
+                  <td class="p-2 text-center">${r.receives_daily_push ? osIcon('check-circle') : '—'}</td>
+                  <td class="p-2 text-center">${r.receives_daily_close ? osIcon('check-circle') : '—'}</td>
                   <td class="p-2 text-center">
                     <button onclick="pmRecipientToggle('${r.id}', ${r.active})" class="text-[10px] ${r.active?'text-emerald-600':'text-slate-400'}">${r.active?'✓':'○'}</button>
                   </td>
@@ -437,13 +437,13 @@ function pmRenderWhatsApp() {
 
       <!-- Últimos mensajes -->
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">💬 Últimos 50 mensajes</div>
+        <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('message')} Últimos 50 mensajes</div>
         ${msgs.length === 0 ? `<div class="p-6 text-center text-xs text-slate-400">Sin mensajes todavía.</div>` : `
           <div class="max-h-96 overflow-y-auto divide-y divide-slate-100">
             ${msgs.map(m => `
               <div class="p-2 ${m.direction==='out'?'bg-blue-50':''}">
                 <div class="flex justify-between text-[10px] text-slate-500">
-                  <span>${m.direction==='out'?'📤':'📥'} ${m.phone_number}</span>
+                  <span>${m.direction==='out'?osIcon('upload'):osIcon('inbox')} ${m.phone_number}</span>
                   <span>${new Date(m.sent_at).toLocaleString('es-MX')}</span>
                 </div>
                 <div class="text-xs mt-1 whitespace-pre-wrap">${(m.body || '').slice(0, 200)}${(m.body||'').length > 200 ? '…' : ''}</div>
@@ -488,7 +488,7 @@ async function pmRunDailyPushNow() {
       body: JSON.stringify({ trigger: 'manual' })
     });
     const r = await res.json();
-    alert(r.ok ? `✅ Push enviado a ${r.pushed} destinatarios.` : 'Error: ' + r.error);
+    alert(r.ok ? `Push enviado a ${r.pushed} destinatarios.` : 'Error: ' + r.error);
     await pmLoadAll(); pmRender();
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -597,9 +597,9 @@ function pmRenderAgent() {
   return `
     <div class="space-y-3">
       <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-900">
-        🤖 <strong>IA Agente PM</strong>: corre Claude sobre tu scorecard + ClickUp + Remodel data para generar el Weekly Business Review (lunes 7am automático).
+        ${osIcon('bot')} <strong>IA Agente PM</strong>: corre Claude sobre tu scorecard + ClickUp + Remodel data para generar el Weekly Business Review (lunes 7am automático).
       </div>
-      <button onclick="withLoading(this, pmRunWeeklyReviewNow)" class="w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-3 rounded">🧠 Generar Weekly Review ahora</button>
+      <button onclick="withLoading(this, pmRunWeeklyReviewNow)" class="w-full bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-3 rounded">${osIcon('brain')} Generar Weekly Review ahora</button>
       <div class="text-[11px] text-slate-500 text-center">Costo aproximado: ~$0.03 por ejecución.</div>
     </div>
   `;
@@ -614,7 +614,7 @@ async function pmRunWeeklyReviewNow() {
       body: JSON.stringify({})
     });
     const r = await res.json();
-    alert(r.ok ? `✅ Reporte generado: ${r.period}` : 'Error: ' + r.error);
+    alert(r.ok ? `Reporte generado: ${r.period}` : 'Error: ' + r.error);
     await pmLoadAll(); pmSetTab('reports');
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -624,10 +624,10 @@ function pmRenderReports() {
   const reps = pmState.reports || [];
   return `
     <div class="space-y-3">
-      ${reps.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin reportes. Click "🧠 Generar Weekly Review ahora" en tab IA Agente.</div>` : reps.map(r => `
+      ${reps.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin reportes. Click "${osIcon('brain')} Generar Weekly Review ahora" en tab IA Agente.</div>` : reps.map(r => `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div class="bg-slate-100 px-3 py-2 flex justify-between">
-            <span class="text-xs font-bold">📅 ${r.report_type} · ${r.period_start} → ${r.period_end}</span>
+            <span class="text-xs font-bold">${osIcon('calendar')} ${r.report_type} · ${r.period_start} → ${r.period_end}</span>
             <span class="text-[10px] text-slate-500">${r.cost_tokens_used || 0} tokens</span>
           </div>
           <div class="p-3">
@@ -678,11 +678,11 @@ function pmRenderRisks() {
 
   // Análisis
   const insights = [];
-  if (critical.length > 0) insights.push(`🚨 <strong>${critical.length} riesgo${critical.length>1?'s':''} crítico${critical.length>1?'s':''}</strong> (score ≥15). Necesitan mitigation plan AHORA.`);
-  if (high.length > 0) insights.push(`⚠️ <strong>${high.length}</strong> riesgos en zona high (score 10-14). Owner asignado y plan documentado.`);
-  if (mitigating.length === 0 && (critical.length + high.length) > 0) insights.push(`📋 <strong>Cero riesgos en estado "mitigating"</strong> aunque hay críticos/altos. ¿Hay un plan activo para cada uno?`);
+  if (critical.length > 0) insights.push(`${osIcon('alert')} <strong>${critical.length} riesgo${critical.length>1?'s':''} crítico${critical.length>1?'s':''}</strong> (score ≥15). Necesitan mitigation plan AHORA.`);
+  if (high.length > 0) insights.push(`${osIcon('alert')} <strong>${high.length}</strong> riesgos en zona high (score 10-14). Owner asignado y plan documentado.`);
+  if (mitigating.length === 0 && (critical.length + high.length) > 0) insights.push(`${osIcon('clipboard')} <strong>Cero riesgos en estado "mitigating"</strong> aunque hay críticos/altos. ¿Hay un plan activo para cada uno?`);
   const noOwner = risks.filter(r => !r.owner && r.score >= 10);
-  if (noOwner.length > 0) insights.push(`👤 <strong>${noOwner.length}</strong> riesgos high/critical SIN owner. Asignar responsable.`);
+  if (noOwner.length > 0) insights.push(`${osIcon('user')} <strong>${noOwner.length}</strong> riesgos high/critical SIN owner. Asignar responsable.`);
 
   return `
     <div class="space-y-3">
@@ -717,7 +717,7 @@ function pmRenderRisks() {
 
       ${insights.length > 0 ? `
         <div class="bg-red-50 border border-red-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-red-900 mb-2">🤖 Análisis del risk register</div>
+          <div class="text-xs font-bold uppercase text-red-900 mb-2">${osIcon('bot')} Análisis del risk register</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
@@ -725,7 +725,7 @@ function pmRenderRisks() {
       <!-- Risk Matrix 5x5 -->
       ${risks.filter(r => r.status !== 'closed').length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Risk Matrix (Probabilidad × Impacto)</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('chart')} Risk Matrix (Probabilidad × Impacto)</div>
           <div class="p-3">
             <table class="w-full text-xs">
               <tbody>
@@ -753,7 +753,7 @@ function pmRenderRisks() {
       <!-- Por categoría -->
       ${Object.keys(byCategory).length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">📁 Por categoría</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('folder')} Por categoría</div>
           <div class="flex flex-wrap gap-2">
             ${Object.entries(byCategory).sort((a,b) => b[1]-a[1]).map(([c,n]) => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded"><strong>${c}</strong>: ${n}</span>`).join('')}
           </div>
@@ -763,24 +763,24 @@ function pmRenderRisks() {
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Risk register. Score = probabilidad × impacto. Score ≥ 12 = atender.</div>
         <div class="flex gap-2">
-          <button onclick="pmGenerateRisksAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza la operación y detecta riesgos no registrados">🤖 Analizar riesgos con IA</button>
+          <button onclick="pmGenerateRisksAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza la operación y detecta riesgos no registrados">${osIcon('bot')} Analizar riesgos con IA</button>
           <button onclick="pmAddRisk()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar risk</button>
         </div>
       </div>
 
-      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">🧠 Claude analizando tu operación para detectar riesgos...</span></div>` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">${osIcon('brain')} Claude analizando tu operación para detectar riesgos...</span></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">${osIcon('alert')} ${ai.error}</div>` : ''}
       ${ai.detected_risks && ai.detected_risks.length ? `
         <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 Riesgos detectados por Claude (no en tu register)</div>
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">${osIcon('bot')} Riesgos detectados por Claude (no en tu register)</div>
           <div class="space-y-2">
             ${ai.detected_risks.map((r,i) => `
               <div class="bg-white border border-violet-200 rounded-lg p-3">
                 <div class="flex justify-between gap-2">
                   <div class="flex-1">
                     <div class="font-bold text-sm">${r.title}</div>
-                    ${r.evidence ? `<div class="text-[11px] text-slate-600 italic mt-1">📊 ${r.evidence}</div>` : ''}
-                    ${r.mitigation ? `<div class="text-[11px] text-emerald-700 mt-1">💡 ${r.mitigation}</div>` : ''}
+                    ${r.evidence ? `<div class="text-[11px] text-slate-600 italic mt-1">${osIcon('chart')} ${r.evidence}</div>` : ''}
+                    ${r.mitigation ? `<div class="text-[11px] text-emerald-700 mt-1">${osIcon('lightbulb')} ${r.mitigation}</div>` : ''}
                   </div>
                   <div class="flex flex-col items-end gap-1 flex-shrink-0">
                     <span class="text-[10px] bg-${r.score>=15?'red':r.score>=10?'amber':'slate'}-100 text-${r.score>=15?'red':r.score>=10?'amber':'slate'}-800 px-2 py-0.5 rounded font-bold">score ${r.score}</span>
@@ -794,12 +794,12 @@ function pmRenderRisks() {
       ` : ''}
       ${ai.recommendations && ai.recommendations.length ? `
         <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
-          <strong>🎯 Recomendaciones generales (IA):</strong>
+          <strong>${osIcon('target')} Recomendaciones generales (IA):</strong>
           <ul class="mt-1 ml-4 list-disc space-y-1">${ai.recommendations.map(r => `<li>${typeof r==='string'?r:JSON.stringify(r)}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
-      ${risks.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin riesgos registrados aún. Click "🤖 Analizar riesgos con IA" para que Claude detecte riesgos basados en tu operación.</div>` : `
+      ${risks.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin riesgos registrados aún. Click "${osIcon('bot')} Analizar riesgos con IA" para que Claude detecte riesgos basados en tu operación.</div>` : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50"><tr><th class="text-left p-2">Título</th><th class="text-center p-2">Área</th><th class="text-center p-2">Prob</th><th class="text-center p-2">Impacto</th><th class="text-center p-2">Score</th><th class="text-center p-2">Status</th></tr></thead>
@@ -849,10 +849,10 @@ function pmRenderCompliance() {
 
   // Análisis
   const insights = [];
-  if (vencidos.length > 0) insights.push(`🚨 <strong>${vencidos.length} item${vencidos.length>1?'s':''} VENCIDO${vencidos.length>1?'S':''}</strong>. Renovar urgente — pueden generar multa o paralizar operación.`);
-  if (venceMes.length > 0) insights.push(`⚠️ <strong>${venceMes.length}</strong> vence${venceMes.length>1?'n':''} en los próximos 30 días. Empezá trámite ya.`);
-  if (items.length === 0) insights.push(`📭 Sin compliance items registrados. Click "🤖 Análisis IA" para que Claude sugiera lo que probablemente te falte.`);
-  if (items.length > 0 && venceMes.length === 0 && vencidos.length === 0) insights.push(`✅ Sin items próximos a vencer. Compliance al día.`);
+  if (vencidos.length > 0) insights.push(`${osIcon('alert')} <strong>${vencidos.length} item${vencidos.length>1?'s':''} VENCIDO${vencidos.length>1?'S':''}</strong>. Renovar urgente — pueden generar multa o paralizar operación.`);
+  if (venceMes.length > 0) insights.push(`${osIcon('alert')} <strong>${venceMes.length}</strong> vence${venceMes.length>1?'n':''} en los próximos 30 días. Empezá trámite ya.`);
+  if (items.length === 0) insights.push(`Sin compliance items registrados. Click "Análisis IA" para que Claude sugiera lo que probablemente te falte.`);
+  if (items.length > 0 && venceMes.length === 0 && vencidos.length === 0) insights.push(`Sin items próximos a vencer. Compliance al día.`);
 
   return `
     <div class="space-y-3">
@@ -885,14 +885,14 @@ function pmRenderCompliance() {
 
       ${insights.length > 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis de compliance</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis de compliance</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
       ${Object.keys(byType).length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">📁 Por tipo</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('folder')} Por tipo</div>
           <div class="flex flex-wrap gap-2">
             ${Object.entries(byType).sort((a,b) => b[1]-a[1]).map(([t,n]) => `<span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded"><strong>${t}</strong>: ${n}</span>`).join('')}
           </div>
@@ -902,16 +902,16 @@ function pmRenderCompliance() {
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">Permisos, licencias, seguros con fecha de vencimiento.</div>
         <div class="flex gap-2">
-          <button onclick="pmGenerateComplianceAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude sugiere compliance items que probablemente te falten">🤖 Análisis IA</button>
+          <button onclick="pmGenerateComplianceAnalysis()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude sugiere compliance items que probablemente te falten">${osIcon('bot')} Análisis IA</button>
           <button onclick="pmAddCompliance()" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1.5 rounded font-bold">+ Agregar item</button>
         </div>
       </div>
 
-      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">🧠 Claude analizando compliance...</span></div>` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900"><span class="animate-pulse">${osIcon('brain')} Claude analizando compliance...</span></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">${osIcon('alert')} ${ai.error}</div>` : ''}
       ${ai.missing_items && ai.missing_items.length ? `
         <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 Compliance que probablemente te falta</div>
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">${osIcon('bot')} Compliance que probablemente te falta</div>
           <div class="space-y-2">
             ${ai.missing_items.map(m => `
               <div class="bg-white border border-violet-200 rounded-lg p-3 text-xs">
@@ -925,12 +925,12 @@ function pmRenderCompliance() {
       ` : ''}
       ${ai.recommendations && ai.recommendations.length ? `
         <div class="bg-emerald-50 border border-emerald-200 rounded p-3 text-xs">
-          <strong>🎯 Recomendaciones (IA):</strong>
+          <strong>${osIcon('target')} Recomendaciones (IA):</strong>
           <ul class="mt-1 ml-4 list-disc space-y-1">${ai.recommendations.map(r => `<li>${typeof r==='string'?r:JSON.stringify(r)}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
-      ${items.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin items. Click "🤖 Análisis IA" para que Claude sugiera compliance items según tu negocio.</div>` : items.map(c => {
+      ${items.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin items. Click "${osIcon('bot')} Análisis IA" para que Claude sugiera compliance items según tu negocio.</div>` : items.map(c => {
         const exp = c.expiry_date ? new Date(c.expiry_date) : null;
         const days = exp ? Math.round((exp - today) / 86400000) : null;
         const tone = days != null && days <= 0 ? 'border-red-400 bg-red-50' : days != null && days <= 30 ? 'border-amber-400 bg-amber-50' : 'border-slate-200';
@@ -982,7 +982,7 @@ function pmRenderCompanies() {
                 <td class="p-2">
                   <input value="${c.clickup_team_id || ''}" onchange="pmCompanyUpdate('${c.id}','clickup_team_id',this.value)" placeholder="9011..." class="w-32 border border-slate-300 rounded px-2 py-0.5 font-mono text-[10px]" />
                 </td>
-                <td class="p-2 text-center">${c.is_holding ? '🏛️' : '—'}</td>
+                <td class="p-2 text-center">${c.is_holding ? osIcon('landmark') : '—'}</td>
                 <td class="p-2 text-center">
                   <button onclick="pmCompanyToggle('${c.id}', ${c.active})" class="${c.active?'text-emerald-600':'text-slate-400'}">${c.active?'✓':'○'}</button>
                 </td>
@@ -992,7 +992,7 @@ function pmRenderCompanies() {
         </table>
       </div>
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] text-blue-900">
-        💡 <strong>Cómo encontrar el Space ID de ClickUp:</strong> abrí tu space → URL será <code>app.clickup.com/{team_id}/v/s/{space_id}</code>. Copiá el space_id (números) y pegalo arriba. Después corré "🔄 Sync ClickUp" en el dashboard ClickUp Análisis.
+        ${osIcon('lightbulb')} <strong>Cómo encontrar el Space ID de ClickUp:</strong> abrí tu space → URL será <code>app.clickup.com/{team_id}/v/s/{space_id}</code>. Copiá el space_id (números) y pegalo arriba. Después corré "${osIcon('refresh')} Sync ClickUp" en el dashboard ClickUp Análisis.
       </div>
     </div>
   `;
@@ -1001,7 +1001,7 @@ function pmRenderCompanies() {
 async function pmAddCompany() {
   const name = prompt('Nombre de la empresa:'); if (!name) return;
   const slug = (prompt('Slug (lowercase, sin espacios):', name.toLowerCase().replace(/\s+/g, '-')) || '').toLowerCase().replace(/\s+/g, '-');
-  const icon = prompt('Icon emoji:', '🏢') || '🏢';
+  const icon = prompt('Icon emoji:', osIcon('building')) || osIcon('building');
   const clickup_space_id = prompt('ClickUp Space ID (opcional, podés agregarlo después):', '') || null;
   await sb.from('pm_companies').insert({ name, slug, icon, clickup_space_id, active: true });
   await pmLoadAll(); pmRender();
@@ -1019,7 +1019,7 @@ async function pmCompanyToggle(id, current) {
 function pmRenderExecutive() {
   const exec = pmState.executiveCross || [];
   if (exec.length === 0) {
-    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">🏢</div><div class="font-bold">Sin empresas configuradas</div><div class="text-xs mt-2">Configurá tus empresas en tab "🏛️ Empresas" para ver el dashboard ejecutivo cross-company.</div></div>`;
+    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">${osIcon('building')}</div><div class="font-bold">Sin empresas configuradas</div><div class="text-xs mt-2">Configurá tus empresas en tab "${osIcon('landmark')} Empresas" para ver el dashboard ejecutivo cross-company.</div></div>`;
   }
   return `
     <div class="space-y-3">
@@ -1043,7 +1043,7 @@ function pmRenderExecutive() {
                   <div class="text-xs"><strong>${e.okrs_active}</strong> · progreso prom ${e.okrs_avg_progress || 0}%</div>
                 </div>
               ` : ''}
-              ${e.risks_high > 0 ? `<div class="mt-1 text-[10px] text-red-700 font-bold">🚨 ${e.risks_high} risks high</div>` : ''}
+              ${e.risks_high > 0 ? `<div class="mt-1 text-[10px] text-red-700 font-bold">${osIcon('alert')} ${e.risks_high} risks high</div>` : ''}
             </div>
           `;
         }).join('')}
@@ -1060,9 +1060,9 @@ function pmRenderPerformance() {
     <div class="space-y-3">
       <div class="flex justify-between items-center">
         <div class="text-xs text-slate-600">Performance score por persona. Composite = cumplimiento + on-time + calidad + velocidad + capacity adherence.</div>
-        <button onclick="withLoading(this, pmRunComputePerformance)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧮 Recalcular ahora</button>
+        <button onclick="withLoading(this, pmRunComputePerformance)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('calculator')} Recalcular ahora</button>
       </div>
-      ${lb.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin scores aún. Click "🧮 Recalcular ahora" para generar.</div>` : `
+      ${lb.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin scores aún. Click "${osIcon('calculator')} Recalcular ahora" para generar.</div>` : `
         <div class="border border-slate-200 rounded-xl overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50">
@@ -1133,12 +1133,12 @@ function pmRenderOKRs() {
 
   // Análisis automático
   const insights = [];
-  if (okrs.length === 0) insights.push(`📭 Sin OKRs definidos. Click "🤖 Sugerir con IA" para arrancar.`);
+  if (okrs.length === 0) insights.push(`Sin OKRs definidos. Click "Sugerir con IA" para arrancar.`);
   else {
-    if (atRisk.length > 0) insights.push(`🚨 <strong>${atRisk.length} OKR${atRisk.length>1?'s':''} at-risk</strong> — review urgente. Considerá re-scope o más recursos.`);
-    if (avgProgress < 30 && okrs.length > 0) insights.push(`📉 Progreso promedio bajo (${avgProgress}%). Si estamos a mitad de quarter, revisar targets — son muy ambiciosos o falta foco.`);
-    if (avgProgress >= 70) insights.push(`✅ Excelente progreso (${avgProgress}% prom). Validá que los targets no fueran muy bajos (debe ser stretch).`);
-    if (behind > 0) insights.push(`⚠️ <strong>${behind} OKR${behind>1?'s':''}</strong> con <30% progreso. Identificá blockers en próximo 1-on-1.`);
+    if (atRisk.length > 0) insights.push(`${osIcon('alert')} <strong>${atRisk.length} OKR${atRisk.length>1?'s':''} at-risk</strong> — review urgente. Considerá re-scope o más recursos.`);
+    if (avgProgress < 30 && okrs.length > 0) insights.push(`Progreso promedio bajo (${avgProgress}%). Si estamos a mitad de quarter, revisar targets — son muy ambiciosos o falta foco.`);
+    if (avgProgress >= 70) insights.push(`Excelente progreso (${avgProgress}% prom). Validá que los targets no fueran muy bajos (debe ser stretch).`);
+    if (behind > 0) insights.push(`${osIcon('alert')} <strong>${behind} OKR${behind>1?'s':''}</strong> con <30% progreso. Identificá blockers en próximo 1-on-1.`);
   }
 
   return `
@@ -1172,7 +1172,7 @@ function pmRenderOKRs() {
 
       ${insights.length > 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis automático</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis automático</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
@@ -1180,16 +1180,16 @@ function pmRenderOKRs() {
       <div class="flex justify-between items-center flex-wrap gap-2">
         <div class="text-xs text-slate-600">OKRs trimestrales por empresa o persona. Objetivos + Key Results medibles.</div>
         <div class="flex gap-2">
-          <button onclick="pmGenerateOKRSuggestions()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza tu operación y propone OKRs ambiciosos">🤖 Sugerir OKRs con IA</button>
+          <button onclick="pmGenerateOKRSuggestions()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold px-3 py-2 rounded" title="Claude analiza tu operación y propone OKRs ambiciosos">${osIcon('bot')} Sugerir OKRs con IA</button>
           <button onclick="pmAddOKR()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">+ OKR manual</button>
         </div>
       </div>
 
-      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center text-xs text-violet-900"><div class="text-3xl animate-pulse">🧠</div><div class="mt-2 font-bold">Claude analizando tu operación...</div><div class="text-[10px] text-violet-700 mt-1">~30 segundos · revisando ClickUp, performance, alertas, capital en obra</div></div>` : ''}
-      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">⚠️ ${ai.error}</div>` : ''}
+      ${ai.loading ? `<div class="bg-violet-50 border border-violet-200 rounded-xl p-4 text-center text-xs text-violet-900"><div class="text-3xl animate-pulse">${osIcon('brain')}</div><div class="mt-2 font-bold">Claude analizando tu operación...</div><div class="text-[10px] text-violet-700 mt-1">~30 segundos · revisando ClickUp, performance, alertas, capital en obra</div></div>` : ''}
+      ${ai.error ? `<div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-900">${osIcon('alert')} ${ai.error}</div>` : ''}
       ${ai.suggestions && ai.suggestions.length ? `
         <div class="bg-gradient-to-br from-violet-50 to-purple-50 border-2 border-violet-300 rounded-xl p-4">
-          <div class="text-xs font-bold text-violet-900 uppercase mb-2">🤖 OKRs sugeridos por Claude — ${ai.context || 'basado en tu operación actual'}</div>
+          <div class="text-xs font-bold text-violet-900 uppercase mb-2">${osIcon('bot')} OKRs sugeridos por Claude — ${ai.context || 'basado en tu operación actual'}</div>
           <div class="space-y-3">
             ${ai.suggestions.map((o, i) => `
               <div class="bg-white border border-violet-200 rounded-lg p-3">
@@ -1208,7 +1208,7 @@ function pmRenderOKRs() {
         </div>
       ` : ''}
 
-      ${okrs.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin OKRs activos. Click "🤖 Sugerir OKRs con IA" para que Claude te proponga 3-5 basados en tu operación.</div>` : okrs.map(o => `
+      ${okrs.length === 0 ? `<div class="text-center py-8 text-slate-400">Sin OKRs activos. Click "${osIcon('bot')} Sugerir OKRs con IA" para que Claude te proponga 3-5 basados en tu operación.</div>` : okrs.map(o => `
         <div class="bg-white border border-slate-200 rounded-xl p-3">
           <div class="flex justify-between items-start gap-2 flex-wrap">
             <div class="flex-1 min-w-0">
@@ -1284,10 +1284,10 @@ function pmRenderOneOnOnes() {
 
   // Análisis
   const insights = [];
-  if (overdueScheduled.length > 0) insights.push(`📅 <strong>${overdueScheduled.length}</strong> 1-on-1${overdueScheduled.length>1?'s':''} pasaron sin marcarse como completados. Actualizá el estado.`);
-  if (overdue1on1.length > 0) insights.push(`👤 <strong>${overdue1on1.length}</strong> líder${overdue1on1.length>1?'es':''} sin 1-on-1 en los últimos 14 días: ${overdue1on1.map(r => r.full_name).join(', ')}.`);
-  if (openActions.length > 0) insights.push(`📋 <strong>${openActions.length}</strong> action items pendientes de 1-on-1s previos.`);
-  if (upcoming7d.length > 0) insights.push(`📆 ${upcoming7d.length} 1-on-1${upcoming7d.length>1?'s':''} esta semana. Considerá usar "🧠 Preparar IA" para tener data lista.`);
+  if (overdueScheduled.length > 0) insights.push(`${osIcon('calendar')} <strong>${overdueScheduled.length}</strong> 1-on-1${overdueScheduled.length>1?'s':''} pasaron sin marcarse como completados. Actualizá el estado.`);
+  if (overdue1on1.length > 0) insights.push(`${osIcon('user')} <strong>${overdue1on1.length}</strong> líder${overdue1on1.length>1?'es':''} sin 1-on-1 en los últimos 14 días: ${overdue1on1.map(r => r.full_name).join(', ')}.`);
+  if (openActions.length > 0) insights.push(`${osIcon('clipboard')} <strong>${openActions.length}</strong> action items pendientes de 1-on-1s previos.`);
+  if (upcoming7d.length > 0) insights.push(`📆 ${upcoming7d.length} 1-on-1${upcoming7d.length>1?'s':''} esta semana. Considerá usar "Preparar IA" para tener data lista.`);
 
   return `
     <div class="space-y-3">
@@ -1321,14 +1321,14 @@ function pmRenderOneOnOnes() {
 
       ${insights.length > 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
       ${overdue1on1.length > 0 ? `
         <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">👤 Líderes sin 1-on-1 reciente (>14 días)</div>
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">${osIcon('user')} Líderes sin 1-on-1 reciente (>14 días)</div>
           <div class="divide-y divide-slate-100">
             ${overdue1on1.map(r => {
               const last = lastBy[r.id];
@@ -1344,7 +1344,7 @@ function pmRenderOneOnOnes() {
 
       ${openActions.length > 0 ? `
         <div class="bg-white border border-violet-200 rounded-xl overflow-hidden">
-          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 text-xs font-bold uppercase text-violet-900">📋 Action items pendientes de 1-on-1s</div>
+          <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 text-xs font-bold uppercase text-violet-900">${osIcon('clipboard')} Action items pendientes de 1-on-1s</div>
           <div class="divide-y divide-slate-100 max-h-48 overflow-y-auto">
             ${openActions.slice(0, 20).map(ai => `
               <div class="p-2 text-xs">
@@ -1366,14 +1366,14 @@ function pmRenderOneOnOnes() {
           <div class="flex justify-between gap-2 flex-wrap">
             <div>
               <div class="text-xs"><strong>${o.pm_whatsapp_recipients?.full_name || '—'}</strong> · ${o.scheduled_date ? new Date(o.scheduled_date).toLocaleString('es-MX') : 'sin fecha'} · ${o.cadence}</div>
-              <div class="text-[10px] text-slate-500">${o.status} · ${o.duration_min}min${o.ai_generated_at ? ' · 🤖 agenda IA preparada' : ''}</div>
+              <div class="text-[10px] text-slate-500">${o.status} · ${o.duration_min}min${o.ai_generated_at ? ' · agenda IA preparada' : ''}</div>
             </div>
             <div class="flex gap-1">
-              ${!o.ai_generated_at ? `<button onclick="pmPrepareOneOnOne('${o.id}')" class="bg-violet-100 hover:bg-violet-200 text-violet-700 text-[10px] font-bold px-2 py-1 rounded">🧠 Preparar IA</button>` : ''}
+              ${!o.ai_generated_at ? `<button onclick="pmPrepareOneOnOne('${o.id}')" class="bg-violet-100 hover:bg-violet-200 text-violet-700 text-[10px] font-bold px-2 py-1 rounded">${osIcon('brain')} Preparar IA</button>` : ''}
               ${o.status === 'scheduled' ? `<button onclick="pmCompleteOneOnOne('${o.id}')" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded">✓ Completar</button>` : ''}
             </div>
           </div>
-          ${o.ai_agenda_md ? `<details class="mt-2"><summary class="cursor-pointer text-[11px] text-slate-600 font-bold">📋 Agenda IA</summary><div class="mt-1 text-xs whitespace-pre-wrap bg-slate-50 rounded p-2">${o.ai_agenda_md}</div></details>` : ''}
+          ${o.ai_agenda_md ? `<details class="mt-2"><summary class="cursor-pointer text-[11px] text-slate-600 font-bold">${osIcon('clipboard')} Agenda IA</summary><div class="mt-1 text-xs whitespace-pre-wrap bg-slate-50 rounded p-2">${o.ai_agenda_md}</div></details>` : ''}
         </div>
       `).join('')}
     </div>
@@ -1407,7 +1407,7 @@ async function pmPrepareOneOnOne(id) {
       body: JSON.stringify({ one_on_one_id: id })
     });
     const r = await res.json();
-    alert(r.ok ? '✅ Agenda generada.' : 'Error: ' + r.error);
+    alert(r.ok ? 'Agenda generada.' : 'Error: ' + r.error);
     await pmLoadAll(); pmRender();
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -1429,14 +1429,14 @@ function pmRenderCoaching() {
     <div class="space-y-3">
       <div class="flex justify-between items-center">
         <div class="text-xs text-slate-600">Playbook de coaching semanal. Claude analiza performance + alertas + dailies y sugiere qué hacer con cada persona.</div>
-        <button onclick="withLoading(this, pmRunCoaching)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">🧠 Generar ahora</button>
+        <button onclick="withLoading(this, pmRunCoaching)" class="bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('brain')} Generar ahora</button>
       </div>
-      ${prompts.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin sugerencias todavía. Click "🧠 Generar ahora" o esperá al lunes 7:30am.</div>` : `
+      ${prompts.length === 0 ? `<div class="text-center py-12 text-slate-400">Sin sugerencias todavía. Click "${osIcon('brain')} Generar ahora" o esperá al lunes 7:30am.</div>` : `
         <div class="space-y-2">
           ${prompts.map(p => {
-            const prio = p.priority === 'urgent' ? '🚨' : p.priority === 'high' ? '⚠️' : p.priority === 'low' ? 'ℹ️' : '📌';
+            const prio = p.priority === 'urgent' ? osIcon('alert') : p.priority === 'high' ? osIcon('alert') : p.priority === 'low' ? '' : osIcon('map-pin');
             const tone = p.priority === 'urgent' ? 'border-red-400 bg-red-50' : p.priority === 'high' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white';
-            const type = p.prompt_type === 'recognition' ? '🏆' : p.prompt_type === 'intervention' ? '🚨' : p.prompt_type === 'learning' ? '🎓' : p.prompt_type === 'reassignment' ? '🔄' : '💬';
+            const type = p.prompt_type === 'recognition' ? osIcon('trophy') : p.prompt_type === 'intervention' ? osIcon('alert') : p.prompt_type === 'learning' ? osIcon('graduation-cap') : p.prompt_type === 'reassignment' ? osIcon('refresh') : osIcon('message');
             return `
               <div class="border-2 ${tone} rounded-xl p-3">
                 <div class="flex items-start justify-between gap-2 flex-wrap">
@@ -1444,7 +1444,7 @@ function pmRenderCoaching() {
                     <div class="text-[10px] uppercase font-bold flex items-center gap-1">${prio} ${p.priority} · ${type} ${p.prompt_type} · ${p.pm_whatsapp_recipients?.full_name || '?'}</div>
                     <div class="text-sm font-bold mt-1">${p.title}</div>
                     <div class="text-xs mt-1 whitespace-pre-wrap">${p.message}</div>
-                    ${(p.evidence || []).length ? `<div class="text-[10px] text-slate-600 mt-1">📊 ${(p.evidence || []).join(' · ')}</div>` : ''}
+                    ${(p.evidence || []).length ? `<div class="text-[10px] text-slate-600 mt-1">${osIcon('chart')} ${(p.evidence || []).join(' · ')}</div>` : ''}
                   </div>
                 </div>
               </div>
@@ -1475,7 +1475,7 @@ function pmRenderHeatmap() {
   // Reconstruimos client-side desde clickupTasks para EXCLUIR backlog (no es bottleneck — es backlog)
   const tasks = pmFilterByCompany(pmState.clickupTasks).filter(pmIsActive);
   if (tasks.length === 0) {
-    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">🔥</div><div class="font-bold">Sin tareas activas</div><div class="text-xs mt-2">Backlog excluido. Sincronizá ClickUp si recién configuraste el space.</div></div>`;
+    return `<div class="text-center py-12 text-slate-500"><div class="text-5xl mb-3">${osIcon('flame')}</div><div class="font-bold">Sin tareas activas</div><div class="text-xs mt-2">Backlog excluido. Sincronizá ClickUp si recién configuraste el space.</div></div>`;
   }
 
   const buckets = ['0-1d','2-3d','4-7d','8-14d','15d+'];
@@ -1516,29 +1516,29 @@ function pmRenderHeatmap() {
   const analysisLines = [];
   if (hottest && hottest.count > 0) {
     if (hottest.bucket === '15d+') {
-      analysisLines.push(`🚨 <strong>Cuello de botella crítico:</strong> ${hottest.count} tareas atascadas en status "<strong>${hottest.status}</strong>" por más de 15 días. Esto es donde el flujo se está rompiendo. Hacé review específico de estas con los asignados.`);
+      analysisLines.push(`${osIcon('alert')} <strong>Cuello de botella crítico:</strong> ${hottest.count} tareas atascadas en status "<strong>${hottest.status}</strong>" por más de 15 días. Esto es donde el flujo se está rompiendo. Hacé review específico de estas con los asignados.`);
     } else if (hottest.bucket === '8-14d') {
-      analysisLines.push(`⚠️ <strong>Atención:</strong> ${hottest.count} tareas llevan 8-14 días en "<strong>${hottest.status}</strong>". Si pasan a 15d+, son cuello de botella.`);
+      analysisLines.push(`${osIcon('alert')} <strong>Atención:</strong> ${hottest.count} tareas llevan 8-14 días en "<strong>${hottest.status}</strong>". Si pasan a 15d+, son cuello de botella.`);
     } else {
-      analysisLines.push(`✅ El status más cargado es "<strong>${hottest.status}</strong>" con ${hottest.count} tareas en ${hottest.bucket} — flujo saludable.`);
+      analysisLines.push(`${osIcon('check-circle')} El status más cargado es "<strong>${hottest.status}</strong>" con ${hottest.count} tareas en ${hottest.bucket} — flujo saludable.`);
     }
   }
   const stale15 = tasks.filter(t => (Date.now() - new Date(t.date_updated || t.date_created)) / 86400000 > 14).length;
   if (stale15 >= 5) {
-    analysisLines.push(`📊 <strong>${stale15} tareas activas llevan +15 días sin actualizarse</strong> (${Math.round(stale15/tasks.length*100)}% del total activo). Revisá si están bloqueadas o reasignar.`);
+    analysisLines.push(`${osIcon('chart')} <strong>${stale15} tareas activas llevan +15 días sin actualizarse</strong> (${Math.round(stale15/tasks.length*100)}% del total activo). Revisá si están bloqueadas o reasignar.`);
   }
   // Personas con tareas viejas
   const oldByPerson = {};
   worstTasks.forEach(t => { const p = t.primary_assignee; if (!p) return; oldByPerson[p] = (oldByPerson[p]||0)+1; });
   const topStuckPerson = Object.entries(oldByPerson).sort((a,b) => b[1]-a[1])[0];
   if (topStuckPerson && topStuckPerson[1] >= 3) {
-    analysisLines.push(`👤 <strong>${topStuckPerson[0]}</strong> tiene ${topStuckPerson[1]} tareas atascadas +15d. Posible sobrecarga o bloqueo. Hablá 1-on-1.`);
+    analysisLines.push(`${osIcon('user')} <strong>${topStuckPerson[0]}</strong> tiene ${topStuckPerson[1]} tareas atascadas +15d. Posible sobrecarga o bloqueo. Hablá 1-on-1.`);
   }
 
   return `
     <div class="space-y-3">
       <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
-        <strong>🔥 Heatmap de bottlenecks (solo tareas activas, backlog excluido):</strong>
+        <strong>${osIcon('flame')} Heatmap de bottlenecks (solo tareas activas, backlog excluido):</strong>
         <p class="mt-1 text-slate-600">Cuántas tareas asignadas llevan X días sin update en cada status. Rojo = atascadas hace mucho. El status con muchas celdas rojas es donde el flujo se rompe.</p>
       </div>
 
@@ -1573,7 +1573,7 @@ function pmRenderHeatmap() {
       <!-- Análisis automático -->
       ${analysisLines.length > 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis automático</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis automático</div>
           <ul class="space-y-1.5 text-xs text-slate-700">
             ${analysisLines.map(l => `<li>${l}</li>`).join('')}
           </ul>
@@ -1584,7 +1584,7 @@ function pmRenderHeatmap() {
       ${worstTasks.length > 0 ? `
         <div class="border border-red-200 rounded-xl overflow-hidden">
           <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">
-            🚨 Top tareas atascadas (15+ días sin update) — ${worstTasks.length}
+            ${osIcon('alert')} Top tareas atascadas (15+ días sin update) — ${worstTasks.length}
           </div>
           <div class="max-h-72 overflow-y-auto">
             <table class="w-full text-xs">
@@ -1616,7 +1616,7 @@ function pmRenderHeatmap() {
         </div>
       ` : ''}
 
-      <div class="text-[11px] text-slate-500 italic">💡 Hovereá las celdas para ver los nombres de las tareas atascadas. Las celdas rojas son el cuello de botella real.</div>
+      <div class="text-[11px] text-slate-500 italic">${osIcon('lightbulb')} Hovereá las celdas para ver los nombres de las tareas atascadas. Las celdas rojas son el cuello de botella real.</div>
     </div>
   `;
 }
@@ -1641,9 +1641,9 @@ function pmRenderHoldingPulse() {
 
   if (exec.length === 0) {
     return `<div class="text-center py-12 text-slate-500">
-      <div class="text-5xl mb-3">🏢</div>
+      <div class="text-5xl mb-3">${osIcon('building')}</div>
       <div class="font-bold">Sin data de empresas todavía</div>
-      <div class="text-xs mt-2 max-w-md mx-auto">Corré "🔄 Sync" arriba para que ClickUp tire data en las 3 empresas. Si recién configuraste los space IDs, esto puede tardar 30-60 seg.</div>
+      <div class="text-xs mt-2 max-w-md mx-auto">Corré "${osIcon('refresh')} Sync" arriba para que ClickUp tire data en las 3 empresas. Si recién configuraste los space IDs, esto puede tardar 30-60 seg.</div>
     </div>`;
   }
 
@@ -1651,13 +1651,13 @@ function pmRenderHoldingPulse() {
     <div class="space-y-4">
       <!-- KPIs totales del holding -->
       <div class="bg-slate-900 text-white rounded-xl p-4">
-        <div class="text-xs text-slate-400 uppercase font-bold mb-2">🏛️ Holding Total</div>
+        <div class="text-xs text-slate-400 uppercase font-bold mb-2">${osIcon('landmark')} Holding Total</div>
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div><div class="text-[10px] text-slate-400 uppercase" title="Tareas asignadas + no en backlog">Activas</div><div class="text-3xl font-bold">${totalActive}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Vencidas</div><div class="text-3xl font-bold ${totalOverdue>10?'text-red-300':'text-amber-300'}">${totalOverdue}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Cerradas 7d</div><div class="text-3xl font-bold text-emerald-300">${totalClosed7d}</div></div>
           <div><div class="text-[10px] text-slate-400 uppercase">Personas activas</div><div class="text-3xl font-bold">${totalPeople}</div></div>
-          <div><div class="text-[10px] text-slate-400 uppercase" title="Backlog NO se cuenta en activas/vencidas">📥 Backlog</div><div class="text-3xl font-bold text-violet-300">${totalBacklog}</div></div>
+          <div><div class="text-[10px] text-slate-400 uppercase" title="Backlog NO se cuenta en activas/vencidas">${osIcon('inbox')} Backlog</div><div class="text-3xl font-bold text-violet-300">${totalBacklog}</div></div>
         </div>
       </div>
 
@@ -1680,11 +1680,11 @@ function pmRenderHoldingPulse() {
                 <div><div class="text-[10px] text-slate-500 uppercase">Vencidas</div><div class="text-2xl font-bold ${myOverdue>5?'text-red-700':'text-slate-700'}">${myOverdue}</div></div>
                 <div><div class="text-[10px] text-slate-500 uppercase">Cerradas 7d</div><div class="text-2xl font-bold text-emerald-700">${myClosed7d}</div></div>
                 <div><div class="text-[10px] text-slate-500 uppercase">Personas</div><div class="text-2xl font-bold">${myPeople}</div></div>
-                <div class="col-span-2"><div class="text-[10px] text-violet-600 uppercase font-bold">📥 Backlog (no cuenta como activa)</div><div class="text-xl font-bold text-violet-700">${myBacklog}</div></div>
+                <div class="col-span-2"><div class="text-[10px] text-violet-600 uppercase font-bold">${osIcon('inbox')} Backlog (no cuenta como activa)</div><div class="text-xl font-bold text-violet-700">${myBacklog}</div></div>
               </div>
               ${e.avg_score_this_week ? `<div class="mt-2 pt-2 border-t border-slate-200"><div class="text-[10px] text-slate-500 uppercase">Score equipo (semana)</div><div class="text-xl font-bold ${e.avg_score_this_week>=80?'text-emerald-700':e.avg_score_this_week>=60?'text-amber-700':'text-red-700'}">${e.avg_score_this_week}/100</div></div>` : ''}
               ${e.okrs_active > 0 ? `<div class="mt-1 text-[11px]"><strong>${e.okrs_active}</strong> OKRs · ${e.okrs_avg_progress||0}% progreso</div>` : ''}
-              ${e.risks_high > 0 ? `<div class="mt-1 text-[11px] text-red-700 font-bold">🚨 ${e.risks_high} risks high</div>` : ''}
+              ${e.risks_high > 0 ? `<div class="mt-1 text-[11px] text-red-700 font-bold">${osIcon('alert')} ${e.risks_high} risks high</div>` : ''}
               <div class="mt-2 text-[10px] text-slate-400">→ Click para drill-down</div>
             </button>
           `;
@@ -1694,7 +1694,7 @@ function pmRenderHoldingPulse() {
       <!-- Alertas activas top -->
       ${alerts.length > 0 ? `
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">🚨 Alertas activas (${alerts.length})</div>
+          <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">${osIcon('alert')} Alertas activas (${alerts.length})</div>
           <div class="max-h-64 overflow-y-auto divide-y divide-slate-100">
             ${alerts.slice(0, 20).map(a => `
               <div class="p-2 text-xs flex justify-between items-start gap-2">
@@ -1718,9 +1718,9 @@ function pmRenderEmpresaPulse() {
   if (!co) return `<div class="text-center py-12 text-slate-500">Empresa no encontrada.</div>`;
   if (!co.clickup_space_id) {
     return `<div class="text-center py-12">
-      <div class="text-5xl mb-3">⚠️</div>
+      <div class="text-5xl mb-3">${osIcon('alert')}</div>
       <div class="font-bold text-amber-700">Falta configurar el ClickUp Space ID</div>
-      <div class="text-xs mt-2 text-slate-500">Andá al tab "🏛️ Empresas" y pegá el space_id de ${co.name}.</div>
+      <div class="text-xs mt-2 text-slate-500">Andá al tab "${osIcon('landmark')} Empresas" y pegá el space_id de ${co.name}.</div>
     </div>`;
   }
 
@@ -1797,7 +1797,7 @@ function pmRenderEmpresaPulse() {
           <div class="text-3xl font-bold text-emerald-900">${closed7d.length}</div>
         </div>
         <div class="bg-violet-50 border border-violet-200 rounded-xl p-3" title="Tareas SIN persona asignada — pendientes de tomar dueño. NO se cuentan como vencidas.">
-          <div class="text-[10px] text-violet-700 uppercase font-bold">📥 Backlog</div>
+          <div class="text-[10px] text-violet-700 uppercase font-bold">${osIcon('inbox')} Backlog</div>
           <div class="text-3xl font-bold text-violet-900">${backlog.length}</div>
           <div class="text-[10px] text-violet-700">sin asignar</div>
         </div>
@@ -1806,15 +1806,15 @@ function pmRenderEmpresaPulse() {
       <!-- Cycle time histórico (cerradas) -->
       ${avgCycleLate !== null ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
-          <strong>⏱ Velocidad histórica:</strong> Promedio de cierre vs due date en las últimas ${closedWithDue.length} tareas: <span class="${avgCycleLate>0?'text-red-700':'text-emerald-700'} font-bold">${avgCycleLate>0?'+':''}${avgCycleLate} días</span>
-          ${avgCycleLate>0 ? `<span class="text-slate-600 ml-2">→ las tareas se cierran ${avgCycleLate} días después de su fecha objetivo. Mejorar planning de duedates o capacidad.</span>` : `<span class="text-emerald-700 ml-2">→ el equipo cierra a tiempo. 👏</span>`}
+          <strong>${osIcon('clock')} Velocidad histórica:</strong> Promedio de cierre vs due date en las últimas ${closedWithDue.length} tareas: <span class="${avgCycleLate>0?'text-red-700':'text-emerald-700'} font-bold">${avgCycleLate>0?'+':''}${avgCycleLate} días</span>
+          ${avgCycleLate>0 ? `<span class="text-slate-600 ml-2">→ las tareas se cierran ${avgCycleLate} días después de su fecha objetivo. Mejorar planning de duedates o capacidad.</span>` : `<span class="text-emerald-700 ml-2">→ el equipo cierra a tiempo. </span>`}
         </div>
       ` : ''}
 
       <!-- Por status (activas) + Por persona, lado a lado -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">📊 Por status (solo activas, NO backlog)</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('chart')} Por status (solo activas, NO backlog)</div>
           ${Object.keys(byStatus).length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin tareas activas.</div>' : `
             <table class="w-full text-xs">
               <tbody>
@@ -1833,7 +1833,7 @@ function pmRenderEmpresaPulse() {
         </div>
 
         <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">👥 Carga por persona (top 10, solo activas)</div>
+          <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">${osIcon('users')} Carga por persona (top 10, solo activas)</div>
           ${topPeople.length === 0 ? '<div class="p-4 text-center text-xs text-slate-400">Sin asignados.</div>' : `
             <table class="w-full text-xs">
               <tbody>
@@ -1854,13 +1854,13 @@ function pmRenderEmpresaPulse() {
       ${backlog.length > 0 ? `
         <div class="bg-white border border-violet-200 rounded-xl overflow-hidden">
           <div class="bg-violet-50 border-b border-violet-200 px-3 py-2 text-xs font-bold uppercase text-violet-900 flex justify-between">
-            <span>📥 Backlog por folder (${backlog.length} tareas sin dueño)</span>
+            <span>${osIcon('inbox')} Backlog por folder (${backlog.length} tareas sin dueño)</span>
             <span class="text-[10px] font-normal text-violet-700">Estas tareas están esperando que alguien las tome — asigná un responsable o dejalas en backlog si todavía no es el momento</span>
           </div>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-1 p-2">
             ${Object.entries(backlogByFolder).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([folder, n]) => `
               <div class="bg-violet-50 border border-violet-200 rounded p-2 text-xs">
-                <div class="font-bold text-violet-900 truncate" title="${folder}">📁 ${folder}</div>
+                <div class="font-bold text-violet-900 truncate" title="${folder}">${folder}</div>
                 <div class="text-violet-700">${n} sin asignar</div>
               </div>
             `).join('')}
@@ -1872,7 +1872,7 @@ function pmRenderEmpresaPulse() {
       ${overdue.length > 0 ? `
         <div class="bg-white border border-red-200 rounded-xl overflow-hidden">
           <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900 flex justify-between">
-            <span>🚨 Top vencidas (${overdue.length})</span>
+            <span>${osIcon('alert')} Top vencidas (${overdue.length})</span>
             <span class="text-[10px] font-normal text-red-700">tarea + folder + lista + responsable + días vencidas</span>
           </div>
           <div class="max-h-72 overflow-auto">
@@ -1909,7 +1909,7 @@ function pmRenderEmpresaPulse() {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         ${myAlerts.length > 0 ? `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase text-amber-900">⚠️ Alertas (${myAlerts.length}) — origen detallado</div>
+            <div class="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs font-bold uppercase text-amber-900">${osIcon('alert')} Alertas (${myAlerts.length}) — origen detallado</div>
             <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
               ${myAlerts.slice(0, 12).map(a => `
                 <div class="p-2 text-xs">
@@ -1921,7 +1921,7 @@ function pmRenderEmpresaPulse() {
                     </div>
                     <span class="text-[10px] bg-${a.severity==='critical'?'red':'amber'}-100 text-${a.severity==='critical'?'red':'amber'}-800 px-2 py-0.5 rounded flex-shrink-0">${a.severity}</span>
                   </div>
-                  ${a.related_folder_id ? `<div class="text-[10px] text-slate-400 mt-1">📁 folder_id: ${a.related_folder_id}${a.metric_value!=null?` · ${a.metric_value}`:''}</div>` : ''}
+                  ${a.related_folder_id ? `<div class="text-[10px] text-slate-400 mt-1">${osIcon('folder')} folder_id: ${a.related_folder_id}${a.metric_value!=null?` · ${a.metric_value}`:''}</div>` : ''}
                 </div>
               `).join('')}
             </div>
@@ -1929,7 +1929,7 @@ function pmRenderEmpresaPulse() {
         ` : ''}
         ${myRisks.length > 0 ? `
           <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">⚠️ Riesgos (${myRisks.length})</div>
+            <div class="bg-red-50 border-b border-red-200 px-3 py-2 text-xs font-bold uppercase text-red-900">${osIcon('alert')} Riesgos (${myRisks.length})</div>
             <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
               ${myRisks.slice(0, 10).map(r => `
                 <div class="p-2 text-xs">
@@ -1972,9 +1972,9 @@ function pmRenderClickUpTasks() {
 
   const filters = [
     ['active', `Activas (${tasks.filter(pmIsActive).length})`],
-    ['overdue', `🚨 Vencidas (${tasks.filter(pmIsOverdue).length})`],
-    ['backlog', `📥 Backlog (${tasks.filter(pmIsBacklog).length})`],
-    ['closed7d', `✅ Cerradas 7d`],
+    ['overdue', `Vencidas (${tasks.filter(pmIsOverdue).length})`],
+    ['backlog', `Backlog (${tasks.filter(pmIsBacklog).length})`],
+    ['closed7d', `Cerradas 7d`],
     ['closed', `Cerradas (${tasks.filter(pmIsClosed).length})`],
     ['all', `Todas (${tasks.length})`]
   ];
@@ -2015,7 +2015,7 @@ function pmRenderClickUpTasks() {
                   ? `<span class="text-[10px] text-slate-500">cerró </span>${new Date(t.date_closed).toLocaleDateString('es-MX')}`
                   : t.due_date ? new Date(t.due_date).toLocaleDateString('es-MX') : '—';
                 return `<tr class="border-t border-slate-100 ${rowCls} hover:bg-slate-50">
-                  <td class="p-2 font-semibold truncate max-w-xs">${isBack?'📥 ':''}${t.name || '(sin título)'}</td>
+                  <td class="p-2 font-semibold truncate max-w-xs">${isBack?osIcon('inbox'):''}${t.name || '(sin título)'}</td>
                   <td class="p-2 text-[10px] text-slate-600">${pmTaskContext(t)}</td>
                   <td class="p-2"><span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">${t.status || '—'}</span></td>
                   <td class="p-2 text-[11px] text-slate-700">${t.primary_assignee || '<span class="text-violet-700 font-bold">— sin asignar</span>'}</td>
@@ -2074,12 +2074,12 @@ function pmRenderTeam() {
 
   // Análisis automático
   const insights = [];
-  if (overloaded > 0) insights.push(`🔥 <strong>${overloaded}</strong> persona${overloaded>1?'s':''} sobrecargada${overloaded>1?'s':''} (≥15 tareas). Considerá rebalancear.`);
+  if (overloaded > 0) insights.push(`${osIcon('flame')} <strong>${overloaded}</strong> persona${overloaded>1?'s':''} sobrecargada${overloaded>1?'s':''} (≥15 tareas). Considerá rebalancear.`);
   if (totalOverdueByTeam > totalActive * 0.2) insights.push(`🚨 ${Math.round(totalOverdueByTeam/totalActive*100)}% del backlog activo está vencido. El equipo no llega — revisar capacidad o priorización.`);
   const topPerformer = list[0];
-  if (topPerformer && topPerformer[1].overdue === 0 && topPerformer[1].total >= 5) insights.push(`✅ <strong>${topPerformer[0]}</strong> tiene ${topPerformer[1].total} activas y 0 vencidas. Reconocer públicamente.`);
+  if (topPerformer && topPerformer[1].overdue === 0 && topPerformer[1].total >= 5) insights.push(`${osIcon('check-circle')} <strong>${topPerformer[0]}</strong> tiene ${topPerformer[1].total} activas y 0 vencidas. Reconocer públicamente.`);
   const slowest = [...list].sort((a,b) => (b[1].avgCycle||-999) - (a[1].avgCycle||-999))[0];
-  if (slowest && slowest[1].avgCycle > 5) insights.push(`⏱ <strong>${slowest[0]}</strong> cierra en promedio ${slowest[1].avgCycle}d después del due. Posible 1-on-1 sobre planning.`);
+  if (slowest && slowest[1].avgCycle > 5) insights.push(`${osIcon('clock')} <strong>${slowest[0]}</strong> cierra en promedio ${slowest[1].avgCycle}d después del due. Posible 1-on-1 sobre planning.`);
 
   // Performance leaderboard filtrado
   const lb = (pmState.leaderboard || []).filter(p => pmState.currentCompany === 'holding' || p.company_name === co?.name);
@@ -2120,14 +2120,14 @@ function pmRenderTeam() {
       <!-- Análisis automático -->
       ${insights.length > 0 ? `
         <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <div class="text-xs font-bold uppercase text-amber-900 mb-2">🤖 Análisis del equipo</div>
+          <div class="text-xs font-bold uppercase text-amber-900 mb-2">${osIcon('bot')} Análisis del equipo</div>
           <ul class="space-y-1 text-xs text-slate-700">${insights.map(i => `<li>• ${i}</li>`).join('')}</ul>
         </div>
       ` : ''}
 
       <!-- Workload detallado -->
       <div>
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">📊 Carga real por persona (solo activas, excluye backlog)</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('chart')} Carga real por persona (solo activas, excluye backlog)</div>
         ${list.length === 0 ? '<div class="text-center py-8 text-slate-400">Sin gente asignada todavía. Sincronizá ClickUp.</div>' : `
           <div class="border border-slate-200 rounded-xl overflow-hidden">
             <table class="w-full text-xs">
@@ -2146,7 +2146,7 @@ function pmRenderTeam() {
                   const overPct = s.total > 0 ? Math.round(s.overdue/s.total*100) : 0;
                   const isOverloaded = s.total >= 15;
                   return `<tr class="border-t border-slate-100 ${isOverloaded?'bg-amber-50':''} hover:bg-slate-50">
-                    <td class="p-2 font-semibold">${p} ${isOverloaded?'🔥':''}</td>
+                    <td class="p-2 font-semibold">${p} ${isOverloaded?osIcon('flame'):''}</td>
                     <td class="p-2 text-right font-bold ${s.total>=15?'text-amber-700':''}">${s.total}</td>
                     <td class="p-2 text-right ${s.overdue>0?'text-red-700 font-bold':'text-slate-400'}">${s.overdue} ${s.overdue?`(${overPct}%)`:''}</td>
                     <td class="p-2 text-right ${s.stale15>0?'text-amber-700':'text-slate-400'}">${s.stale15||''}</td>
@@ -2163,7 +2163,7 @@ function pmRenderTeam() {
       <!-- Performance leaderboard (si hay data) -->
       ${lb.length > 0 ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🏆 Performance semana actual</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('trophy')} Performance semana actual</div>
           <div class="border border-slate-200 rounded-xl overflow-hidden">
             <table class="w-full text-xs">
               <thead class="bg-slate-50"><tr><th class="text-left p-2">Persona</th><th class="text-center p-2">Score</th><th class="text-center p-2">Tier</th><th class="text-center p-2">Tend</th></tr></thead>
@@ -2185,7 +2185,7 @@ function pmRenderTeam() {
       <!-- Coaching prompts -->
       ${coaching.length > 0 ? `
         <div>
-          <div class="text-xs font-bold uppercase text-slate-700 mb-2">🧠 Coaching sugerido por IA (pendientes)</div>
+          <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('brain')} Coaching sugerido por IA (pendientes)</div>
           <div class="space-y-2">
             ${coaching.map(p => `
               <div class="border ${p.priority==='urgent'?'border-red-400 bg-red-50':p.priority==='high'?'border-amber-400 bg-amber-50':'border-slate-200 bg-white'} rounded-xl p-3">
@@ -2250,12 +2250,12 @@ function pmRenderDecisiones() {
   };
 
   const sections = [
-    { title: '🔴 Vencidas (activas)', desc: 'Tareas asignadas con due_date pasado. Excluye backlog.', items: overdue, render: t => taskRow(t) },
-    { title: '🟣 Backlog urgente', desc: 'Sin persona asignada PERO con due date ≤ 7 días. Asignar YA.', items: backlogUrgent, render: t => taskRow(t) },
-    { title: '🟡 Alta prio sin fecha', desc: 'Activas con prioridad urgent/high pero sin due_date — riesgo de quedar olvidadas.', items: noDue, render: t => taskRow(t) },
-    { title: '🚨 Riesgos score ≥ 12', desc: 'Probabilidad × Impacto ≥ 12 → atención inmediata.', items: riskHigh, render: r => `<div class="text-xs"><strong>${r.title}</strong> · score ${r.score} · owner ${r.owner||'?'} · ${r.category||''}</div>` },
-    { title: '📜 Compliance vence < 30d', desc: 'Permisos/licencias/seguros que vencen pronto. Renovar antes.', items: compSoon, render: c => `<div class="text-xs"><strong>${c.title}</strong> · vence ${c.expiry_date} (${Math.floor((new Date(c.expiry_date)-now)/86400000)}d) · ${c.area||''}</div>` },
-    { title: '🔗 Dependencias bloqueando', desc: 'X bloquea Y cross-área. Si no se resuelve, Y no avanza.', items: deps, render: d => `<div class="text-xs"><strong>${d.source_label}</strong> [${d.source_area}] → bloquea → <strong>${d.target_label}</strong> [${d.target_area}] · severidad ${d.severity}</div>` }
+    { title: 'Vencidas (activas)', desc: 'Tareas asignadas con due_date pasado. Excluye backlog.', items: overdue, render: t => taskRow(t) },
+    { title: 'Backlog urgente', desc: 'Sin persona asignada PERO con due date ≤ 7 días. Asignar YA.', items: backlogUrgent, render: t => taskRow(t) },
+    { title: 'Alta prio sin fecha', desc: 'Activas con prioridad urgent/high pero sin due_date — riesgo de quedar olvidadas.', items: noDue, render: t => taskRow(t) },
+    { title: 'Riesgos score ≥ 12', desc: 'Probabilidad × Impacto ≥ 12 → atención inmediata.', items: riskHigh, render: r => `<div class="text-xs"><strong>${r.title}</strong> · score ${r.score} · owner ${r.owner||'?'} · ${r.category||''}</div>` },
+    { title: '' + osIcon('file') + ' Compliance vence < 30d', desc: 'Permisos/licencias/seguros que vencen pronto. Renovar antes.', items: compSoon, render: c => `<div class="text-xs"><strong>${c.title}</strong> · vence ${c.expiry_date} (${Math.floor((new Date(c.expiry_date)-now)/86400000)}d) · ${c.area||''}</div>` },
+    { title: 'Dependencias bloqueando', desc: 'X bloquea Y cross-área. Si no se resuelve, Y no avanza.', items: deps, render: d => `<div class="text-xs"><strong>${d.source_label}</strong> [${d.source_area}] → bloquea → <strong>${d.target_label}</strong> [${d.target_area}] · severidad ${d.severity}</div>` }
   ];
 
   const totalAccion = sections.reduce((s, x) => s + x.items.length, 0);
@@ -2282,7 +2282,7 @@ function pmRenderDecisiones() {
           </div>
         </div>
       `).join('')}
-      ${totalAccion === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">✅</div><div class="font-bold mt-2">Sin decisiones pendientes</div><div class="text-xs text-slate-500 mt-1">Todo bajo control en ${co?co.name:'el holding'}.</div></div>` : ''}
+      ${totalAccion === 0 ? `<div class="text-center py-12 text-emerald-700"><div class="text-5xl">${osIcon('check-circle')}</div><div class="font-bold mt-2">Sin decisiones pendientes</div><div class="text-xs text-slate-500 mt-1">Todo bajo control en ${co?co.name:'el holding'}.</div></div>` : ''}
     </div>
   `;
 }
@@ -2394,7 +2394,7 @@ async function pmAdoptOKRSuggestion(idx) {
   ai.suggestions.splice(idx, 1);
   await pmLoadAll();
   pmRender();
-  alert('✅ OKR adoptado y activo. Ya aparece en tu lista.');
+  alert('OKR adoptado y activo. Ya aparece en tu lista.');
 }
 
 async function pmAdoptDetectedRisk(idx) {
@@ -2417,7 +2417,7 @@ async function pmAdoptDetectedRisk(idx) {
   ai.detected_risks.splice(idx, 1);
   await pmLoadAll();
   pmRender();
-  alert('✅ Riesgo agregado a tu register.');
+  alert('Riesgo agregado a tu register.');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2429,11 +2429,11 @@ const pmComposerState = { selectedIds: new Set(), tono: 'amigable', context: '' 
 
 function pmOpenQuickComposer() {
   const recipients = (pmState.recipients || []).filter(r => r.active);
-  if (!recipients.length) return alert('Sin destinatarios activos. Agregá uno desde la sección "👥 Destinatarios".');
+  if (!recipients.length) return alert('Sin destinatarios activos. Agregá uno desde la sección "Destinatarios".');
 
   pmComposerState.selectedIds = new Set(recipients.map(r => r.id));
 
-  openModal('✍️ Componer mensaje · WhatsApp Cloud API', `
+  openModal('Componer mensaje · WhatsApp Cloud API', `
     <div class="space-y-3 max-h-[80vh] overflow-y-auto pr-1">
       <div class="bg-blue-50 border border-blue-200 rounded p-2 text-xs text-blue-900">
         Mensaje único enviado automáticamente vía Cloud API. Sin abrir pestañas. Si el setup todavía no está hecho, te muestro la guía.
@@ -2441,7 +2441,7 @@ function pmOpenQuickComposer() {
 
       <!-- Destinatarios -->
       <div class="bg-white border border-slate-200 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-slate-700 mb-2">👥 Destinatarios (${recipients.length})</div>
+        <div class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('users')} Destinatarios (${recipients.length})</div>
         <div class="flex gap-1.5 mb-2">
           <button onclick="pmComposerCheckAll(true)" class="text-[11px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-2 py-1 rounded font-bold">✓ Todos</button>
           <button onclick="pmComposerCheckAll(false)" class="text-[11px] bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded font-bold">✕ Ninguno</button>
@@ -2461,16 +2461,16 @@ function pmOpenQuickComposer() {
 
       <!-- Mensaje -->
       <div>
-        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">📝 Mensaje (puede usar {nombre} para personalizar)</label>
+        <label class="block text-xs font-bold uppercase text-slate-700 mb-1">${osIcon('pencil-line')} Mensaje (puede usar {nombre} para personalizar)</label>
         <textarea id="pm-composer-msg" rows="6" placeholder="Ej: Hola {nombre}, recordatorio que mañana 9am tenemos sync semanal. Llegá con avance de tus 3 OKRs principales." class="w-full border border-slate-300 rounded px-3 py-2 text-sm">${(pmComposerState.context || '').replace(/</g,'&lt;')}</textarea>
-        <div class="text-[10px] text-slate-500 mt-1">💡 {nombre} se reemplaza con el primer nombre de cada destinatario.</div>
+        <div class="text-[10px] text-slate-500 mt-1">${osIcon('lightbulb')} {nombre} se reemplaza con el primer nombre de cada destinatario.</div>
       </div>
 
       <!-- Botones -->
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="pmComposerSendManual()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Abre wa.me por cada destinatario (manual)">📲 Manual</button>
-        <button onclick="pmComposerSendCloud()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 rounded" title="Envía vía Cloud API sin abrir pestañas">🚀 Enviar automático</button>
+        <button onclick="pmComposerSendManual()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2 rounded" title="Abre wa.me por cada destinatario (manual)">${osIcon('phone')} Manual</button>
+        <button onclick="pmComposerSendCloud()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 rounded" title="Envía vía Cloud API sin abrir pestañas">${osIcon('rocket')} Enviar automático</button>
       </div>
     </div>
   `);
@@ -2522,7 +2522,7 @@ async function pmComposerSendCloud() {
   if (pmComposerState.selectedIds.size === 0) return alert('Seleccioná al menos un destinatario');
 
   const recipients = (pmState.recipients || []).filter(r => pmComposerState.selectedIds.has(r.id));
-  if (!confirm(`🚀 Enviar ${recipients.length} mensajes vía Cloud API (sin abrir pestañas)?`)) return;
+  if (!confirm(`Enviar ${recipients.length} mensajes vía Cloud API (sin abrir pestañas)?`)) return;
 
   // 1) Insertar mensajes en pm_whatsapp_messages
   const rows = recipients.map(r => ({
@@ -2549,7 +2549,7 @@ async function pmComposerSendCloud() {
   // 2) Llamar a la edge function genérica con source=pm
   const overlay = document.createElement('div');
   overlay.className = 'fixed inset-0 z-[200] bg-slate-900/80 flex items-center justify-center p-4';
-  overlay.innerHTML = '<div class="bg-white rounded-2xl p-6 text-center"><div class="text-4xl animate-pulse">🚀</div><div class="font-bold mt-2">Enviando vía Cloud API...</div></div>';
+  overlay.innerHTML = '<div class="bg-white rounded-2xl p-6 text-center"><div class="text-4xl animate-pulse">' + osIcon('rocket') + '</div><div class="font-bold mt-2">Enviando vía Cloud API...</div></div>';
   document.body.appendChild(overlay);
 
   try {
@@ -2574,7 +2574,7 @@ async function pmComposerSendCloud() {
     await pmLoadAll();
     pmRender();
     closeModal();
-    alert(`✅ Envío completado:\n\n✓ Enviados: ${r.sent || 0}\n✗ Fallaron: ${r.failed || 0}`);
+    alert(`Envío completado:\n\n✓ Enviados: ${r.sent || 0}\n✗ Fallaron: ${r.failed || 0}`);
   } catch (e) {
     overlay.remove();
     alert('Error: ' + e.message);
@@ -2582,7 +2582,7 @@ async function pmComposerSendCloud() {
 }
 
 function pmShowCloudSetup() {
-  openModal('⚙️ Setup Cloud API requerido', `
+  openModal('Setup Cloud API requerido', `
     <div class="space-y-3">
       <div class="bg-amber-50 border border-amber-300 rounded p-3 text-xs text-amber-900">
         La edge function <code>whatsapp-send-cloud</code> o las credenciales Meta no están listas.
@@ -2599,7 +2599,7 @@ supabase functions deploy whatsapp-send-cloud --no-verify-jwt</pre>
           </li>
           <li>Listo. Sirve para PM + Educación</li>
         </ol>
-        <div class="mt-2 text-[10px] text-slate-500">📖 Guía completa en docs/whatsapp-cloud-api-setup.md</div>
+        <div class="mt-2 text-[10px] text-slate-500">${osIcon('book')} Guía completa en docs/whatsapp-cloud-api-setup.md</div>
       </div>
       <button onclick="closeModal()" class="w-full bg-slate-900 text-white text-sm font-bold py-2 rounded">Entendido</button>
     </div>

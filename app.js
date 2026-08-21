@@ -15,12 +15,12 @@ let state = {
 
 // ===== Tipos =====
 const SYSTEM_TYPES = {
-  link: { label: 'Link externo', icon: '🔗', desc: 'URL a una app web o servicio' },
-  app: { label: 'App de escritorio', icon: '🖥️', desc: 'Aplicación instalada (usa URL scheme)' },
-  table: { label: 'Tabla / Base de datos', icon: '📋', desc: 'Formulario + tabla editable' },
-  checklist: { label: 'Checklist / SOP', icon: '✅', desc: 'Lista de pasos marcables' },
-  calculator: { label: 'Calculadora', icon: '🧮', desc: 'Inputs numéricos + fórmula' },
-  notes: { label: 'Notas / Documento', icon: '📝', desc: 'Texto libre por proyecto' }
+  link: { label: 'Link externo', icon: osIcon('link'), desc: 'URL a una app web o servicio' },
+  app: { label: 'App de escritorio', icon: osIcon('globe'), desc: 'Aplicación instalada (usa URL scheme)' },
+  table: { label: 'Tabla / Base de datos', icon: osIcon('clipboard'), desc: 'Formulario + tabla editable' },
+  checklist: { label: 'Checklist / SOP', icon: osIcon('check-circle'), desc: 'Lista de pasos marcables' },
+  calculator: { label: 'Calculadora', icon: osIcon('calculator'), desc: 'Inputs numéricos + fórmula' },
+  notes: { label: 'Notas / Documento', icon: osIcon('pencil-line'), desc: 'Texto libre por proyecto' }
 };
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -90,7 +90,7 @@ async function doLogin() {
   if (!email) return showAuthError('Poné tu email.');
   if (!password) return showAuthError('Poné tu contraseña (o usá el link mágico de abajo).');
   const btn = document.getElementById('auth-login-btn');
-  btn.disabled = true; btn.textContent = '⏳ Entrando…';
+  btn.disabled = true; btn.textContent = 'Entrando…';
   try {
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) return showAuthError(authErrorES(error));
@@ -125,9 +125,9 @@ document.getElementById('auth-eye')?.addEventListener('click', () => {
 document.getElementById('auth-magic-btn')?.addEventListener('click', async (ev) => {
   const email = document.getElementById('auth-email').value.trim();
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError('Poné tu email arriba y tocá de nuevo.');
-  const btn = ev.target; btn.disabled = true; btn.textContent = '⏳ Enviando link…';
+  const btn = ev.target; btn.disabled = true; btn.textContent = 'Enviando link…';
   const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin + '/' } });
-  btn.disabled = false; btn.textContent = '✉️ Entrar con link al email (sin contraseña)';
+  btn.disabled = false; btn.textContent = 'Entrar con link al email (sin contraseña)';
   if (error) return showAuthError(authErrorES(error));
   showAuthError('✓ Te mandamos un link a ' + email + '. Abrilo desde este dispositivo y entrás directo (puede tardar 1-2 min; mirá spam).');
   const errEl = document.getElementById('auth-error');
@@ -147,7 +147,7 @@ async function promptMfaChallenge(user) {
   screen.innerHTML = `
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
       <div class="text-center mb-6">
-        <div class="text-4xl mb-2">🛡️</div>
+        <div class="text-4xl mb-2">${osIcon('shield')}</div>
         <h1 class="text-2xl font-bold">Verificación en dos pasos</h1>
         <p class="text-sm text-slate-500 mt-1">Abrí tu app de autenticación e ingresá el código de 6 dígitos.</p>
       </div>
@@ -259,14 +259,14 @@ function showNewPasswordForm() {
   ov.innerHTML = `
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
       <div class="text-center mb-5">
-        <div class="text-4xl mb-2">🔑</div>
+        <div class="text-4xl mb-2">${osIcon('key')}</div>
         <h1 class="text-xl font-bold">Creá tu nueva contraseña</h1>
         <p class="text-sm text-slate-500 mt-1">Mínimo 8 caracteres, con al menos 3 de: minúscula, mayúscula, número, símbolo.</p>
       </div>
       <div class="space-y-3">
         <div class="relative">
           <input id="pwd-new" type="password" placeholder="Nueva contraseña" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 pr-10 text-sm" />
-          <button id="pwd-eye" type="button" tabindex="-1" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">👁</button>
+          <button id="pwd-eye" type="button" tabindex="-1" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">${osIcon('eye')}</button>
         </div>
         <input id="pwd-new2" type="password" placeholder="Repetila para confirmar" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm" />
         <div id="pwd-err" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-2"></div>
@@ -282,7 +282,7 @@ function showNewPasswordForm() {
     const st = passwordStrength(p1);
     if (!st.ok) return err(st.reason);
     if (p1 !== p2) return err('Las contraseñas no coinciden.');
-    const btn = ov.querySelector('#pwd-save'); btn.disabled = true; btn.textContent = '⏳ Guardando…';
+    const btn = ov.querySelector('#pwd-save'); btn.disabled = true; btn.textContent = 'Guardando…';
     const { error } = await sb.auth.updateUser({ password: p1 });
     btn.disabled = false; btn.textContent = 'Guardar y entrar';
     if (error) return err(error.message);
@@ -403,7 +403,7 @@ function showInstallBanner() {
   banner.className = 'fixed bottom-4 left-4 right-4 lg:left-auto lg:right-4 lg:max-w-sm z-[70] bg-gradient-to-br from-emerald-600 to-emerald-800 text-white rounded-2xl p-4 shadow-2xl';
   banner.innerHTML = `
     <div class="flex items-start gap-3">
-      <div class="text-3xl">📱</div>
+      <div class="text-3xl">${osIcon('phone')}</div>
       <div class="flex-1">
         <div class="font-bold text-sm">Instalá Empresa OS</div>
         <div class="text-xs opacity-90 mt-0.5">Acceso rápido desde tu pantalla de inicio. Funciona sin conexión.</div>
@@ -469,13 +469,13 @@ function propertySelectorHtml(currentId, onChangeFn, saveFn) {
   return `
     <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 mb-3">
       <div class="flex items-center gap-2 mb-2">
-        <span class="text-base">🏠</span>
+        <span class="text-base">${osIcon('house')}</span>
         <h3 class="text-xs font-bold text-blue-900 uppercase">Propiedad</h3>
         ${currentId ? '<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold">VINCULADA</span>' : '<span class="text-[10px] text-slate-500">análisis sin guardar</span>'}
       </div>
       <div class="flex gap-2">
         <select onchange="${onChangeFn}(this.value)" class="flex-1 border border-slate-300 rounded px-3 py-2 text-sm bg-white">${opts}</select>
-        <button onclick="${saveFn}()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-bold whitespace-nowrap">${currentId?'💾 Actualizar':'➕ Guardar como propiedad'}</button>
+        <button onclick="${saveFn}()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-bold whitespace-nowrap">${currentId?'Actualizar':'Guardar como propiedad'}</button>
       </div>
       <p class="text-[10px] text-blue-700 mt-1">Esta info se comparte entre Cashout, ARV, Estimador y Predictor de Cashflow.</p>
     </div>
@@ -509,13 +509,13 @@ function aiBoxHtml(systemKey, title, hint, runFn) {
     <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-4 mt-3">
       <div class="flex items-start justify-between gap-2 mb-2">
         <div>
-          <h3 class="text-sm font-bold text-purple-900 uppercase">🤖 ${title}</h3>
+          <h3 class="text-sm font-bold text-purple-900 uppercase">${osIcon('bot')} ${title}</h3>
           <p class="text-[10px] text-purple-700">${hint}</p>
         </div>
-        <button onclick="${runFn}()" ${s.loading?'disabled':''} class="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">${s.loading?'🔄 Analizando...':'🚀 Analizar con IA'}</button>
+        <button onclick="${runFn}()" ${s.loading?'disabled':''} class="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white text-xs font-bold px-3 py-2 rounded whitespace-nowrap">${s.loading?'Analizando...':'Analizar con IA'}</button>
       </div>
-      ${s.error ? `<div class="text-xs text-red-700 bg-red-100 rounded p-2 mt-2">⚠️ ${s.error}</div>` : ''}
-      ${s.loading ? `<div class="text-center py-6 text-purple-700"><div class="text-3xl animate-pulse">🔍</div><p class="text-xs mt-2">Buscando en internet... (30-60s)</p></div>` : ''}
+      ${s.error ? `<div class="text-xs text-red-700 bg-red-100 rounded p-2 mt-2">${osIcon('alert')} ${s.error}</div>` : ''}
+      ${s.loading ? `<div class="text-center py-6 text-purple-700"><div class="text-3xl animate-pulse">${osIcon('search')}</div><p class="text-xs mt-2">Buscando en internet... (30-60s)</p></div>` : ''}
       ${s.analysis ? `<div id="ai-result-${systemKey}"></div>` : ''}
     </div>
   `;
@@ -543,7 +543,7 @@ function aiResultGenericHtml(a) {
       blocks.push(`<div class="bg-white rounded p-2 border border-purple-200 text-xs"><strong class="text-purple-900 uppercase text-[10px]">${k.replace(/_/g,' ')}</strong><div class="mt-1 grid grid-cols-2 gap-1 text-[10px]">${Object.entries(v).map(([ik,iv])=>`<div><span class="text-slate-500">${ik}:</span> <strong>${typeof iv === 'object' ? JSON.stringify(iv) : iv}</strong></div>`).join('')}</div></div>`);
     }
   }
-  blocks.push(`<div class="flex items-center justify-between text-[10px] text-slate-500 mt-2"><span>${a._fromCache ? `📦 Cache (${new Date(a._cachedAt).toLocaleDateString()})` : '🌐 Recién analizado'}</span></div>`);
+  blocks.push(`<div class="flex items-center justify-between text-[10px] text-slate-500 mt-2"><span>${a._fromCache ? `Cache (${new Date(a._cachedAt).toLocaleDateString()})` : 'Recién analizado'}</span></div>`);
   return `<div class="space-y-2">${blocks.join('')}</div>`;
 }
 
@@ -573,7 +573,7 @@ function render() {
   if (!isAdmin() && (!state.allowedAreas || state.allowedAreas.length === 0)) {
     document.getElementById('content').innerHTML = `
       <div class="text-center py-20 max-w-md mx-auto">
-        <div class="text-5xl mb-4">🔒</div>
+        <div class="text-5xl mb-4">${osIcon('lock')}</div>
         <h3 class="text-lg font-semibold text-slate-700">Sin acceso asignado</h3>
         <p class="text-sm text-slate-500 mt-2">Tu administrador todavía no te asignó áreas de trabajo. Contactalo para pedir acceso.</p>
       </div>`;
@@ -642,7 +642,7 @@ async function openTeamMgmt() {
     <div class="space-y-4">
       <!-- Invitar nuevo -->
       <div class="border-2 border-emerald-300 bg-emerald-50 rounded-xl p-3">
-        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">➕ Invitar usuario nuevo</div>
+        <div class="text-xs font-bold uppercase text-emerald-900 mb-2">${osIcon('plus')} Invitar usuario nuevo</div>
         <div class="space-y-2">
           <input id="inv-email" type="email" placeholder="email@ejemplo.com" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
           <div class="flex items-center gap-2">
@@ -656,7 +656,7 @@ async function openTeamMgmt() {
             <label class="text-xs text-slate-600 block mb-1">Áreas visibles (no aplica si es admin):</label>
             <div class="flex flex-wrap gap-1">${areaCheckboxes([], 'inv')}</div>
           </div>
-          <button onclick="inviteUser()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">📧 Enviar invitación</button>
+          <button onclick="inviteUser()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('mail')} Enviar invitación</button>
           <p class="text-[10px] text-slate-500">El usuario recibirá un email para crear su contraseña. El rol y las áreas quedan pre-asignados.</p>
         </div>
       </div>
@@ -679,14 +679,14 @@ async function openTeamMgmt() {
                     <option value="admin" ${p.role==='admin'?'selected':''}>admin</option>
                   </select>
                   ${!isCurrent ? `
-                    <button onclick="adminSetUserPassword('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-blue-600 hover:text-blue-800" title="Cambiar contraseña">🔑</button>
-                    <button onclick="deleteUser('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario completamente">🗑</button>
+                    <button onclick="adminSetUserPassword('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-blue-600 hover:text-blue-800" title="Cambiar contraseña">${osIcon('key')}</button>
+                    <button onclick="deleteUser('${(window.esc||((s)=>s))(p.id)}','${(window.esc||((s)=>s))(p.email)}')" class="text-xs text-red-600 hover:text-red-800" title="Eliminar usuario completamente">${osIcon('trash')}</button>
                   ` : ''}
                 </div>
                 ${p.role !== 'admin' ? `
                   <div class="text-[10px] text-slate-500 mb-1">Áreas asignadas:</div>
                   <div class="flex flex-wrap gap-1 mb-2">${areaCheckboxes(p.allowed_areas || [], 'u'+p.id)}</div>
-                  <button onclick="updateUserAreas('${p.id}')" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1 rounded">💾 Guardar áreas</button>
+                  <button onclick="updateUserAreas('${p.id}')" class="text-xs bg-slate-900 hover:bg-slate-700 text-white px-3 py-1 rounded">${osIcon('save')} Guardar áreas</button>
                 ` : '<div class="text-[10px] text-emerald-700 italic">Admin: ve todas las áreas</div>'}
               </div>`;
           }).join('')}
@@ -694,7 +694,7 @@ async function openTeamMgmt() {
       </div>
     </div>
   `;
-  openModal('👥 Gestión de equipo', html);
+  openModal('Gestión de equipo', html);
 }
 
 async function inviteUser(event) {
@@ -705,7 +705,7 @@ async function inviteUser(event) {
   // BUG FIX: capturar btn ANTES del await (event puede ser null al regresar
   // del await en algunos browsers, lo que rompía el re-enable al fallar).
   const btn = (event && event.target) || event || null;
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
   try {
     // Usar el JWT real del user logueado para que la edge function pueda
     // verificar admin server-side (sin esto, requireAuth rechaza con 401).
@@ -724,7 +724,7 @@ async function inviteUser(event) {
     setTimeout(openTeamMgmt, 200);
   } catch (e) {
     alert('Error: ' + e.message);
-    if (btn) { btn.disabled = false; btn.textContent = '📧 Enviar invitación'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar invitación'; }
   }
 }
 
@@ -754,7 +754,7 @@ async function deleteUser(userId, email) {
     });
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || 'falló');
-    if (r.warning) alert('⚠️ ' + r.warning);
+    if (r.warning) alert(r.warning);
     else alert('✓ Usuario eliminado completamente. Podés re-invitar el email cuando quieras.');
     closeModal(); setTimeout(openTeamMgmt, 200);
   } catch (e) {
@@ -797,7 +797,7 @@ async function openMyProfile() {
     <div class="space-y-4">
       <!-- Datos -->
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-slate-600 mb-3">👤 Mis datos</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">${osIcon('user')} Mis datos</div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-[10px] text-slate-500 mb-0.5">Email</label>
@@ -822,31 +822,31 @@ async function openMyProfile() {
             <div class="text-[10px] text-slate-500 mb-1">Áreas con acceso (${areaNames.length}):</div>
             <div class="flex flex-wrap gap-1">${areaNames.length ? areaNames.map(n => `<span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded">${n}</span>`).join('') : '<span class="text-[10px] text-amber-600">Ninguna — contactá a tu admin</span>'}</div>
           </div>
-        ` : '<div class="mt-3 pt-3 border-t border-slate-100 text-[10px] text-emerald-700">✨ Como admin, ves todas las áreas y podés gestionar el equipo</div>'}
-        <button onclick="saveMyProfile()" class="mt-3 w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">💾 Guardar datos</button>
+        ` : '<div class="mt-3 pt-3 border-t border-slate-100 text-[10px] text-emerald-700">' + osIcon('sparkles') + ' Como admin, ves todas las áreas y podés gestionar el equipo</div>'}
+        <button onclick="saveMyProfile()" class="mt-3 w-full bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2 rounded">${osIcon('save')} Guardar datos</button>
       </div>
 
       <!-- Cambiar contraseña -->
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-slate-600 mb-3">🔐 Cambiar contraseña</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">Cambiar contraseña</div>
         <div class="space-y-2">
           <input id="mp-pwd1" type="password" placeholder="Contraseña nueva (mín 8 caracteres)" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
           <input id="mp-pwd2" type="password" placeholder="Repetí la contraseña" class="w-full border border-slate-300 rounded px-3 py-2 text-sm" />
-          <button onclick="changeMyPassword()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">🔐 Actualizar contraseña</button>
+          <button onclick="changeMyPassword()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">Actualizar contraseña</button>
           <p class="text-[10px] text-slate-400">No necesitás tu contraseña actual (ya estás autenticado). Si te olvidás la nueva, usá "olvidé mi contraseña" en login o pedile al admin que te reenvíe una invitación.</p>
         </div>
       </div>
 
       <!-- MFA (autenticación de dos factores) -->
       <div class="bg-white border border-slate-200 rounded-xl p-4">
-        <div class="text-xs font-bold uppercase text-slate-600 mb-3">🛡️ Verificación en dos pasos (MFA)</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-3">${osIcon('shield')} Verificación en dos pasos (MFA)</div>
         <div id="mp-mfa-body"><div class="text-xs text-slate-400 py-2">Cargando estado MFA...</div></div>
       </div>
 
       <div class="text-[10px] text-slate-400 text-center">Cuenta creada: ${new Date(p.created_at).toLocaleString('es-MX')}</div>
     </div>
   `;
-  openModal('⚙️ Mi perfil', html);
+  openModal('Mi perfil', html);
   // Cargar estado MFA async
   setTimeout(loadMfaStatus, 100);
 }
@@ -869,7 +869,7 @@ async function loadMfaStatus() {
           <div class="font-bold text-emerald-800 mb-1">✓ MFA activado</div>
           <div class="text-emerald-700">Factor: ${(window.esc||((s)=>s))(factor.friendly_name || 'TOTP')}</div>
           <div class="text-[10px] text-emerald-600 mt-1">Creado: ${new Date(factor.created_at).toLocaleDateString('es')}</div>
-          <button onclick="disableMfa('${factor.id}')" class="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 rounded">🗑️ Desactivar MFA</button>
+          <button onclick="disableMfa('${factor.id}')" class="mt-2 w-full bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold py-1.5 rounded">${osIcon('trash')} Desactivar MFA</button>
         </div>
       `;
     } else {
@@ -878,7 +878,7 @@ async function loadMfaStatus() {
           Agregá una capa extra de seguridad escaneando un código QR con tu app
           de autenticación (Authy, Google Authenticator, 1Password, etc.).
         </div>
-        <button onclick="startMfaEnroll()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">🛡️ Activar MFA</button>
+        <button onclick="startMfaEnroll()" class="w-full bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">${osIcon('shield')} Activar MFA</button>
         <p class="text-[10px] text-slate-400 mt-2">Necesitarás el código de 6 dígitos cada vez que entres.</p>
       `;
     }
@@ -890,7 +890,7 @@ async function loadMfaStatus() {
 async function startMfaEnroll() {
   const body = document.getElementById('mp-mfa-body');
   if (!body) return;
-  body.innerHTML = '<div class="text-xs text-slate-500 py-2">⏳ Generando código QR...</div>';
+  body.innerHTML = '<div class="text-xs text-slate-500 py-2">' + osIcon('loader') + ' Generando código QR...</div>';
   try {
     // Limpia factores en estado 'unverified' previos (signup interrumpido)
     const { data: list } = await sb.auth.mfa.listFactors();
@@ -991,7 +991,7 @@ async function openAuditLog() {
     <div class="space-y-3">
       <!-- Últimos accesos -->
       <div>
-        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📅 Últimos accesos</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('calendar')} Últimos accesos</div>
         <div class="border border-slate-200 rounded-lg overflow-hidden">
           <table class="w-full text-xs">
             <thead class="bg-slate-50"><tr>
@@ -1016,7 +1016,7 @@ async function openAuditLog() {
 
       <!-- Últimos cambios -->
       <div>
-        <div class="text-xs font-bold uppercase text-slate-600 mb-2">📜 Últimos cambios (100 más recientes)</div>
+        <div class="text-xs font-bold uppercase text-slate-600 mb-2">${osIcon('file')} Últimos cambios (100 más recientes)</div>
         <div class="border border-slate-200 rounded-lg overflow-hidden max-h-96 overflow-y-auto">
           <table class="w-full text-xs">
             <thead class="bg-slate-50 sticky top-0"><tr>
@@ -1028,7 +1028,7 @@ async function openAuditLog() {
             </tr></thead>
             <tbody>
               ${(events || []).map(e => {
-                const actionIcon = e.action === 'insert' ? '➕' : e.action === 'delete' ? '🗑️' : '✏️';
+                const actionIcon = e.action === 'insert' ? osIcon('plus') : e.action === 'delete' ? osIcon('trash') : osIcon('pencil');
                 const changesPreview = e.changes ? (
                   e.action === 'update'
                     ? Object.entries(e.changes).slice(0,3).map(([k,v]) => `<code class="text-[10px]">${k}</code>`).join(', ') + (Object.keys(e.changes).length > 3 ? '...' : '')
@@ -1051,7 +1051,7 @@ async function openAuditLog() {
       </div>
     </div>
   `;
-  openModal('📜 Auditoría', html);
+  openModal('Auditoría', html);
 }
 
 function renderSystems(area) {
@@ -1060,7 +1060,7 @@ function renderSystems(area) {
   if (systems.length === 0) {
     content.innerHTML = `
       <div class="text-center py-20">
-        <div class="text-6xl mb-4">📦</div>
+        <div class="text-6xl mb-4">${osIcon('package')}</div>
         <h3 class="text-lg font-semibold text-slate-700">Sin sistemas aún</h3>
         <p class="text-sm text-slate-500 mt-2">${isAdmin() ? 'Agrega links, apps o crea sistemas internos para esta área.' : 'El admin debe agregar sistemas.'}</p>
         ${isAdmin() ? '<button onclick="openAddSystem()" class="mt-6 bg-slate-900 text-white text-sm px-4 py-2 rounded-lg">+ Nuevo sistema</button>' : ''}
@@ -1076,12 +1076,12 @@ function renderSystems(area) {
 }
 
 function systemCard(area, sys) {
-  const type = SYSTEM_TYPES[sys.type] || { icon: sys.icon || '💎', label: sys.type };
+  const type = SYSTEM_TYPES[sys.type] || { icon: sys.icon || osIcon('gem'), label: sys.type };
   const admin = isAdmin();
   const adminBtns = admin ? `
     <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-      <button onclick="event.stopPropagation(); editSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-slate-900 p-1">✏️</button>
-      <button onclick="event.stopPropagation(); deleteSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-red-600 p-1">🗑️</button>
+      <button onclick="event.stopPropagation(); editSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-slate-900 p-1">${osIcon('pencil')}</button>
+      <button onclick="event.stopPropagation(); deleteSystem('${area.id}','${sys.id}')" class="text-xs text-slate-400 hover:text-red-600 p-1">${osIcon('trash')}</button>
     </div>` : '';
   const dragHandle = admin ? `<span class="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-700 select-none text-lg leading-none" title="Arrastrá para reordenar">⋮⋮</span>` : '';
   const dragAttrs = admin ? `draggable="true" ondragstart="sysDragStart(event,'${sys.id}')" ondragover="sysDragOver(event)" ondragleave="sysDragLeave(event)" ondrop="sysDrop(event,'${area.id}','${sys.id}')" ondragend="sysDragEnd(event)"` : '';
@@ -1370,7 +1370,7 @@ function openInternalSystem(sys) {
 function openEduMovedNotice(sys) {
   window._eduLegacySys = sys; // sys real de la card, para el acceso legacy
   const FLIPTRACK_URL = 'https://fliptrack-two.vercel.app/admin/educacion';
-  openModal('🎓 Educación se movió a Fliptrack', `
+  openModal('Educación se movió a Fliptrack', `
     <div class="space-y-4 text-sm">
       <p class="text-base">El cockpit de la mentoría (Manager, Reportes, Metodología, WhatsApp) ahora vive en <b>Fliptrack</b>. Este sistema quedó desactivado.</p>
       <a href="${FLIPTRACK_URL}" target="_blank" rel="noopener"
@@ -1406,13 +1406,13 @@ async function openArvCalc(sys) {
   const data = all || [];
 
   if (!data.length) {
-    return openModal(`🎯 ${sys.name}`, `<p class="text-sm text-slate-500">Necesitas al menos 1 appraisal procesado. Sube PDFs en 📂 Appraisals primero.</p>`);
+    return openModal(`${sys.name}`, `<p class="text-sm text-slate-500">Necesitas al menos 1 appraisal procesado. Sube PDFs en ${osIcon('folder-open')} Appraisals primero.</p>`);
   }
 
   const i = sys.data.input || { zip: '', sqft: 1500, beds: 3, baths: 2, year_built: 1980, condition: 'C3', lot_size: 7000, propertyId: null };
   window._arvCurrentSys = sys;
 
-  openModal(`🎯 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     ${propertySelectorHtml(i.propertyId, 'arvOnPropertyChange', 'arvSaveProperty')}
     <div class="grid grid-cols-2 gap-6">
       <div class="space-y-3">
@@ -1626,7 +1626,7 @@ async function openArvInsights(sys) {
   const data = (all || []).filter(a => a.price_per_sqft);
 
   if (data.length < 2) {
-    return openModal(`📊 ${sys.name}`, `<p class="text-sm text-slate-500">Necesitas al menos 2 appraisals procesados. Tienes ${data.length}.</p>`);
+    return openModal(`${sys.name}`, `<p class="text-sm text-slate-500">Necesitas al menos 2 appraisals procesados. Tienes ${data.length}.</p>`);
   }
 
   const ppsf = data.map(a => +a.price_per_sqft);
@@ -1677,7 +1677,7 @@ async function openArvInsights(sys) {
   const maxYearPpsf = Math.max(...yearRows.map(r => r.avgPpsf), 1);
   const maxWordCount = Math.max(...wordFreq.map(w => w.count), 1);
 
-  openModal(`📊 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <div class="space-y-5">
       <div class="grid grid-cols-4 gap-3">
         <div class="bg-slate-50 rounded-lg p-3">
@@ -1710,7 +1710,7 @@ async function openArvInsights(sys) {
             </div>
           `).join('') || '<p class="text-xs text-slate-400">Sin data</p>'}
         </div>
-        <p class="text-[10px] text-slate-500 mt-2">📍 <strong>Apunta a comprar en zips con $/sqft más alto.</strong></p>
+        <p class="text-[10px] text-slate-500 mt-2">${osIcon('map-pin')} <strong>Apunta a comprar en zips con $/sqft más alto.</strong></p>
       </div>
 
       <div class="grid grid-cols-2 gap-6">
@@ -1759,7 +1759,7 @@ async function openArvInsights(sys) {
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <h4 class="text-xs font-bold text-amber-900 uppercase mb-2">💡 Cómo subir tu ARV (basado en tu data)</h4>
+        <h4 class="text-xs font-bold text-amber-900 uppercase mb-2">${osIcon('lightbulb')} Cómo subir tu ARV (basado en tu data)</h4>
         <ul class="text-xs text-amber-900 space-y-1 leading-relaxed">
           <li>• <strong>Compra en el zip con $/sqft más alto</strong> de los que aparecen arriba (top: ${zipRows[0]?.zip || '—'}, $${zipRows[0]?.avgPpsf.toFixed(0) || '—'}/sqft).</li>
           <li>• <strong>Apunta a Condition C2 o C3</strong> en la remodelación. Diferencial entre tus C2 y C3: $${(condRows.find(c=>c.cond==='C2')?.avgPpsf - condRows.find(c=>c.cond==='C3')?.avgPpsf || 0).toFixed(0)}/sqft.</li>
@@ -1780,11 +1780,11 @@ async function openAppraisals(sys) {
   const done = all.filter(a => a.status === 'done' && a.appraised_value && a.price_per_sqft);
   const tab = sys.data.activeTab || 'analytics';
 
-  openModal(`📂 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <div class="border-b border-slate-200 -mt-2 -mx-6 px-6 mb-4">
       <div class="flex gap-1">
-        <button onclick="switchApprTab('${sys.id}','analytics')" class="px-4 py-2 text-sm font-medium border-b-2 ${tab==='analytics'?'border-slate-900 text-slate-900':'border-transparent text-slate-500 hover:text-slate-900'}">📊 Análisis (${done.length})</button>
-        <button onclick="switchApprTab('${sys.id}','list')" class="px-4 py-2 text-sm font-medium border-b-2 ${tab==='list'?'border-slate-900 text-slate-900':'border-transparent text-slate-500 hover:text-slate-900'}">📂 Lista y Upload (${all.length})</button>
+        <button onclick="switchApprTab('${sys.id}','analytics')" class="px-4 py-2 text-sm font-medium border-b-2 ${tab==='analytics'?'border-slate-900 text-slate-900':'border-transparent text-slate-500 hover:text-slate-900'}">Análisis (${done.length})</button>
+        <button onclick="switchApprTab('${sys.id}','list')" class="px-4 py-2 text-sm font-medium border-b-2 ${tab==='list'?'border-slate-900 text-slate-900':'border-transparent text-slate-500 hover:text-slate-900'}">Lista y Upload (${all.length})</button>
       </div>
     </div>
     <div id="appr-tab-content"></div>
@@ -1806,7 +1806,7 @@ function renderAnalyticsTab(sys, done) {
   const container = document.getElementById('appr-tab-content');
   if (done.length === 0) {
     container.innerHTML = `<div class="text-center py-12">
-      <div class="text-5xl mb-3">📊</div>
+      <div class="text-5xl mb-3">${osIcon('chart')}</div>
       <p class="text-sm text-slate-500">Sin data todavía. Ve a "Lista y Upload" y sube PDFs.</p>
     </div>`;
     return;
@@ -1935,13 +1935,13 @@ function renderAnalyticsTab(sys, done) {
 
       <!-- Recomendaciones IA -->
       <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-5">
-        <h4 class="text-sm font-bold text-amber-900 uppercase tracking-wide mb-3">💡 Recomendaciones para tu próxima casa</h4>
+        <h4 class="text-sm font-bold text-amber-900 uppercase tracking-wide mb-3">${osIcon('lightbulb')} Recomendaciones para tu próxima casa</h4>
         <ul class="space-y-2 text-sm text-amber-950">
-          ${bestZip ? `<li>🎯 <strong>Zip ${bestZip.zip}</strong> paga el $/sqft más alto: <strong>$${bestZip.avgPpsf.toFixed(0)}</strong> (n=${bestZip.count}). ${zipSpread > 10 ? `Eso es ${zipSpread.toFixed(0)}% más que ${worstZip.zip} ($${worstZip.avgPpsf.toFixed(0)}). Prioriza ese zip si encuentras deal.` : ''}</li>` : ''}
-          ${bestSqft ? `<li>📏 <strong>Sweet spot: ${bestSqft.bucket} sqft</strong> — rinde $${bestSqft.avgPpsf.toFixed(0)}/sqft en promedio. Casas en ese rango maximizan tu $/sqft.</li>` : ''}
-          ${condDiff ? `<li>🔧 <strong>C2 vs C3 diferencial:</strong> $${condDiff.toFixed(0)}/sqft. En una casa de 1500 sqft eso son ${fmt$(condDiff*1500)} extra. Vale la pena escalar el remodel si el costo extra es menor.</li>` : `<li>⚠️ <strong>Todas tus casas son ${condRows[0]?.cond||'C?'}</strong> — sin datos para medir el lift de subir condition. En el próximo refi, pídele al appraiser que considere C2 si tu remodel lo justifica.</li>`}
-          ${wordFreq[0] ? `<li>🛠️ <strong>Features que más aparecen en justificación de valor:</strong> ${wordFreq.slice(0,5).map(w=>`<strong>${w.word}</strong> (${w.count})`).join(', ')}. Estos upgrades pesan en el ARV.</li>` : ''}
-          ${bbRows[0] ? `<li>🛏️ <strong>Mejor config beds/baths:</strong> ${bbRows[0].config} → $${bbRows[0].avgPpsf.toFixed(0)}/sqft. ${bbRows[1] ? `Peor: ${bbRows[bbRows.length-1].config} → $${bbRows[bbRows.length-1].avgPpsf.toFixed(0)}/sqft.` : ''}</li>` : ''}
+          ${bestZip ? `<li>${osIcon('target')} <strong>Zip ${bestZip.zip}</strong> paga el $/sqft más alto: <strong>$${bestZip.avgPpsf.toFixed(0)}</strong> (n=${bestZip.count}). ${zipSpread > 10 ? `Eso es ${zipSpread.toFixed(0)}% más que ${worstZip.zip} ($${worstZip.avgPpsf.toFixed(0)}). Prioriza ese zip si encuentras deal.` : ''}</li>` : ''}
+          ${bestSqft ? `<li>${osIcon('ruler')} <strong>Sweet spot: ${bestSqft.bucket} sqft</strong> — rinde $${bestSqft.avgPpsf.toFixed(0)}/sqft en promedio. Casas en ese rango maximizan tu $/sqft.</li>` : ''}
+          ${condDiff ? `<li>${osIcon('wrench')} <strong>C2 vs C3 diferencial:</strong> $${condDiff.toFixed(0)}/sqft. En una casa de 1500 sqft eso son ${fmt$(condDiff*1500)} extra. Vale la pena escalar el remodel si el costo extra es menor.</li>` : `<li>${osIcon('alert')} <strong>Todas tus casas son ${condRows[0]?.cond||'C?'}</strong> — sin datos para medir el lift de subir condition. En el próximo refi, pídele al appraiser que considere C2 si tu remodel lo justifica.</li>`}
+          ${wordFreq[0] ? `<li>${osIcon('wrench')} <strong>Features que más aparecen en justificación de valor:</strong> ${wordFreq.slice(0,5).map(w=>`<strong>${w.word}</strong> (${w.count})`).join(', ')}. Estos upgrades pesan en el ARV.</li>` : ''}
+          ${bbRows[0] ? `<li>${osIcon('bed')} <strong>Mejor config beds/baths:</strong> ${bbRows[0].config} → $${bbRows[0].avgPpsf.toFixed(0)}/sqft. ${bbRows[1] ? `Peor: ${bbRows[bbRows.length-1].config} → $${bbRows[bbRows.length-1].avgPpsf.toFixed(0)}/sqft.` : ''}</li>` : ''}
         </ul>
       </div>
 
@@ -2091,7 +2091,7 @@ function renderListTab(sys, appraisals) {
       <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-slate-900 transition">
         <input type="file" id="appr-upload" accept="application/pdf" multiple class="hidden" />
         <label for="appr-upload" class="cursor-pointer">
-          <div class="text-3xl mb-2">📄</div>
+          <div class="text-3xl mb-2">${osIcon('file')}</div>
           <div class="text-sm font-semibold text-slate-700">Subir PDF(s) de appraisal</div>
           <div class="text-xs text-slate-500 mt-1">La IA extrae los datos automáticamente. Los insights se actualizan solos.</div>
         </label>
@@ -2128,9 +2128,9 @@ function renderListTab(sys, appraisals) {
                 <td class="px-3 py-2">${a.condition_rating || '—'}</td>
                 <td class="px-3 py-2">${statusBadge(a)}</td>
                 <td class="px-2 py-2 text-right whitespace-nowrap">
-                  <button onclick="viewAppraisal('${a.id}')" class="text-xs text-slate-600 hover:text-slate-900 mr-1">👁️</button>
-                  ${a.status === 'error' ? `<button onclick="retryAppraisal('${a.id}','${sys.id}')" class="text-xs text-amber-600 hover:text-amber-800 mr-1" title="Reintentar">🔄</button>` : ''}
-                  ${isAdmin() ? `<button onclick="deleteAppraisal('${a.id}','${sys.id}')" class="text-xs text-red-600 hover:text-red-800">🗑️</button>` : ''}
+                  <button onclick="viewAppraisal('${a.id}')" class="text-xs text-slate-600 hover:text-slate-900 mr-1">${osIcon('eye')}</button>
+                  ${a.status === 'error' ? `<button onclick="retryAppraisal('${a.id}','${sys.id}')" class="text-xs text-amber-600 hover:text-amber-800 mr-1" title="Reintentar">${osIcon('refresh')}</button>` : ''}
+                  ${isAdmin() ? `<button onclick="deleteAppraisal('${a.id}','${sys.id}')" class="text-xs text-red-600 hover:text-red-800">${osIcon('trash')}</button>` : ''}
                 </td>
               </tr>
             `).join('') || '<tr><td colspan="10" class="text-center text-slate-400 py-8">Sin appraisals todavía.</td></tr>'}
@@ -2147,10 +2147,10 @@ function renderListTab(sys, appraisals) {
     progress.classList.remove('hidden');
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      progress.textContent = `📤 Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      progress.textContent = `Subiendo ${i+1}/${files.length}: ${file.name}...`;
       try {
         await uploadAppraisal(file, (msg) => {
-          progress.textContent = `🤖 (${i+1}/${files.length}) ${file.name}: ${msg}`;
+          progress.textContent = `(${i+1}/${files.length}) ${file.name}: ${msg}`;
         });
       } catch (err) {
         progress.textContent = `⚠️ ${file.name}: ${err.message}. Continuando...`;
@@ -2159,7 +2159,7 @@ function renderListTab(sys, appraisals) {
       // Espera entre uploads para no exceder rate limit Claude (30K tokens/min)
       if (i < files.length - 1) {
         for (let s = 30; s > 0; s--) {
-          progress.textContent = `⏳ Esperando ${s}s antes del siguiente PDF (rate limit Claude)...`;
+          progress.textContent = `Esperando ${s}s antes del siguiente PDF (rate limit Claude)...`;
           await sleep(1000);
         }
       }
@@ -2213,7 +2213,7 @@ async function viewAppraisal(id) {
     </div>
   `).join('') || '<p class="text-xs text-slate-400">Sin comparables extraídos</p>';
 
-  openModal(`📄 ${a.property_address || 'Appraisal'}`, `
+  openModal(`${a.property_address || 'Appraisal'}`, `
     <div class="grid grid-cols-2 gap-6">
       <div>
         <h4 class="text-xs font-bold text-slate-600 uppercase mb-2">Propiedad</h4>
@@ -2236,7 +2236,7 @@ async function viewAppraisal(id) {
         ${row('Appraised value', a.appraised_value ? '$'+(+a.appraised_value).toLocaleString() : '—')}
         ${row('$/sqft', a.price_per_sqft ? '$'+(+a.price_per_sqft).toFixed(2) : '—')}
 
-        ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" class="block mt-4 text-center bg-slate-900 text-white text-sm py-2 rounded-lg hover:bg-slate-700">📄 Ver PDF original</a>` : ''}
+        ${pdfUrl ? `<a href="${pdfUrl}" target="_blank" class="block mt-4 text-center bg-slate-900 text-white text-sm py-2 rounded-lg hover:bg-slate-700">${osIcon('file')} Ver PDF original</a>` : ''}
       </div>
       <div>
         <h4 class="text-xs font-bold text-slate-600 uppercase mb-2">Comparables</h4>
@@ -2264,7 +2264,7 @@ async function deleteAppraisal(id, sysId) {
 function openTable(sys) {
   const cols = sys.config.columns || [];
   const rows = sys.data.rows || [];
-  openModal(`📋 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <div class="space-y-3">
       <div class="overflow-x-auto border border-slate-200 rounded-lg">
         <table class="w-full text-sm">
@@ -2315,7 +2315,7 @@ function tableDelRow(sysId, idx) {
 function openChecklist(sys) {
   const items = sys.config.items || [];
   const checked = sys.data.checked || {};
-  openModal(`✅ ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <div class="space-y-2">
       ${items.map((it, i) => `
         <label class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -2345,7 +2345,7 @@ function checklistReset(sysId) {
 function openCalculator(sys) {
   const inputs = sys.config.inputs || [];
   const values = sys.data.values || {};
-  openModal(`🧮 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <div class="space-y-3">
       ${inputs.map(inp => `
         <div>
@@ -2376,7 +2376,7 @@ function openCalculator(sys) {
 
 // --- Notas ---
 function openNotes(sys) {
-  openModal(`📝 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     <textarea id="notes-area" rows="18" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" placeholder="Escribe aquí...">${sys.data.text || ''}</textarea>
     <p class="text-xs text-slate-400 mt-2">Se guarda automáticamente</p>`);
   document.getElementById('notes-area').addEventListener('input', e => {
@@ -2426,10 +2426,10 @@ async function openCashout(sys) {
   const showAdminSettings = true;
   window._cashoutCurrentSys = sys;
 
-  openModal(`💰 ${sys.name}`, `
+  openModal(`${sys.name}`, `
     ${propertySelectorHtml(d.propertyId, 'cashoutOnPropertyChange', 'cashoutSaveProperty')}
     <div class="flex items-center justify-between text-[10px] mb-3 -mt-1">
-      <span class="text-emerald-700 font-bold">🔒 Auto-guardado — los números persisten al cerrar el modal</span>
+      <span class="text-emerald-700 font-bold">${osIcon('lock')} Auto-guardado — los números persisten al cerrar el modal</span>
       <span id="co-saved-badge" class="text-emerald-600 font-bold opacity-0 transition-opacity"></span>
     </div>
     <div class="flex items-center gap-2 mb-5 pb-3 border-b border-slate-200">
@@ -2460,7 +2460,7 @@ async function openCashout(sys) {
 
         ${showAdminSettings ? `
         <details class="border border-slate-200 rounded-lg">
-          <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-600 uppercase hover:bg-slate-50">⚙️ Parámetros del cálculo (editables por el equipo)</summary>
+          <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-600 uppercase hover:bg-slate-50">${osIcon('settings')} Parámetros del cálculo (editables por el equipo)</summary>
           <div class="p-3 space-y-3 border-t border-slate-200">
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1">LTV % del refi</label>
@@ -2482,7 +2482,7 @@ async function openCashout(sys) {
                 <p class="text-[10px] text-slate-400 mt-0.5">Calibrado: 8% deals reales TX 2026 (Michelle Ct: 8.04%)</p>
               </div>
               <div class="mt-3 pt-3 border-t border-slate-200 text-[10px] text-slate-600">
-                <strong>📋 Desglose típico TX investor cashout 8%:</strong>
+                <strong>${osIcon('clipboard')} Desglose típico TX investor cashout 8%:</strong>
                 <ul class="ml-3 list-disc mt-1 space-y-0.5">
                   <li>Lender (orig + UW + proc + doc): ~2.2% del loan</li>
                   <li>Title + endorsements + recording: ~$3,000 flat</li>
@@ -2510,7 +2510,7 @@ async function openCashout(sys) {
 
           <!-- Desglose del closing — separar fees REALES (perdido) vs escrow (tu plata) -->
           <details class="border border-slate-700 rounded-lg mt-4">
-            <summary class="cursor-pointer px-3 py-2 text-[11px] font-bold text-slate-300 uppercase hover:bg-slate-800">📋 Desglose del closing</summary>
+            <summary class="cursor-pointer px-3 py-2 text-[11px] font-bold text-slate-300 uppercase hover:bg-slate-800">${osIcon('clipboard')} Desglose del closing</summary>
             <div class="p-3 border-t border-slate-700 space-y-1 text-[11px]">
               <div class="text-red-300 font-bold">Lo que SE PIERDE (fees lender + title):</div>
               <div class="flex justify-between pl-2"><span>Lender fees (~2.2% loan)</span><span id="co-bd-lender">—</span></div>
@@ -2574,8 +2574,8 @@ async function openCashout(sys) {
     co.textContent = fmt(cashout);
     co.className = `text-4xl font-bold mt-1 ${cashout < 0 ? 'text-red-400' : cashout < 5000 ? 'text-amber-300' : 'text-green-400'}`;
     const warn = document.getElementById('co-warning');
-    if (cashout < 0) { warn.textContent = `⚠️ Faltarían ${fmt(Math.abs(cashout))} para cubrir el cierre`; warn.classList.remove('hidden'); }
-    else if (cashout < 5000) { warn.textContent = `⚠️ Cash-out marginal — revisar números`; warn.classList.remove('hidden'); }
+    if (cashout < 0) { warn.textContent = `Faltarían ${fmt(Math.abs(cashout))} para cubrir el cierre`; warn.classList.remove('hidden'); }
+    else if (cashout < 5000) { warn.textContent = `Cash-out marginal — revisar números`; warn.classList.remove('hidden'); }
     else warn.classList.add('hidden');
 
     document.getElementById('co-cashout-arv').textContent = dd.arv ? `${(cashout/dd.arv*100).toFixed(2)}%` : '—';
@@ -2606,7 +2606,7 @@ async function openCashout(sys) {
     // Mostrar badge de guardado por 2s
     const b = document.getElementById('co-saved-badge');
     if (b) {
-      b.textContent = '💾 Guardado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      b.textContent = 'Guardado ' + new Date().toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
       b.classList.remove('opacity-0'); b.classList.add('opacity-100');
       clearTimeout(window._coSavedTimer);
       window._coSavedTimer = setTimeout(() => { b.classList.remove('opacity-100'); b.classList.add('opacity-0'); }, 2000);
@@ -2744,7 +2744,7 @@ async function cashoutSaveProperty() {
 document.getElementById('add-area-btn').addEventListener('click', async () => {
   const name = prompt('Nombre del área:');
   if (!name) return;
-  const icon = prompt('Ícono (emoji):', '📁') || '📁';
+  const icon = prompt('Ícono (emoji):', osIcon('folder')) || osIcon('folder');
   const description = prompt('Descripción:') || '';
   const id = uid();
   const position = state.areas.length;
@@ -2790,7 +2790,7 @@ async function notifyRequestPermission() {
   const perm = await Notification.requestPermission();
   window.notifyState.enabled = perm === 'granted';
   if (perm === 'granted') {
-    notifySend('🔔 Notificaciones activadas', { body: 'Te avisaré cuando haya críticas atrasadas o cosas importantes.', tag: 'enabled' });
+    notifySend('Notificaciones activadas', { body: 'Te avisaré cuando haya críticas atrasadas o cosas importantes.', tag: 'enabled' });
   }
   return perm === 'granted';
 }
@@ -2894,10 +2894,10 @@ async function generateDailyDigest() {
 
     const fecha = new Date().toLocaleDateString('es', { weekday:'long', day:'numeric', month:'long' });
 
-    let msg = `📊 *DIGEST DIARIO · ${fecha.toUpperCase()}*\n\n`;
+    let msg = `*DIGEST DIARIO · ${fecha.toUpperCase()}*\n\n`;
 
     if (overdueCritical.length > 0) {
-      msg += `🔴 *${overdueCritical.length} CRÍTICA${overdueCritical.length>1?'S':''} ATRASADA${overdueCritical.length>1?'S':''}*\n`;
+      msg += `*${overdueCritical.length} CRÍTICA${overdueCritical.length>1?'S':''} ATRASADA${overdueCritical.length>1?'S':''}*\n`;
       overdueCritical.slice(0,5).forEach(a => {
         const daysLate = Math.round((new Date(todayIso+'T00:00:00') - new Date(a.date+'T00:00:00'))/86400000);
         msg += `• ${a.activity_name} (${a.property_name||'—'}) — ${daysLate}d\n`;
@@ -2905,7 +2905,7 @@ async function generateDailyDigest() {
       msg += '\n';
     }
 
-    msg += `📅 *HOY · ${hoyActs.length} tareas* (${hoyDone} hechas)\n`;
+    msg += `*HOY · ${hoyActs.length} tareas* (${hoyDone} hechas)\n`;
     if (hoyActs.length > 0) {
       const byHome = {};
       hoyActs.forEach(a => { (byHome[a.property_name||'—'] = byHome[a.property_name||'—'] || []).push(a); });
@@ -2916,15 +2916,15 @@ async function generateDailyDigest() {
     }
 
     if (manana.length > 0) {
-      msg += `🔜 *MAÑANA · ${manana.length} tareas planeadas*\n\n`;
+      msg += `*MAÑANA · ${manana.length} tareas planeadas*\n\n`;
     }
 
     msg += `🏗️ ${projs.length} obras activas\n`;
-    msg += `\n📱 Ver dashboard: ${window.location.origin}/?rd_mode=ceo`;
+    msg += `\nVer dashboard: ${window.location.origin}/?rd_mode=ceo`;
 
     return msg;
   } catch (e) {
-    return '❌ Error generando digest: ' + e.message;
+    return 'Error generando digest: ' + e.message;
   }
 }
 
@@ -2951,7 +2951,7 @@ function setDigestSchedule(patch) {
 function openDigestScheduleConfig() {
   const cfg = getDigestSchedule();
   const dayLabels = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  openModal('⏰ Programar digest diario', `
+  openModal('Programar digest diario', `
     <div class="space-y-3">
       <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
         El digest se prepara automáticamente a la hora elegida. Mientras la app esté abierta o instalada como PWA,
@@ -2985,12 +2985,12 @@ function openDigestScheduleConfig() {
         </div>
       </div>
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número WhatsApp (con código país, sin +)</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('phone')} Número WhatsApp (con código país, sin +)</label>
         <input id="ds-phone" type="text" value="${cfg.phone||''}" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="saveDigestSchedule()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">💾 Guardar</button>
+        <button onclick="saveDigestSchedule()" class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold py-2 rounded">${osIcon('save')} Guardar</button>
       </div>
     </div>
   `);
@@ -3027,7 +3027,7 @@ async function digestScheduleTick() {
   try {
     const msg = await generateDailyDigest();
     if (window.notifyState?.enabled) {
-      notifySend('📤 Digest diario listo', {
+      notifySend('Digest diario listo', {
         body: 'Tu resumen del día está preparado. Tap para revisar y enviar por WhatsApp.',
         tag: 'digest-' + today,
         persistent: true,
@@ -3058,23 +3058,23 @@ if (typeof window !== 'undefined') {
 
 async function openDailyDigest() {
   const btn = document.querySelector('[onclick="openDailyDigest()"]');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
   const msg = await generateDailyDigest();
-  if (btn) { btn.disabled = false; btn.textContent = '📤 Digest del día'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Digest del día'; }
 
-  openModal('📤 Digest diario', `
+  openModal('Digest diario', `
     <div class="space-y-3">
       <div class="bg-violet-50 border border-violet-200 rounded p-3 text-xs text-violet-900">
         Resumen automático de lo que pasó hoy y lo que viene. Editalo y mandalo por WhatsApp a quien necesite el update.
       </div>
       <textarea id="digest-msg" rows="14" class="w-full border border-violet-300 rounded p-3 text-sm font-mono">${msg.replace(/</g,'&lt;')}</textarea>
       <div>
-        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">📞 Número (opcional)</label>
+        <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">${osIcon('phone')} Número (opcional)</label>
         <input id="digest-phone" type="text" placeholder="521555..." class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm"/>
       </div>
       <div class="flex gap-2 pt-2 border-t border-slate-200">
         <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-sm py-2 rounded">Cancelar</button>
-        <button onclick="(()=>{const m=document.getElementById('digest-msg').value;const p=(document.getElementById('digest-phone').value||'').replace(/[^0-9]/g,'');const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`;window.open(u,'_blank');closeModal();})()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">💬 Enviar WhatsApp</button>
+        <button onclick="(()=>{const m=document.getElementById('digest-msg').value;const p=(document.getElementById('digest-phone').value||'').replace(/[^0-9]/g,'');const u=p?\`https://wa.me/\${p}?text=\${encodeURIComponent(m)}\`:\`https://wa.me/?text=\${encodeURIComponent(m)}\`;window.open(u,'_blank');closeModal();})()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 rounded">${osIcon('message')} Enviar WhatsApp</button>
       </div>
     </div>
   `);

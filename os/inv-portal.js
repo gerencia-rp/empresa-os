@@ -62,7 +62,7 @@ window.ipLogout = ipLogout;
 
 // ─── 👁 modo VISTA DEL INVERSOR (solo admin): mismos datasets, filtrados server-side
 // por el inversionista objetivo vía inv_portal_como (guard rol admin + audit). Read-only.
-function ipRO() { alert('👁 Modo vista — solo lectura. Ninguna acción se ejecuta.'); }
+function ipRO() { alert('Modo vista — solo lectura. Ninguna acción se ejecuta.'); }
 async function ipLoadComo() {
   const pay = await sb.rpc('inv_portal_como', { p_inv: IP.ver }).then(r => r.data).catch(() => null);
   if (!pay) {
@@ -88,7 +88,7 @@ async function ipLoadComo() {
   const qc = new URLSearchParams(location.search).get('casa');
   const props = [...new Set(IP.holdings.map(h => h.property_id))];
   IP.casa = (qc && props.includes(qc)) ? qc : props[0];
-  if (!IP.holdings.length) { app().innerHTML = '<div class="login card"><h1>👁 ' + esc(IP.verNombre) + '</h1><div class="meta" style="margin-top:10px">Este inversionista no tiene casas asignadas todavía — su portal se ve vacío (igual que lo vería él).</div>' + ipVerBar() + '</div>'; return; }
+  if (!IP.holdings.length) { app().innerHTML = '<div class="login card"><h1>' + osIcon('eye') + ' ' + esc(IP.verNombre) + '</h1><div class="meta" style="margin-top:10px">Este inversionista no tiene casas asignadas todavía — su portal se ve vacío (igual que lo vería él).</div>' + ipVerBar() + '</div>'; return; }
   render();
 }
 function ipVerBar() {
@@ -96,7 +96,7 @@ function ipVerBar() {
   const sel = (IP.verList || []).length > 1
     ? '<select class="ibtn" onchange="location.href=\'/inversionista?ver=\'+encodeURIComponent(this.value)">' + IP.verList.map(v => '<option value="' + esc(v.inv) + '"' + (v.inv === IP.ver ? ' selected' : '') + '>' + esc(v.nombre || v.email) + '</option>').join('') + '</select>' : '';
   return '<div style="position:sticky;top:0;z-index:999;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(245,178,61,.14);border:1px solid rgba(245,178,61,.5);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12.5px">'
-    + '👁 <b>Estás viendo como ' + esc(IP.verNombre) + '</b> — solo lectura (mismos datos y componente que su portal real)' + sel
+    + '' + osIcon('eye') + ' <b>Estás viendo como ' + esc(IP.verNombre) + '</b> — solo lectura (mismos datos y componente que su portal real)' + sel
     + '<button class="ibtn" style="margin-left:auto" onclick="location.href=\'/inversionistas\'">Salir de la vista</button></div>';
 }
 
@@ -225,7 +225,7 @@ window.ipInfo = ipInfo;
 // tarjeta KPI con botón ℹ
 function kpiI(lab, val, meta, cls, infoKey) {
   return '<div class="card" style="position:relative">'
-    + (infoKey ? '<button class="infob" title="¿Qué significa?" onclick="ipInfo(\'' + infoKey + '\')">ℹ</button>' : '')
+    + (infoKey ? '<button class="infob" title="¿Qué significa?" onclick="ipInfo(\'' + infoKey + '\')">' + osIcon('info') + '</button>' : '')
     + '<div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>'
     + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
 }
@@ -354,8 +354,8 @@ function renderIndicadores(pid, met) {
     + card('TVPI', 'tvpi', vals.tvpi, 'retorno total = DPI + RVPI · 1.0x = empatás', im.tvpi >= 1 ? 'up' : '')
     + card('Tu TIR combinada', 'tir', $pct(im.tir), 'XIRR de tus aportes, distribuciones y tu equity de hoy', im.tir > 0 ? 'up' : '')
     + '</div>';
-  return '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">📈 Indicadores de retorno' + (c ? ' · ' + esc(c.casa) : '') + '</div><div class="k">metodología del Excel IRR Portafolio · una definición (os/inv-indicadores.js)</div></div>'
-    + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber)">📄 Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; <b>no son ganancias realizadas</b> hasta la venta o el refi.</div>'
+  return '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">' + osIcon('trending-up') + ' Indicadores de retorno' + (c ? ' · ' + esc(c.casa) : '') + '</div><div class="k">metodología del Excel IRR Portafolio · una definición (os/inv-indicadores.js)</div></div>'
+    + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber)">' + osIcon('file') + ' Indicadores sobre <b>valor en papel</b> (appraisal/ARV) — no incluyen rentas, intereses ni gastos; <b>no son ganancias realizadas</b> hasta la venta o el refi.</div>'
     + casaCards
     + '<div class="lab" style="margin-top:14px">Tu posición como inversionista (todas tus casas)</div>'
     + invCards
@@ -366,7 +366,7 @@ function renderIndicadores(pid, met) {
 function ipGlosQ(v) { IP.glosQ = v; render(); const el = document.getElementById('ip-glos-q'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 window.ipGlosQ = ipGlosQ;
 function renderGlosario() {
-  const temas = [['retorno', '💰 Tu retorno'], ['deuda', '🏦 La deuda'], ['propiedad', '🏠 La propiedad'], ['proceso', '🧭 El proceso']];
+  const temas = [['retorno', 'Tu retorno'], ['deuda', 'La deuda'], ['propiedad', 'La propiedad'], ['proceso', 'El proceso']];
   const q = (IP.glosQ || '').toLowerCase();
   const list = Object.values(IP.glos || {}).sort((a, b) => (a.orden || 0) - (b.orden || 0))
     .filter(g => !q || (g.termino_es + ' ' + (g.termino_en || '') + ' ' + g.que_es).toLowerCase().includes(q));
@@ -378,8 +378,8 @@ function renderGlosario() {
     + '4️⃣ <b>Flujo Mensual</b>: la operación real (renta − gastos). Los draws y la deuda aparecen aparte como [P&L NO] — informativos.<br>'
     + '5️⃣ <b>Distribuciones</b>: la plata que YA te pagamos, con comprobante y K-1.<br>'
     + 'Tocá cualquier <b>ⓘ</b> para ver qué es, para qué sirve y TU caso con tus números.</div></div>';
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">📚 Aprende — glosario del inversionista</div><div class="k">todo término del portal, explicado sin jerga</div></div>'
-    + '<input id="ip-glos-q" placeholder="🔍 Buscar término…" value="' + esc(IP.glosQ || '') + '" oninput="ipGlosQ(this.value)" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;outline:none">'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('book') + ' Aprende — glosario del inversionista</div><div class="k">todo término del portal, explicado sin jerga</div></div>'
+    + '<input id="ip-glos-q" placeholder="Buscar término…" value="' + esc(IP.glosQ || '') + '" oninput="ipGlosQ(this.value)" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;outline:none">'
     + '</div>' + guia
     + temas.map(([t, tit]) => {
       const rows = list.filter(g => g.tema === t);
@@ -418,11 +418,11 @@ function render() {
 
   const noLeidos = (IP.msgs || []).filter(m => m.de === 'admin' && !(m.read_by || []).includes(IP.email.toLowerCase())).length;
   // Auditoría Item 22 (20-ago): 'docs' (Mis Documentos) y 'msgs' (Mensajes) OCULTOS del portal del
-  // inversor por pedido del CEO ("quitemos esto"). El 🤖 Asistente SE CONSERVA (Item 23). Código y
+  // inversor por pedido del CEO ("quitemos esto"). El Asistente SE CONSERVA (Item 23). Código y
   // datos intactos (renderDocs/renderMsgs siguen y se renderizan si se navega directo). PARA REACTIVAR:
   // sacá el tab de IP_TABS_OCULTOS.
   const IP_TABS_OCULTOS = ['docs', 'msgs'];
-  const TABS = [['port', '🏠 Mi Portafolio'], ['rend', '📈 Rendimiento'], ['casa', '🏡 Mi Casa'], ['flujo', '📅 Flujo Mensual'], ['dist', '💸 Distribuciones'], ['docs', '📄 Mis Documentos'], ['glos', '📚 Aprende'], ['msgs', '💬 Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', '🤖 Asistente']].filter(t => !IP_TABS_OCULTOS.includes(t[0]));
+  const TABS = [['port', 'Mi Portafolio'], ['rend', 'Rendimiento'], ['casa', 'Mi Casa'], ['flujo', 'Flujo Mensual'], ['dist', 'Distribuciones'], ['docs', 'Mis Documentos'], ['glos', 'Aprende'], ['msgs', 'Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', 'Asistente']].filter(t => !IP_TABS_OCULTOS.includes(t[0]));
   const head = ipVerBar()
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
@@ -477,7 +477,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   const distTodas = (IP.dists || []).filter(d => d.estado === 'pagada').reduce((s, d) => s + (+d.monto || 0), 0);
   const hoy = new Date();
   const prox1 = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
-  const saludo = '<h1>👋 Hola <span>· tu portafolio</span></h1>'
+  const saludo = '<h1>Hola <span>· tu portafolio</span></h1>'
     + '<div class="sub">' + nProps + (nProps === 1 ? ' propiedad' : ' propiedades') + ' · capital aportado <b>' + $money(capTotal) + '</b> · distribuciones recibidas <b>' + $money(distTodas) + '</b> · próxima actualización de datos: <b>' + prox1.toISOString().slice(0, 10) + '</b> (1° de mes)</div>';
 
   // ── tus casas de un vistazo (v_portal_inversor) ──
@@ -495,12 +495,12 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
           + '<div class="meta" style="font-size:11px">caja atrapada de la operación — se recupera con el refi/venta' + (rc.fecha_estimada_pago ? ' · fecha estimada: <b>' + esc(rc.fecha_estimada_pago) + '</b>' : '') + '</div></div>'
         : '';
       const dist = rc.proxima_dist_fecha
-        ? '<div style="margin-top:6px;font-size:12px">💸 Próxima distribución: <b>' + esc(rc.proxima_dist_fecha) + '</b>' + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</div>'
+        ? '<div style="margin-top:6px;font-size:12px">' + osIcon('banknote') + ' Próxima distribución: <b>' + esc(rc.proxima_dist_fecha) + '</b>' + (rc.proxima_dist_monto != null ? ' · ' + $money(rc.proxima_dist_monto) : '') + '</div>'
         : (rc.ultima_dist_fecha ? '<div class="meta" style="margin-top:6px;font-size:11px">última distribución pagada: ' + esc(rc.ultima_dist_fecha) + (rc.ultima_dist_monto != null ? ' (' + $money(rc.ultima_dist_monto) + ')' : '') + '</div>'
           : '<div class="meta" style="margin-top:6px;font-size:11px">sin distribuciones programadas</div>');
       return '<div class="card" onclick="IP.casa=\'' + rc.property_id + '\';render()" style="cursor:pointer;margin:0' + (activa ? ';border-color:var(--a2)' : '') + '">'
         + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>' + esc(rc.casa || '—') + '</b><span class="src">' + esc((rc.etapa || '—').replace(/_/g, ' ')) + '</span></div>'
-        + '<div class="meta" style="margin-top:4px">' + (rc.avance_planner != null ? '🏗 obra ' + Math.round(rc.avance_planner) + '% · ' : '') + (rc.lider ? '👷 ' + esc(String(rc.lider).split(',')[0]) : '') + '</div>'
+        + '<div class="meta" style="margin-top:4px">' + (rc.avance_planner != null ? 'obra ' + Math.round(rc.avance_planner) + '% · ' : '') + (rc.lider ? osIcon('hard-hat') + esc(String(rc.lider).split(',')[0]) : '') + '</div>'
         + '<div style="margin-top:8px;font-size:13px">Invertiste <b>' + $money(rc.invertido) + '</b>' + (meses ? ' <span class="meta">hace ' + meses + '</span>' : '') + '</div>'
         + '<div style="margin-top:4px;font-size:12px">Flujo del último mes: ' + flujo + '</div>'
         + deficit + dist + '</div>';
@@ -551,7 +551,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   const hero = '<div class="grid k4" style="margin-top:14px">'
     + kpiI('Tu inversión', $money(met.cap), 'aportada el ' + sd(holding.fecha_entrada || cierre) + ' · participación <b>' + $pct(met.inv) + '</b>', '', null)
     + kpiI('Tu riqueza hoy', $money(met.riquezaHoy), 'lo que vale tu posición: capital + equity amortizado + valorización × tu %', 'up', 'riq')
-    + kpiI('Distribuciones recibidas', $money(met.distTotal), met.distMias.length + ' pagos ya en tu bolsillo · ver pestaña 💸', met.distTotal > 0 ? 'up' : '', 'dist')
+    + kpiI('Distribuciones recibidas', $money(met.distTotal), met.distMias.length + ' pagos ya en tu bolsillo · ver pestaña ', met.distTotal > 0 ? 'up' : '', 'dist')
     + kpiI('Equity Multiple', met.em != null ? met.em.toFixed(2) + '×' : '—', 'retorno total: (recibido + riqueza hoy) ÷ capital · 1.0× = empatás', met.em != null && met.em >= 1 ? 'up' : '', 'em')
     + '</div>'
     + '<div class="grid k4" style="margin-top:14px">'
@@ -571,7 +571,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     // 3B item 5 (coherente con A1): en rehab no se muestra TIR anualizada — no hay operación que la sostenga
     + kpiI('TIR a 31 años', ipEnRehab(i) ? '—' : $pct(i.tir31PostRefi),
       ipEnRehab(i) ? '🔨 ' + ipRehabTxt(i) : 'retorno anual del hold completo (base post-refi del Excel)', ipEnRehab(i) ? 'warn' : 'up', null)
-    + kpiI('Escenario', escenario === 'realizado' ? '✅ Real' : '🎯 Proyectado', escenario === 'realizado' ? movsCasa.length + ' movimientos reales cargados' : 'premisas del modelo — lo real se carga desde administración', '', null)
+    + kpiI('Escenario', escenario === 'realizado' ? 'Real' : 'Proyectado', escenario === 'realizado' ? movsCasa.length + ' movimientos reales cargados' : 'premisas del modelo — lo real se carga desde administración', '', null)
     + '</div>';
 
   // ── info del deal ──
@@ -669,7 +669,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     + [['mantenimiento_mes', 'Mantenimiento /mes'], ['servicios_mes', 'Servicios públicos /mes'], ['hoa_mes', 'HOA /mes'], ['padsplit_pct', 'PADSPLIT (% ingreso)'], ['comision_pct', 'Comisión (% ingreso)'], ['imp_propiedad_pct', 'Impuesto propiedad (anual s/ avalúo)'], ['imp_renta_pct', 'Impuesto a la renta (s/ utilidad)'], ['seguro_mes', 'Seguro /mes'], ['cierre_compra', 'Gastos de cierre compra'], ['refi_tasa', 'Tasa refi 30 años'], ['hm_tasa', 'Tasa Hard Money']]
       .map(([k, lab]) => { const rr = P[k]; if (!rr) return '<div class="kv"><span>' + lab + '</span><b>' + SD + '</b></div>'; const v = parseFloat(rr.value); const isPct = /pct|tasa/.test(k); return '<div class="kv"><span>' + lab + srcChip(P, k) + '</span><b>' + (isPct ? $pct(v) : $money(v)) + '</b></div>'; }).join('')
     + '</div>'
-    + '<div class="card overx"><div class="chart-h"><div class="t">Flujo del ciclo (modelo, mes 0–' + p.cicloMeses + ')</div><div class="k">' + (movsCasa.length ? 'con movimientos reales cargados' : 'proyección — lo real vive en 📅 Flujo Mensual') + '</div></div>'
+    + '<div class="card overx"><div class="chart-h"><div class="t">Flujo del ciclo (modelo, mes 0–' + p.cicloMeses + ')</div><div class="k">' + (movsCasa.length ? 'con movimientos reales cargados' : 'proyección — lo real vive en Flujo Mensual') + '</div></div>'
     + '<table><thead><tr><th>Mes</th><th>Ocup.</th><th>Ingreso</th><th>Gastos</th><th>Financiación</th><th>FCL</th></tr></thead><tbody>'
     + r.meses.map(x => '<tr><td>m' + x.m + '</td><td>' + Math.round(x.ocupacion * 100) + '%</td><td>' + $money(x.ingreso) + '</td><td>' + $money(-(x.operativos + x.impPropiedad + x.impRenta)) + '</td><td>' + $money(x.fin) + '</td><td class="' + (x.fclNegocio >= 0 ? 'up' : 'down') + '">' + $money(x.fclNegocio) + '</td></tr>').join('')
     + '</tbody></table></div></div>';
@@ -792,7 +792,7 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
   const rc = (IP.resumen || []).find(x => x.property_id === pid) || {};
   const vals = { capital: $money(met.cap), residual: c && c.equityHoy != null ? $money(Math.max(0, c.equityHoy) * met.inv) : '—', dist: $money(met.distTotal), tvpi: met.em != null ? met.em.toFixed(2) + 'x' : '—', paper: c ? $money(c.paper_value) : '—', paper_fuente: c ? String(c.paper_fuente || '') : '—', tir: c ? (c.tirNA ? 'n/a (muy reciente)' : $pct(c.tirActivo)) : '—' };
   const card5 = (lab, clave, val, linea, cls) => '<div class="card" style="margin:0"><div class="lab">' + lab + (clave ? gI(clave, vals) : '') + '</div><div class="big ' + (cls || '') + '">' + val + '</div><div class="meta" style="font-size:10.5px">' + linea + '</div></div>';
-  const sec1 = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:10px">📄 "Lo que vale tu casa" es <b>valor en papel</b> (' + esc(vals.paper_fuente) + ') — se vuelve ganancia real al vender o refinanciar.</div>'
+  const sec1 = '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:10px">' + osIcon('file') + ' "Lo que vale tu casa" es <b>valor en papel</b> (' + esc(vals.paper_fuente) + ') — se vuelve ganancia real al vender o refinanciar.</div>'
     + '<div class="grid k5" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">'
     + card5('Tu inversión', null, $money(met.cap), 'lo que pusiste · ' + $pct(met.inv) + ' de la casa')
     + card5('Lo que vale tu casa hoy', 'paper_value', c ? $money(c.paper_value) : SD, 'en papel · fuente: ' + esc(vals.paper_fuente))
@@ -820,12 +820,12 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
     + '</div>';
   // 4 · riesgos en lenguaje humano (solo lo que le afecta a ÉL)
   const riesgos = [];
-  if (enObra && !rMes) riesgos.push('🔨 Tu casa está en remodelación — todavía no genera renta. Es lo normal en esta etapa: primero la obra, después la renta.');
-  if (+rc.deficit > 0) riesgos.push('🕳 La operación usó ' + $money(rc.deficit) + ' más de lo que entró hasta ahora. Se cubre con la refinanciación o la venta' + (rc.fecha_estimada_pago ? ' (fecha estimada: ' + esc(rc.fecha_estimada_pago) + ')' : '') + '.');
-  if (c && c.deuda_vigente == null && !c.vendida) riesgos.push('📋 El equipo está terminando de registrar el préstamo de esta casa — mientras tanto, algunos indicadores dicen "en registro" en vez de inventar un número.');
-  if (!enObra && rMes && rMes - gMes < 0) riesgos.push('⚖️ Este mes la renta no alcanzó a cubrir los gastos — mirá el detalle en 📅 Flujo Mensual.');
+  if (enObra && !rMes) riesgos.push('Tu casa está en remodelación — todavía no genera renta. Es lo normal en esta etapa: primero la obra, después la renta.');
+  if (+rc.deficit > 0) riesgos.push('La operación usó ' + $money(rc.deficit) + ' más de lo que entró hasta ahora. Se cubre con la refinanciación o la venta' + (rc.fecha_estimada_pago ? ' (fecha estimada: ' + esc(rc.fecha_estimada_pago) + ')' : '') + '.');
+  if (c && c.deuda_vigente == null && !c.vendida) riesgos.push('El equipo está terminando de registrar el préstamo de esta casa — mientras tanto, algunos indicadores dicen "en registro" en vez de inventar un número.');
+  if (!enObra && rMes && rMes - gMes < 0) riesgos.push('Este mes la renta no alcanzó a cubrir los gastos — mirá el detalle en Flujo Mensual.');
   const sec4 = '<div class="card" style="margin:0"><div class="chart-h"><div class="t">Riesgos, en cristiano</div><div class="k">solo lo que afecta a TU casa</div></div>'
-    + (riesgos.length ? riesgos.map(t => '<div style="padding:8px 0;border-top:1px solid var(--glassb);font-size:12.5px;line-height:1.55;color:var(--mut)">' + t + '</div>').join('') : '<div class="empty" style="padding:14px">Sin alertas para tu casa hoy 🎯</div>')
+    + (riesgos.length ? riesgos.map(t => '<div style="padding:8px 0;border-top:1px solid var(--glassb);font-size:12.5px;line-height:1.55;color:var(--mut)">' + t + '</div>').join('') : '<div class="empty" style="padding:14px">Sin alertas para tu casa hoy ' + osIcon('target') + '</div>')
     + '</div>';
   // 5 · qué sigue
   const fExit = txt(P, 'fecha_exit_proyectada');
@@ -850,14 +850,14 @@ function renderCasaDash(pid, P, holding, p, r, dir) {
       const x2 = v => v == null ? '—' : v.toFixed(2) + 'x';
       const valsV = { ...vals };
       secVender = '<div class="card" style="margin:0">'
-        + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:8px">🔮 Escenarios con <b>supuestos</b> (apreciación ' + $pct(e.supuestos.apreciacion) + '/año · renta +' + $pct(e.supuestos.crec_renta) + '/año · costo de venta ' + $pct(e.supuestos.costo_venta) + ' · vacancia ' + $pct(e.supuestos.vacancia) + ') — <b>no son promesas</b>.</div>'
+        + '<div style="padding:8px 12px;border:1px solid rgba(245,178,61,.45);background:rgba(245,178,61,.08);border-radius:9px;font-size:11.5px;color:var(--amber);margin-bottom:8px">Escenarios con <b>supuestos</b> (apreciación ' + $pct(e.supuestos.apreciacion) + '/año · renta +' + $pct(e.supuestos.crec_renta) + '/año · costo de venta ' + $pct(e.supuestos.costo_venta) + ' · vacancia ' + $pct(e.supuestos.vacancia) + ') — <b>no son promesas</b>.</div>'
         + (e.porCompletar
           ? '<div class="empty" style="padding:14px">Escenarios por completar: falta registrar ' + (!(+indRow.renta_anual > 0) ? 'la renta de esta casa (está en obra o sin espejo)' : 'el préstamo de esta casa') + ' — no inventamos números.</div>'
           : '<div class="overx"><table><thead><tr><th>Si vendemos en…</th><th style="text-align:right">Te tocaría de la venta' + gI('waterfall', valsV) + '</th><th style="text-align:right">Tu TIR (neta)' + gI('tir_neta', valsV) + '</th><th style="text-align:right">Tu múltiplo</th></tr></thead><tbody>'
             + e.filas.map(f => '<tr><td><b>' + f.n + ' años</b></td><td style="text-align:right" class="up">' + $money(f.reparto) + '</td><td style="text-align:right">' + $pct(f.irrNeta) + '</td><td style="text-align:right">' + x2(f.multNeto) + '</td></tr>').join('')
             + '</tbody></table></div>'
             + '<div class="meta" style="margin-top:8px;font-size:11px">El reparto devuelve primero TU capital y la ganancia se divide según tu ' + $pct(casaE.pct) + gI('waterfall', valsV) + ' · la TIR del deal completo (bruta' + gI('tir_bruta', valsV) + ') es mayor — la tuya es después del reparto. <b>Por cada $1 que pusiste, hoy vale ' + (met.em != null ? '$' + met.em.toFixed(2) : '—') + '</b>.</div>'
-            + (e.flujoNegativo ? '<div class="meta" style="margin-top:4px;font-size:11px;color:var(--amber)">⚠ Hoy la renta no cubre la cuota — el plan contempla salir por refinanciación o venta (por eso vender más temprano rinde mejor acá).</div>' : ''))
+            + (e.flujoNegativo ? '<div class="meta" style="margin-top:4px;font-size:11px;color:var(--amber)">' + osIcon('alert') + ' Hoy la renta no cubre la cuota — el plan contempla salir por refinanciación o venta (por eso vender más temprano rinde mejor acá).</div>' : ''))
         + '</div>';
     }
   }
@@ -916,14 +916,14 @@ function drawCasaChart(r, inv) {
   const light = ipTheme() === 'light';
   const A = r.anios.filter(x => x.a >= 1);
   IP.charts.push(new Chart(el, { type: 'line', data: { labels: A.map(x => 'año ' + x.a), datasets: [
-    { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#4f8dff', pointRadius: 0, fill: true, backgroundColor: 'rgba(79,141,255,.10)' },
-  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#475569' : '#93a0b6', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } }, y: { ticks: { color: light ? '#64748b' : '#5b6780', font: { size: 9 } } } } } }));
+    { label: 'Tu riqueza (patrimonio)', data: A.map(x => Math.round(x.patrimonioInv)), borderColor: '#3a5be0', pointRadius: 0, fill: true, backgroundColor: 'rgba(58,91,224,.10)' },
+  ] }, options: { responsive: true, maintainAspectRatio: false, resizeDelay: 200, plugins: { legend: { labels: { color: light ? '#5a6270' : '#8b93a1', boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: light ? '#6f7785' : '#757d8b', font: { size: 9 } } }, y: { ticks: { color: light ? '#6f7785' : '#757d8b', font: { size: 9 } } } } } }));
 }
 
 // ─── evento de refinanciación ───
 function renderRefiCard(pid, P, p, r, met, lender) {
   if (p.refiMes == null) {
-    return '<div class="card"><div class="chart-h"><div class="t">🔄 Evento de refinanciación</div><div class="k">todavía no ocurre</div></div>'
+    return '<div class="card"><div class="chart-h"><div class="t">' + osIcon('refresh') + ' Evento de refinanciación</div><div class="k">todavía no ocurre</div></div>'
       + '<div class="meta">Cuando la casa se refinancia, acá vas a ver el pasivo liquidado al Hard Money, el nuevo prestamista y tu parte del cash-out.</div></div>';
   }
   const hmTotal = p.hmInicial + Object.values(p.draws).reduce((s, v) => s + v, 0);
@@ -932,14 +932,14 @@ function renderRefiCard(pid, P, p, r, met, lender) {
   const cashout = cashoutReal != null ? cashoutReal : cashoutCalc;
   const deficit = r.indicadores.fases && r.indicadores.fases.fase0 ? Math.abs(Math.min(0, r.indicadores.fases.fase0.deficitMax)) : 0;
   const tuCashout = cashout != null ? Math.max(0, cashout - deficit) * met.inv : null;
-  return '<div class="card"><div class="chart-h"><div class="t">🔄 Evento de refinanciación</div><div class="k">mes ' + p.refiMes + ' del ciclo</div></div>'
+  return '<div class="card"><div class="chart-h"><div class="t">' + osIcon('refresh') + ' Evento de refinanciación</div><div class="k">mes ' + p.refiMes + ' del ciclo</div></div>'
     + '<div class="kv"><span>Pasivo liquidado al Hard Money</span><b class="down">−' + $money(hmTotal) + '</b></div>'
     + '<div class="kv"><span>Nuevo prestamista' + srcChip(P, 'refi_lender') + '</span><b>' + sd(lender) + '</b></div>'
     + '<div class="kv"><span>Nuevo préstamo</span><b>' + $money(p.refiMonto) + ' @ ' + $pct(p.refiTasa) + ' · ' + Math.round(p.refiPlazoM / 12) + ' años</b></div>'
     + '<div class="kv"><span>Cash-out de la casa' + (cashoutReal != null ? srcChip(P, 'cashout_real') : ' <span class="src sup">calculado: préstamo − cierre − payoff</span>') + '</span><b class="' + (cashout >= 0 ? 'up' : 'down') + '">' + $money(cashout) + '</b></div>'
     + '<div class="kv"><span>Déficit previo del ciclo (se cubre primero)</span><b class="down">−' + $money(deficit) + '</b></div>'
     + '<div class="kv" style="border-top:2px solid var(--glassb)"><span><b>Tu cash-out (' + $pct(met.inv) + ' del neto)</b></span><b class="' + (tuCashout > 0 ? 'up' : 'warn') + '">' + $money(tuCashout) + '</b></div>'
-    + '<div class="meta" style="margin-top:6px">Tu parte = máx(0, cash-out − déficit previo) × tu % de equity. La distribución real se registra en 💸 Distribuciones cuando se paga.</div>'
+    + '<div class="meta" style="margin-top:6px">Tu parte = máx(0, cash-out − déficit previo) × tu % de equity. La distribución real se registra en ' + osIcon('banknote') + ' Distribuciones cuando se paga.</div>'
     + '</div>';
 }
 
@@ -948,19 +948,19 @@ function renderTimeline(pid, P, p, r, met, cierre) {
   const led = Array.isArray(IP.ledger[pid]) ? IP.ledger[pid] : null;
   const addM = (iso, m) => { if (!iso) return null; const d = new Date(iso + 'T00:00:00'); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 10); };
   const ev = [];
-  if (cierre) ev.push({ f: cierre, ic: '🏠', t: 'Compra de la casa', d: $money(p.compra) + ' + cierre ' + $money(p.cierreCompra), src: 'real' });
-  Object.keys(p.draws).sort((a, b) => +a - +b).forEach(m => ev.push({ f: addM(cierre, +m), ic: '🔨', t: 'Remodelación — draw mes ' + m, d: $money(p.draws[m]), src: 'real' }));
+  if (cierre) ev.push({ f: cierre, ic: osIcon('house'), t: 'Compra de la casa', d: $money(p.compra) + ' + cierre ' + $money(p.cierreCompra), src: 'real' });
+  Object.keys(p.draws).sort((a, b) => +a - +b).forEach(m => ev.push({ f: addM(cierre, +m), ic: osIcon('hammer'), t: 'Remodelación — draw mes ' + m, d: $money(p.draws[m]), src: 'real' }));
   const rentaReal = led ? led.filter(x => x.categoria === 'renta').map(x => x.fecha).sort()[0] : null;
-  if (rentaReal) ev.push({ f: rentaReal, ic: '💵', t: 'Primera renta cobrada', d: 'la casa empieza a producir', src: 'real' });
-  else { const m1 = (p.rampa || []).findIndex(x => x > 0); if (m1 > 0 && cierre) ev.push({ f: addM(cierre, m1), ic: '💵', t: 'Empieza la renta (modelo)', d: 'ocupación ' + Math.round(p.rampa[m1] * 100) + '%', src: 'modelo' }); }
+  if (rentaReal) ev.push({ f: rentaReal, ic: osIcon('banknote'), t: 'Primera renta cobrada', d: 'la casa empieza a producir', src: 'real' });
+  else { const m1 = (p.rampa || []).findIndex(x => x > 0); if (m1 > 0 && cierre) ev.push({ f: addM(cierre, m1), ic: osIcon('banknote'), t: 'Empieza la renta (modelo)', d: 'ocupación ' + Math.round(p.rampa[m1] * 100) + '%', src: 'modelo' }); }
   if (p.refiMes != null && cierre) {
     const rc = (IP.resumen || []).find(x => x.property_id === pid);
     const fReal = rc && rc.fecha_pago_fuente && /Airtable\)$/.test(rc.fecha_pago_fuente) ? rc.fecha_estimada_pago : null;
-    ev.push({ f: fReal || addM(cierre, p.refiMes), ic: '🔄', t: 'Refinanciación', d: 'se paga el Hard Money · entra el banco a 30 años', src: fReal ? 'real' : 'modelo' });
+    ev.push({ f: fReal || addM(cierre, p.refiMes), ic: osIcon('refresh'), t: 'Refinanciación', d: 'se paga el Hard Money · entra el banco a 30 años', src: fReal ? 'real' : 'modelo' });
   }
-  met.distMias.forEach(d => ev.push({ f: d.fecha, ic: '💸', t: 'Distribución pagada (' + d.tipo + ')', d: $money(d.monto) + ' para vos', src: 'real' }));
+  met.distMias.forEach(d => ev.push({ f: d.fecha, ic: osIcon('banknote'), t: 'Distribución pagada (' + d.tipo + ')', d: $money(d.monto) + ' para vos', src: 'real' }));
   const prox = (IP.dists || []).filter(d => d.property_id === pid && d.estado !== 'pagada' && d.fecha >= new Date().toISOString().slice(0, 10)).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
-  if (prox) ev.push({ f: prox.fecha, ic: '⏳', t: 'Próxima distribución (estimada)', d: $money(prox.monto), src: 'programada' });
+  if (prox) ev.push({ f: prox.fecha, ic: osIcon('loader'), t: 'Próxima distribución (estimada)', d: $money(prox.monto), src: 'programada' });
   const f2 = r.indicadores.fases.fase2.anio;
   if (f2 && cierre) ev.push({ f: addM(cierre, f2 * 12), ic: '🏁', t: 'Recuperás tu capital con utilidades (modelo)', d: 'año ' + f2 + ' del hold', src: 'modelo' });
   ev.sort((a, b) => String(a.f).localeCompare(String(b.f)));
@@ -976,9 +976,9 @@ function renderEscenarios(pid, P, base, movsCasa) {
   const g = k => { const rr = P[k]; const v = rr ? parseFloat(rr.value) : NaN; return isNaN(v) ? null : v; };
   const fechaC = P.fecha_cierre ? P.fecha_cierre.value : null;
   const defs = [
-    ['estimado', '📋 Estimado', 'el underwriting original'],
-    ['proyectado', '🎯 Proyectado', 'premisas confirmadas + supuestos'],
-    ['realizado', '✅ Real', movsCasa.length ? movsCasa.length + ' movimientos reales' : 'sin movimientos aún = proyectado'],
+    ['estimado', 'Estimado', 'el underwriting original'],
+    ['proyectado', 'Proyectado', 'premisas confirmadas + supuestos'],
+    ['realizado', 'Real', movsCasa.length ? movsCasa.length + ' movimientos reales' : 'sin movimientos aún = proyectado'],
   ];
   const runs = {};
   defs.forEach(d => {
@@ -1010,7 +1010,7 @@ function renderEscenarios(pid, P, base, movsCasa) {
     + defs.map(d => cell(runs[d[0]] ? fmt(fn(runs[d[0]])) : '—')).join('')
     + cell(simInd && simFn ? fmt(simFn(simInd)) : '—') + '</tr>';
   return '<div class="card overx" style="margin-top:14px"><div class="chart-h"><div class="t">Comparativo de escenarios</div><div class="k">solo lectura · mismo motor, distintos inputs · el Simulado lo arma administración</div></div>'
-    + '<table><thead><tr><th>Indicador</th>' + defs.map(d => '<th style="text-align:right" title="' + d[2] + '">' + d[1] + '</th>').join('') + '<th style="text-align:right">🧪 Simulado</th></tr></thead><tbody>'
+    + '<table><thead><tr><th>Indicador</th>' + defs.map(d => '<th style="text-align:right" title="' + d[2] + '">' + d[1] + '</th>').join('') + '<th style="text-align:right">' + osIcon('flask') + ' Simulado</th></tr></thead><tbody>'
     + fila('TIR 31 años', x => x.indicadores.tir31PostRefi, $pct, s => s.tir31PostRefi)
     + fila('VPN 31 años · casa', x => x.indicadores.vpn31PostRefi, $money, s => s.vpn31PostRefi)
     + fila('VPN · tu parte (' + $pct(inv) + ')', x => x.indicadores.vpn31PostRefi * inv, $money, s => s.vpn31PostRefi * inv)
@@ -1037,7 +1037,7 @@ window.ipToggleAnio = ipToggleAnio;
 
 function renderFlujo(pid, inv) {
   const led = IP.ledger[pid];
-  if (led === undefined || led === null) { if (led === undefined) ipLoadLedger(pid); return '<div class="empty">⏳ Armando tu flujo mensual…</div>'; }
+  if (led === undefined || led === null) { if (led === undefined) ipLoadLedger(pid); return '<div class="empty">' + osIcon('loader') + ' Armando tu flujo mensual…</div>'; }
   if (led.err) return '<div class="empty">Error: ' + esc(led.err) + '</div>';
   if (!led.length) return '<div class="empty">Sin movimientos registrados todavía para esta casa. Cuando empiece a moverse la plata (rentas, gastos, deuda) lo ves acá, mes a mes.</div>';
 
@@ -1075,14 +1075,14 @@ function renderFlujo(pid, inv) {
 
   const box = (lab, val, meta, cls, extra) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + (extra || '') + '</div>';
   const tres = '<div class="grid k4">'
-    + box('💵 Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
-    + box('🧾 Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
-    + box('🏦 Servicio de deuda', tDeuda ? '−' + $money(tDeuda) : $money(0), 'interés del HML + cuota de la refi a 30 años pagados en el período <span class="src">FF:ff_hml_payments</span>', 'down', '<div style="margin-top:8px">' + (deuRows || '<div class="meta">sin pagos de deuda en el período</div>') + '</div>')
-    + box('⚖️ Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos (solo P&L SÍ) · <span title="el servicio de deuda es financiero · P&L NO: no entra en el NOI, pero sí se resta abajo para saber cuánto queda de verdad.">no incluye el servicio de deuda</span>', balanceOp >= 0 ? 'up' : 'down')
+    + box('Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
+    + box('Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
+    + box('Servicio de deuda', tDeuda ? '−' + $money(tDeuda) : $money(0), 'interés del HML + cuota de la refi a 30 años pagados en el período <span class="src">FF:ff_hml_payments</span>', 'down', '<div style="margin-top:8px">' + (deuRows || '<div class="meta">sin pagos de deuda en el período</div>') + '</div>')
+    + box('Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos (solo P&L SÍ) · <span title="el servicio de deuda es financiero · P&L NO: no entra en el NOI, pero sí se resta abajo para saber cuánto queda de verdad.">no incluye el servicio de deuda</span>', balanceOp >= 0 ? 'up' : 'down')
     + '</div>'
     // el número que importa: lo que queda DESPUÉS de pagarle al banco / al hard money
     + '<div class="card" style="margin-top:14px;border-color:' + (balanceTot >= 0 ? 'var(--pos)' : 'var(--neg)') + '">'
-    + '<div class="lab">💰 Flujo después de deuda (lo que realmente queda)</div>'
+    + '<div class="lab">Flujo después de deuda (lo que realmente queda)</div>'
     + '<div class="big ' + (balanceTot >= 0 ? 'up' : 'down') + '">' + $money(balanceTot) + '</div>'
     + '<div class="meta">renta ' + $money(tRenta) + ' − gastos operativos ' + $money(tOper) + ' − servicio de deuda ' + $money(tDeuda)
     + ' · es el mismo neto que usa la distribución automática (tu parte = este número × ' + $pct(inv) + ')</div></div>';
@@ -1125,7 +1125,7 @@ function renderFlujo(pid, inv) {
   const srcTag = f => '<span class="src' + (/manual/.test(f) ? ' sup' : '') + '" title="' + esc(f) + '">' + esc(String(f).split(':')[0]) + '</span>';
   const sel = (campo, opts, cur) => '<select class="ibtn" style="padding:7px 10px" onchange="ipLedgerF(\'' + campo + '\', this.value)">' + opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
 
-  return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap"><b style="font-size:15px">📅 Flujo mensual de la operación</b>' + anioSel + '</div>'
+  return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap"><b style="font-size:15px">' + osIcon('calendar') + ' Flujo mensual de la operación</b>' + anioSel + '</div>'
     + tres
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Detalle año → mes</div><div class="k">operación: renta − gastos − deuda · sin draws ni distribuciones</div></div>' + (anual || '<div class="empty" style="padding:18px">Sin operación en el período elegido.</div>') + '</div>'
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Todos los movimientos · ' + led.length + '</div><div class="k" style="display:flex;gap:6px;flex-wrap:wrap">'
@@ -1138,7 +1138,7 @@ function renderFlujo(pid, inv) {
     + rows.slice().reverse().map(m => '<tr' + (m.pnl || m.deu ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
       + '<td>' + esc(m.concepto)
       + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — se resta del flujo neto del mes, no del NOI">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
-      + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">📎</a>' : '') + '</td>'
+      + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">' + osIcon('paperclip') + '</a>' : '') + '</td>'
       + '<td>' + esc(m.categoria) + '</td>'
       + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
       + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO: repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
@@ -1159,12 +1159,12 @@ function renderDist(pid, inv) {
   const kpi = (lab, val, meta, cls) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
   return '<div class="grid k3">'
     + kpi('Total recibido', $money(total), pagadas.length + (pagadas.length === 1 ? ' distribución pagada' : ' distribuciones pagadas'), total > 0 ? 'up' : '')
-    + kpi('Próxima estimada', prox ? $money(prox.monto) : '—', prox ? esc(prox.fecha) + ' · faltan ' + dias + ' días' + (dias <= 14 ? ' <b class="warn">⏰</b>' : '') : 'sin distribuciones programadas por ahora', prox && dias <= 14 ? 'warn' : '')
+    + kpi('Próxima estimada', prox ? $money(prox.monto) : '—', prox ? esc(prox.fecha) + ' · faltan ' + dias + ' días' + (dias <= 14 ? ' <b class="warn">' + osIcon('clock') + '</b>' : '') : 'sin distribuciones programadas por ahora', prox && dias <= 14 ? 'warn' : '')
     + kpi('K-1 disponibles', String(rows.filter(d => d.k1_url).length), 'documentos fiscales de tus distribuciones')
     + '</div>'
     + '<div class="card" style="margin-top:14px"><div class="chart-h"><div class="t">Historial</div><div class="k"><button class="ibtn" onclick="ipDistCSV()">⬇ Exportar CSV</button></div></div>'
     + (rows.length ? '<div class="overx"><table><thead><tr><th>Fecha</th><th>Casa</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Comprobante</th><th>K-1</th></tr></thead><tbody>'
-      + rows.map(d => { const dd = (IP.params[d.property_id] || {}).direccion; return '<tr><td>' + esc(d.fecha) + '</td><td>' + esc(dd ? dd.value.split(',')[0] : '—') + '</td><td>' + esc(d.tipo) + '</td><td class="up">' + $money(d.monto) + '</td><td>' + (d.estado === 'pagada' ? '<span class="up">✓ pagada</span>' : '<span class="warn">programada</span>') + '</td><td>' + (d.comprobante_url ? '<a href="' + esc(d.comprobante_url) + '" target="_blank" style="color:var(--a2)">📎 Ver ↗</a>' : '—') + '</td><td>' + (d.k1_url ? '<a href="' + esc(d.k1_url) + '" target="_blank" style="color:var(--a2)">K-1 ↗</a>' : '—') + '</td></tr>'; }).join('')
+      + rows.map(d => { const dd = (IP.params[d.property_id] || {}).direccion; return '<tr><td>' + esc(d.fecha) + '</td><td>' + esc(dd ? dd.value.split(',')[0] : '—') + '</td><td>' + esc(d.tipo) + '</td><td class="up">' + $money(d.monto) + '</td><td>' + (d.estado === 'pagada' ? '<span class="up">✓ pagada</span>' : '<span class="warn">programada</span>') + '</td><td>' + (d.comprobante_url ? '<a href="' + esc(d.comprobante_url) + '" target="_blank" style="color:var(--a2)">' + osIcon('paperclip') + ' Ver ↗</a>' : '—') + '</td><td>' + (d.k1_url ? '<a href="' + esc(d.k1_url) + '" target="_blank" style="color:var(--a2)">K-1 ↗</a>' : '—') + '</td></tr>'; }).join('')
       + '</tbody></table></div>' : '<div class="empty">Todavía no hay distribuciones registradas. Cuando la casa reparta utilidades o cash-out, aparecen acá con su comprobante y su K-1.</div>')
     + '</div>';
 }
@@ -1188,7 +1188,7 @@ function renderDocs(docs) {
   const rows = docs.filter(d => (IP.docTipo === 'todos' || norm(d.tipo) === IP.docTipo) && (!q || (String(d.nombre || '') + ' ' + String(d.tipo || '')).toLowerCase().includes(q)));
   return '<div class="card"><div class="chart-h"><div class="t">Mis documentos</div><div class="k">contratos · fiscales · legales — cada vista queda registrada</div></div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
-    + '<input id="ip-doc-q" placeholder="🔍 Buscar documento…" value="' + esc(IP.docQ) + '" oninput="ipDocQ(this.value)" style="flex:1;min-width:200px;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;outline:none">'
+    + '<input id="ip-doc-q" placeholder="Buscar documento…" value="' + esc(IP.docQ) + '" oninput="ipDocQ(this.value)" style="flex:1;min-width:200px;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:9px 12px;color:var(--ink);font-size:13px;outline:none">'
     + tipos.map(t => '<button class="ibtn tabb' + (IP.docTipo === t ? ' on' : '') + '" onclick="ipDocTipo(\'' + t + '\')">' + t + '</button>').join('')
     + '</div>'
     + (rows.length ? '<div class="overx"><table><thead><tr><th>Documento</th><th>Tipo</th><th>Subido</th><th style="text-align:right">Descargar</th></tr></thead><tbody>'
@@ -1203,8 +1203,8 @@ window.ipVerDoc = ipVerDoc;
 // ─── 💬 Mensajes del gestor ───
 function renderMsgs(pid) {
   const rows = (IP.msgs || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  if (IP.viewOnly) return '<div class="card" style="margin-bottom:14px"><div class="empty" style="padding:14px">👁 Modo vista: el formulario de mensajes está deshabilitado (solo lectura).</div></div>'
-    + (rows.length ? rows.map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 Flipping Rentals' : '👤 Inversionista') + ' · ' + esc((m.created_at || '').slice(0, 10)) + '</span></div>' + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:4px 0">' + esc(m.asunto) + '</div>' : '') + '<div style="font-size:12.5px;color:var(--mut);white-space:pre-wrap">' + esc(m.cuerpo) + '</div></div>').join('') : '<div class="empty">Sin mensajes todavía.</div>');
+  if (IP.viewOnly) return '<div class="card" style="margin-bottom:14px"><div class="empty" style="padding:14px">' + osIcon('eye') + ' Modo vista: el formulario de mensajes está deshabilitado (solo lectura).</div></div>'
+    + (rows.length ? rows.map(m => '<div class="card" style="margin-bottom:8px"><div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? 'Flipping Rentals' : 'Inversionista') + ' · ' + esc((m.created_at || '').slice(0, 10)) + '</span></div>' + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:4px 0">' + esc(m.asunto) + '</div>' : '') + '<div style="font-size:12.5px;color:var(--mut);white-space:pre-wrap">' + esc(m.cuerpo) + '</div></div>').join('') : '<div class="empty">Sin mensajes todavía.</div>');
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Escribinos</div><div class="k">te respondemos en el portal — nada se envía sin que toques "Enviar"</div></div>'
     + '<input id="ip-msg-asunto" placeholder="Asunto" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;margin-bottom:8px;outline:none">'
     + '<textarea id="ip-msg-cuerpo" rows="3" placeholder="Tu mensaje…" style="width:100%;background:var(--glass);border:1px solid var(--glassb);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:13px;outline:none"></textarea>'
@@ -1212,7 +1212,7 @@ function renderMsgs(pid) {
     + (rows.length ? rows.map(m => {
       const leido = (m.read_by || []).includes(IP.email.toLowerCase());
       return '<div class="card" style="margin-bottom:8px;' + (!leido && m.de === 'admin' ? 'border-color:var(--a2)' : '') + '" ' + (!leido ? 'onclick="ipMarcarLeido(\'' + m.id + '\')"' : '') + '>'
-        + '<div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? '🏢 Flipping Rentals' : '👤 Vos') + ' · ' + esc((m.created_at || '').slice(0, 10)) + (!leido && m.de === 'admin' ? ' · <b style="color:var(--a2)">nuevo</b>' : '') + '</span></div>'
+        + '<div class="kv" style="border:none;padding:0"><span>' + (m.de === 'admin' ? 'Flipping Rentals' : 'Vos') + ' · ' + esc((m.created_at || '').slice(0, 10)) + (!leido && m.de === 'admin' ? ' · <b style="color:var(--a2)">nuevo</b>' : '') + '</span></div>'
         + (m.asunto ? '<div style="font-weight:700;font-size:13px;margin:4px 0">' + esc(m.asunto) + '</div>' : '')
         + '<div style="font-size:12.5px;color:var(--mut);white-space:pre-wrap">' + esc(m.cuerpo) + '</div></div>';
     }).join('') : '<div class="empty">Sin mensajes todavía.</div>');
@@ -1234,10 +1234,10 @@ window.ipMarcarLeido = ipMarcarLeido;
 // ─── 🤖 Asistente IA ───
 function renderIA() {
   const sugeridos = ['Explícame mis indicadores', '¿Qué es el TVPI?', '¿Por qué mi TIR dice n/a?', '¿Cómo va mi inversión?', '¿Cuándo recupero mi capital?'];
-  return '<div class="card"><div class="chart-h"><div class="t">🤖 Investor Assistant</div><div class="k">responde SOLO con los datos de TU inversión · números concretos · honesto sobre riesgos</div></div>'
+  return '<div class="card"><div class="chart-h"><div class="t">' + osIcon('bot') + ' Investor Assistant</div><div class="k">responde SOLO con los datos de TU inversión · números concretos · honesto sobre riesgos</div></div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">' + sugeridos.map(s => '<button class="ibtn" onclick="ipAsk(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>').join('') + '</div>'
     + '<div id="ip-chat" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;margin-bottom:10px">'
-    + (IP.chat || []).map(m => '<div style="max-width:85%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;' + (m.role === 'user' ? 'align-self:flex-end;background:rgba(79,141,255,.16);border:1px solid rgba(79,141,255,.3)' : 'align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)') + '">' + esc(m.content) + '</div>').join('')
+    + (IP.chat || []).map(m => '<div style="max-width:85%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;' + (m.role === 'user' ? 'align-self:flex-end;background:rgba(58,91,224,.16);border:1px solid rgba(58,91,224,.3)' : 'align-self:flex-start;background:var(--glass);border:1px solid var(--glassb)') + '">' + esc(m.content) + '</div>').join('')
     + '</div>'
     + '<div style="display:flex;gap:8px"><input id="ip-ia-q" placeholder="Preguntá sobre tu inversión…" onkeydown="if(event.key===\'Enter\')ipAsk()" style="flex:1;background:var(--glass);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:13px;outline:none"><button class="cbtn" onclick="ipAsk()">Enviar</button></div>'
     + '</div>';
@@ -1277,32 +1277,32 @@ async function ipReloadProducto() {
 // ─── gráficas (theme-aware; canvas SIEMPRE en wrapper fijo con overflow hidden) ───
 function drawCharts(r, inv) {
   const light = ipTheme() === 'light';
-  const tick = light ? '#64748b' : '#5b6780', leg = light ? '#475569' : '#93a0b6', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
+  const tick = light ? '#6f7785' : '#757d8b', leg = light ? '#5a6270' : '#8b93a1', grid = light ? 'rgba(15,23,42,.08)' : 'rgba(255,255,255,.05)';
   const A = r.anios.filter(x => x.a >= 1);
   const labels = A.map(x => 'a' + x.a);
   const C = (id, cfg) => { const el = document.getElementById(id); if (!el || !window.Chart) return; cfg.options = Object.assign({ resizeDelay: 200 }, cfg.options || {}); IP.charts.push(new Chart(el, cfg)); };
   const gopt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: leg, boxWidth: 10, font: { size: 10 } } } }, scales: { x: { ticks: { color: tick, font: { size: 9 } }, grid: { color: grid } }, y: { ticks: { color: tick, font: { size: 9 } }, grid: { color: grid } } } };
   C('ch1', { type: 'bar', data: { labels, datasets: [
-    { label: 'Amortización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.amortizacion * inv), backgroundColor: '#4f8dff' },
-    { label: 'Rentabilidad', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.rentabilidad * inv), backgroundColor: '#48d69c' },
-    { label: 'Valorización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.valorizacion * inv), backgroundColor: '#45e3c6' },
+    { label: 'Amortización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.amortizacion * inv), backgroundColor: '#3a5be0' },
+    { label: 'Rentabilidad', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.rentabilidad * inv), backgroundColor: '#4ade9e' },
+    { label: 'Valorización', data: r.series.riqueza.filter(x => x.a >= 1).map(x => x.valorizacion * inv), backgroundColor: '#5c79f0' },
   ] }, options: { ...gopt, scales: { ...gopt.scales, x: { ...gopt.scales.x, stacked: true }, y: { ...gopt.scales.y, stacked: true } } } });
   C('ch2', { type: 'line', data: { labels, datasets: [
-    { label: 'Valor de la casa', data: A.map(x => x.valor), borderColor: '#45e3c6', pointRadius: 0 },
-    { label: 'Deuda', data: A.map(x => x.saldo), borderColor: '#f0687a', pointRadius: 0 },
-    { label: 'Tu patrimonio', data: A.map(x => x.patrimonioInv), borderColor: '#4f8dff', pointRadius: 0, fill: true, backgroundColor: 'rgba(79,141,255,.08)' },
+    { label: 'Valor de la casa', data: A.map(x => x.valor), borderColor: '#5c79f0', pointRadius: 0 },
+    { label: 'Deuda', data: A.map(x => x.saldo), borderColor: '#ff6b6b', pointRadius: 0 },
+    { label: 'Tu patrimonio', data: A.map(x => x.patrimonioInv), borderColor: '#3a5be0', pointRadius: 0, fill: true, backgroundColor: 'rgba(58,91,224,.08)' },
   ] }, options: gopt });
   C('ch3', { type: 'bar', data: { labels, datasets: [
-    { label: 'Ingreso anual', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.ingreso), backgroundColor: '#48d69c' },
-    { label: 'Cuota deuda (fija)', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.deuda), backgroundColor: '#f0687a' },
+    { label: 'Ingreso anual', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.ingreso), backgroundColor: '#4ade9e' },
+    { label: 'Cuota deuda (fija)', data: r.series.dscr.filter(x => x.a >= 1).map(x => x.deuda), backgroundColor: '#ff6b6b' },
   ] }, options: gopt });
   C('ch4', { type: 'line', data: { labels, datasets: [
-    { label: 'Utilidad acumulada (tu parte)', data: r.series.utilidadAcum.filter(x => x.a >= 1).map(x => x.acum * inv), borderColor: '#e7b65e', pointRadius: 0, fill: true, backgroundColor: 'rgba(231,182,94,.08)' },
+    { label: 'Utilidad acumulada (tu parte)', data: r.series.utilidadAcum.filter(x => x.a >= 1).map(x => x.acum * inv), borderColor: '#fbbf24', pointRadius: 0, fill: true, backgroundColor: 'rgba(251,191,36,.08)' },
   ] }, options: gopt });
   C('ch5', { type: 'bar', data: { labels, datasets: [
-    { label: 'Operativos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.operativos), backgroundColor: '#4f8dff' },
-    { label: 'Impuestos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.impuestos), backgroundColor: '#e7b65e' },
-    { label: 'Financieros (cuota)', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.financieros), backgroundColor: '#f0687a' },
+    { label: 'Operativos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.operativos), backgroundColor: '#3a5be0' },
+    { label: 'Impuestos', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.impuestos), backgroundColor: '#fbbf24' },
+    { label: 'Financieros (cuota)', data: r.series.gastos.filter(x => x.a >= 1).map(x => x.financieros), backgroundColor: '#ff6b6b' },
   ] }, options: { ...gopt, scales: { ...gopt.scales, x: { ...gopt.scales.x, stacked: true }, y: { ...gopt.scales.y, stacked: true } } } });
 }
 window.render = render;

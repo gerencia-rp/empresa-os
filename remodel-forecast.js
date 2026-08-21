@@ -342,7 +342,7 @@ fcState.form = {
   jornadaH: 8                    // jornada (h/día) global → multiplica el MO total
 };
 
-const FC_STAGE_ICON = { 'Demolición':'⛏️','Cimentación':'🏗️','Externo':'🏠','Estructura':'🪵','Interno':'🛏️','Limpieza':'🧹' };
+const FC_STAGE_ICON = { 'Demolición':osIcon('construction'),'Cimentación':osIcon('construction'),'Externo':osIcon('house'),'Estructura':osIcon('ruler'),'Interno':osIcon('bed'),'Limpieza':osIcon('sparkles') };
 
 // ─── RENDER PRINCIPAL DE LA TAB ───
 function fcApplyInspHandoff() {
@@ -372,25 +372,25 @@ function fcRenderTab(body) {
   const duracionSugerida = fcDuracionEstimada(f.sqft);
 
   body.innerHTML = `
-    ${_insp ? `<div class="bg-teal-50 border border-teal-300 text-teal-800 rounded-lg px-3 py-2 mb-3 text-sm">🔍 <b>Pre-llenado desde la Inspección</b> de ${(_insp.nombre||'').replace(/</g,'&lt;')} (daño global ${_insp.dano_global||'—'}%): las afectaciones por etapa arrancan del diagnóstico, no de cero. Ajustá lo que haga falta.</div>` : ''}
+    ${_insp ? `<div class="bg-teal-50 border border-teal-300 text-teal-800 rounded-lg px-3 py-2 mb-3 text-sm">${osIcon('search')} <b>Pre-llenado desde la Inspección</b> de ${(_insp.nombre||'').replace(/</g,'&lt;')} (daño global ${_insp.dano_global||'—'}%): las afectaciones por etapa arrancan del diagnóstico, no de cero. Ajustá lo que haga falta.</div>` : ''}
     <div class="grid lg:grid-cols-12 gap-4">
       <!-- IZQUIERDA: Visita Previa -->
       <div class="lg:col-span-5 space-y-3">
         <div class="bg-white rounded-xl p-4 border border-slate-200">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-bold uppercase text-slate-700">📋 Visita Previa</h3>
+            <h3 class="text-xs font-bold uppercase text-slate-700">${osIcon('clipboard')} Visita Previa</h3>
             <span class="text-[10px] px-2 py-0.5 rounded ${fcState.coefFuente==='historico'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}">coef: ${fcState.coefFuente} (${fcState.nCasasCompletas||0}/${fcState.nThreshold} casas)</span>
           </div>
           ${(fcState.diagnoses || []).length > 0 ? `
             <div class="mb-2 bg-blue-50 border border-blue-200 rounded p-2">
               ${(() => { const _n = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); const _dc = {}; fcState.diagnoses.forEach(d => { const k = _n(d.direccion || d.propiedad); _dc[k] = (_dc[k] || 0) + 1; }); const _dups = Object.values(_dc).filter(n => n > 1).reduce((a, b) => a + b, 0); window.__fcDc = _dc; window.__fcN = _n; return `
-              <div class="flex items-center justify-between mb-1"><label class="text-[10px] text-blue-700 font-bold uppercase">🔍 Diagnósticos guardados (${fcState.diagnoses.length}) — editar/borrar</label>${_dups ? `<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold" title="Diagnósticos con la misma dirección">⚠ ${_dups} duplicados por dirección</span>` : ''}</div>
+              <div class="flex items-center justify-between mb-1"><label class="text-[10px] text-blue-700 font-bold uppercase">${osIcon('search')} Diagnósticos guardados (${fcState.diagnoses.length}) — editar/borrar</label>${_dups ? `<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold" title="Diagnósticos con la misma dirección">${osIcon('alert')} ${_dups} duplicados por dirección</span>` : ''}</div>
               <div class="flex gap-1">
                 <select id="fc-diag-sel" onchange="fcLoadDiagnosis(this.value)" class="flex-1 border border-slate-300 rounded px-2 py-1.5 text-sm">
                   <option value="">— Cargar para editar —</option>
-                  ${fcState.diagnoses.map(d => `<option value="${d.id}">${(d.propiedad || '').replace(/</g, '&lt;')} · ${d.sqft || '?'}sqft · ${(d.source || 'manual')} · ${new Date(d.updated_at).toLocaleDateString('es-MX')}${_dc[_n(d.direccion || d.propiedad)] > 1 ? ' · ⚠dup' : ''}</option>`).join('')}
+                  ${fcState.diagnoses.map(d => `<option value="${d.id}">${(d.propiedad || '').replace(/</g, '&lt;')} · ${d.sqft || '?'}sqft · ${(d.source || 'manual')} · ${new Date(d.updated_at).toLocaleDateString('es-MX')}${_dc[_n(d.direccion || d.propiedad)] > 1 ? ' · dup' : ''}</option>`).join('')}
                 </select>
-                <button onclick="fcDeleteDiagnosis(document.getElementById('fc-diag-sel').value)" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2.5 font-bold" title="Archivar (soft-delete) el diagnóstico seleccionado">🗑</button>
+                <button onclick="fcDeleteDiagnosis(document.getElementById('fc-diag-sel').value)" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded px-2.5 font-bold" title="Archivar (soft-delete) el diagnóstico seleccionado">${osIcon('trash')}</button>
               </div>`; })()}
             </div>
           ` : ''}
@@ -420,7 +420,7 @@ function fcRenderTab(body) {
 
           <!-- Subir archivo Taskade -->
           <div class="mt-3 bg-gradient-to-br from-violet-50 to-fuchsia-50 border-2 border-violet-300 rounded-lg p-3">
-            <label class="block text-xs font-bold text-violet-900 mb-1.5">📎 Subir Visita Previa de Taskade (.json)</label>
+            <label class="block text-xs font-bold text-violet-900 mb-1.5">${osIcon('paperclip')} Subir Visita Previa de Taskade (.json)</label>
             <input type="file" accept=".json,application/json" onchange="fcUploadTaskadeFile(event.target.files[0])"
               class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-violet-600 file:text-white file:font-bold file:cursor-pointer hover:file:bg-violet-700 cursor-pointer" />
             <div id="fc-taskade-status" class="text-[11px] mt-1.5 text-slate-500">El JSON se parsea, auto-llena la afectación y guarda el detalle (8 grupos + 5 patologías + scores) para el pronóstico.</div>
@@ -430,7 +430,7 @@ function fcRenderTab(body) {
           ${fcState.form._lastTaskade ? fcRenderTaskadePreview(fcState.form._lastTaskade) : ''}
 
           <details class="mt-3">
-            <summary class="text-[10px] text-slate-500 cursor-pointer hover:text-slate-700">📥 O pegar JSON manual (formato simple)</summary>
+            <summary class="text-[10px] text-slate-500 cursor-pointer hover:text-slate-700">${osIcon('inbox')} O pegar JSON manual (formato simple)</summary>
             <textarea id="fc-json" rows="4" placeholder='{"propiedad":"...","sqft":1500,"afectacion":{"Demolición":100,...}}' class="w-full border border-slate-300 rounded px-2 py-1.5 text-[11px] font-mono mt-1"></textarea>
             <button onclick="fcLoadJSON()" class="mt-1 w-full bg-slate-100 hover:bg-slate-200 text-xs py-1.5 rounded">Cargar JSON</button>
           </details>
@@ -438,7 +438,7 @@ function fcRenderTab(body) {
 
         <!-- Cronograma / duración -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">⏱️ Duración total</h3>
+          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('clock')} Duración total</h3>
           <div class="flex items-center gap-2">
             <input type="number" value="${f.duracionDias}" onchange="fcSet('duracionDias', +this.value)" placeholder="días" class="w-24 border border-slate-300 rounded px-2 py-1.5 text-sm" />
             <span class="text-xs text-slate-500">días totales</span>
@@ -448,7 +448,7 @@ function fcRenderTab(body) {
 
         <!-- Cuadrilla: N personas + costo/hora + jornada → cablean el MO total -->
         <div class="bg-white rounded-xl p-4 border border-slate-200">
-          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">👷 Cuadrilla <span class="text-[9px] font-normal text-slate-400 normal-case">(MO = N × $/h × jornada × días)</span></h3>
+          <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('hard-hat')} Cuadrilla <span class="text-[9px] font-normal text-slate-400 normal-case">(MO = N × $/h × jornada × días)</span></h3>
           <div class="grid grid-cols-3 gap-2">
             <div><label class="block text-[10px] text-slate-500 mb-0.5">N° personas</label><input type="number" min="0" value="${f.crewSize}" onchange="fcSet('crewSize', Math.max(0,+this.value))" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
             <div><label class="block text-[10px] text-slate-500 mb-0.5">Costo/hora $ ${fcState.costoHoraPromedio>0?`<span class="text-emerald-600">(auto $${fcState.costoHoraPromedio})</span>`:''}</label><input type="number" min="0" value="${f.costoHora}" onchange="fcSet('costoHora', +this.value)" placeholder="${fcState.costoHoraPromedio>0?fcState.costoHoraPromedio:'auto Airtable'}" class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm" /></div>
@@ -462,7 +462,7 @@ function fcRenderTab(body) {
       <div class="lg:col-span-7 space-y-3">
         ${errores.length ? `
           <div class="bg-red-50 border border-red-300 rounded-xl p-4">
-            <div class="text-sm font-bold text-red-900 mb-1">⚠️ Corregí el diagnóstico antes de calcular</div>
+            <div class="text-sm font-bold text-red-900 mb-1">${osIcon('alert')} Corregí el diagnóstico antes de calcular</div>
             <ul class="text-xs text-red-800 list-disc list-inside">${errores.map(e=>`<li>${e}</li>`).join('')}</ul>
           </div>
         ` : fcRenderResultado(r, crew, otrosPct)}
@@ -512,7 +512,7 @@ function fcRenderResultado(r, crew, otrosPct) {
             <th class="text-right p-2 text-slate-400" title="MO de referencia por coeficiente $/ft² (no es el cálculo activo si hay cuadrilla)">MO ref</th>
             <th class="text-right p-2">Material $</th>
             <th class="text-right p-2">Subtotal $</th>
-            <th class="text-right p-2" title="Peso de la etapa en el avance TÉCNICO de la obra. Default: participación en el costo (MO+material). Editable — debe sumar 100%.">⭐ Importancia</th>
+            <th class="text-right p-2" title="Peso de la etapa en el avance TÉCNICO de la obra. Default: participación en el costo (MO+material). Editable — debe sumar 100%.">${osIcon('star')} Importancia</th>
             <th class="text-right p-2">% tiempo</th>
             <th class="text-right p-2">Días</th>
           </tr>
@@ -526,7 +526,7 @@ function fcRenderResultado(r, crew, otrosPct) {
               <td class="p-2 text-right text-slate-400">$${Math.round(e.moCoef).toLocaleString()}</td>
               <td class="p-2 text-right">$${Math.round(e.mat).toLocaleString()}</td>
               <td class="p-2 text-right font-bold">${Math.round(e.subtotal).toLocaleString()}</td>
-              <td class="p-2 text-right"><input type="number" min="0" max="100" step="0.1" value="${(e.importancia != null ? e.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0)).toFixed(1)}" onchange="fcSetImportancia(${r.etapas.indexOf(e)}, this.value)" class="w-16 text-right border border-slate-200 rounded px-1 py-0.5 text-xs font-bold text-amber-700" title="⭐ % de importancia en el avance técnico"></td>
+              <td class="p-2 text-right"><input type="number" min="0" max="100" step="0.1" value="${(e.importancia != null ? e.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0)).toFixed(1)}" onchange="fcSetImportancia(${r.etapas.indexOf(e)}, this.value)" class="w-16 text-right border border-slate-200 rounded px-1 py-0.5 text-xs font-bold text-amber-700" title="${osIcon('star')} % de importancia en el avance técnico"></td>
               <td class="p-2 text-right text-slate-500">${e.pesoNormPct.toFixed(1)}%</td>
               <td class="p-2 text-right">${e.dias.toFixed(1)}</td>
             </tr>
@@ -549,8 +549,8 @@ function fcRenderResultado(r, crew, otrosPct) {
     <!-- Benchmark vs histórico real -->
     <div class="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs">
       <div class="flex items-center justify-between">
-        <span class="font-bold text-violet-900">📊 vs histórico real (${fcState.nCasasCompletas} casas completas)</span>
-        <span class="text-[10px] ${fcState.nCasasCompletas>=fcState.nThreshold?'text-emerald-700':'text-amber-700'}">${fcState.nCasasCompletas>=fcState.nThreshold?'✅ refinando params':'aún con semilla (faltan '+(fcState.nThreshold-fcState.nCasasCompletas)+')'}</span>
+        <span class="font-bold text-violet-900">${osIcon('chart')} vs histórico real (${fcState.nCasasCompletas} casas completas)</span>
+        <span class="text-[10px] ${fcState.nCasasCompletas>=fcState.nThreshold?'text-emerald-700':'text-amber-700'}">${fcState.nCasasCompletas>=fcState.nThreshold?'refinando params':'aún con semilla (faltan '+(fcState.nThreshold-fcState.nCasasCompletas)+')'}</span>
       </div>
       <div class="grid grid-cols-3 gap-2 mt-2">
         <div>Tu estimado: <strong>$${r.ppsfDirecto.toFixed(0)}/sqft</strong></div>
@@ -575,7 +575,7 @@ function fcRenderResultado(r, crew, otrosPct) {
 
     <!-- Cuadrilla trade-off -->
     <div class="bg-white border border-slate-200 rounded-xl p-3">
-      <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">👷 Trade-off cuadrilla (tiempo vs costo)</h3>
+      <h3 class="text-xs font-bold uppercase text-slate-700 mb-2">${osIcon('hard-hat')} Trade-off cuadrilla (tiempo vs costo)</h3>
       <div class="grid grid-cols-2 gap-2 text-xs">
         <div class="bg-slate-50 rounded p-2">
           <div class="text-[10px] text-slate-500 uppercase">1 persona</div>
@@ -593,11 +593,11 @@ function fcRenderResultado(r, crew, otrosPct) {
 
     <!-- Acciones -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-      <button onclick="withLoading(this, fcSaveForecast)" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda el pronóstico completo (con cálculo)">💾 Guardar pronóstico</button>
-      <button onclick="withLoading(this, () => fcSaveDiagnosis('manual'))" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda solo la Visita Previa (datos + afectación) para reutilizarla">📋 Guardar diagnóstico</button>
-      <button onclick="fcExportXLSX()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg" title="Excel multi-hoja: Info · Presupuesto · Cronograma · Gantt">📥 Excel</button>
-      <button onclick="fcExportCSV()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV plano">📄 CSV</button>
-      <button onclick="fcExportTaskadeCSV()" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV de tareas para reimportar a Taskade">📋 Taskade</button>
+      <button onclick="withLoading(this, fcSaveForecast)" class="bg-slate-900 hover:bg-slate-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda el pronóstico completo (con cálculo)">${osIcon('save')} Guardar pronóstico</button>
+      <button onclick="withLoading(this, () => fcSaveDiagnosis('manual'))" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg" title="Guarda solo la Visita Previa (datos + afectación) para reutilizarla">${osIcon('clipboard')} Guardar diagnóstico</button>
+      <button onclick="fcExportXLSX()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-2.5 rounded-lg" title="Excel multi-hoja: Info · Presupuesto · Cronograma · Gantt">${osIcon('inbox')} Excel</button>
+      <button onclick="fcExportCSV()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV plano">${osIcon('file')} CSV</button>
+      <button onclick="fcExportTaskadeCSV()" class="bg-violet-700 hover:bg-violet-800 text-white text-sm font-bold py-2.5 rounded-lg" title="CSV de tareas para reimportar a Taskade">${osIcon('clipboard')} Taskade</button>
     </div>
   `;
 }
@@ -635,7 +635,7 @@ function fcRenderTaskadePreview(t) {
   return `
     <div class="mt-2 bg-white border border-violet-200 rounded p-2 text-xs">
       <div class="flex items-center justify-between mb-2">
-        <div class="font-bold text-violet-900">📊 Detalle Taskade: ${d.propiedad?.nombre || ''} ${isV2?'<span class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded">v2</span>':''}</div>
+        <div class="font-bold text-violet-900">${osIcon('chart')} Detalle Taskade: ${d.propiedad?.nombre || ''} ${isV2?'<span class="text-[9px] bg-emerald-100 text-emerald-700 px-1 rounded">v2</span>':''}</div>
         <span class="${veredictoBg} px-2 py-0.5 rounded text-[10px] font-bold">${t.veredicto || '—'} · ${t.dano_global_pct?.toFixed(1)}%</span>
       </div>
 
@@ -670,7 +670,7 @@ function fcRenderTaskadePreview(t) {
 
       ${Object.keys(etapasRen).length ? `
         <div class="mt-2 pt-2 border-t border-violet-100">
-          <div class="text-[10px] font-bold text-violet-700 uppercase mb-1">📋 Etapas de renovación (calculadas en visita previa)</div>
+          <div class="text-[10px] font-bold text-violet-700 uppercase mb-1">${osIcon('clipboard')} Etapas de renovación (calculadas en visita previa)</div>
           <div class="grid grid-cols-3 gap-1">
             ${Object.entries(etapasRen).map(([k, v]) => {
               const dp = fcDpct(v) || 0;
@@ -686,7 +686,7 @@ function fcRenderTaskadePreview(t) {
 
       <div class="mt-2 pt-2 border-t border-violet-100 text-[10px] text-slate-500 flex justify-between">
         <span>ID: <code>${t.taskade_id?.slice(0,8) || '—'}</code></span>
-        ${t.archivo_url ? `<a href="${t.archivo_url}" target="_blank" class="text-violet-600 hover:underline">📎 Ver archivo</a>` : ''}
+        ${t.archivo_url ? `<a href="${t.archivo_url}" target="_blank" class="text-violet-600 hover:underline">${osIcon('paperclip')} Ver archivo</a>` : ''}
       </div>
     </div>
   `;
@@ -798,7 +798,7 @@ async function fcUploadTaskadeFile(file) {
     return alert('Por ahora solo soporto archivos .json de Taskade Visita Previa. Si tu Taskade exporta en otro formato, decímelo.');
   }
   const statusEl = document.getElementById('fc-taskade-status');
-  if (statusEl) statusEl.innerHTML = '<span class="text-amber-600">⏳ Procesando...</span>';
+  if (statusEl) statusEl.innerHTML = '<span class="text-amber-600">' + osIcon('loader') + ' Procesando...</span>';
 
   try {
     // 1. Leer archivo localmente y parsear
@@ -904,7 +904,7 @@ async function fcUploadTaskadeFile(file) {
     const body = document.getElementById('rm-body');
     if (body) fcRenderTab(body);
   } catch (e) {
-    if (statusEl) statusEl.innerHTML = `<span class="text-red-600">❌ ${e.message}</span>`;
+    if (statusEl) statusEl.innerHTML = `<span class="text-red-600">${osIcon('x-circle')} ${e.message}</span>`;
     console.error('fcUploadTaskadeFile:', e);
   }
 }
@@ -1005,7 +1005,7 @@ function fcSetImportancia(idx, val) {
   const r = fcState.lastResult; if (!r || !r.etapas || !r.etapas[idx]) return;
   r.etapas[idx].importancia = Math.max(0, Math.min(100, parseFloat(val) || 0));
   const suma = r.etapas.reduce((s2, e) => s2 + (e.importancia != null ? e.importancia : (r.totalObra > 0 ? 100 * e.subtotal / r.totalObra : 0)), 0);
-  if (Math.abs(suma - 100) > 1) console.warn('⭐ Importancias suman ' + suma.toFixed(1) + '% (se renormalizan al guardar)');
+  if (Math.abs(suma - 100) > 1) console.warn('Importancias suman ' + suma.toFixed(1) + '% (se renormalizan al guardar)');
 }
 window.fcSetImportancia = fcSetImportancia;
 
@@ -1190,7 +1190,7 @@ async function fcExportXLSX() {
     ws1.getCell(`M${row}`).style = { ...styleCalc, numFmt: FMT_CURRENCY, font:{bold:true} };
     ws1.getCell(`N${row}`).value = { formula: `IFERROR((F${row}-M${row})/F${row},0)` };
     ws1.getCell(`N${row}`).style = { ...styleCalc, numFmt: FMT_PCT };
-    ws1.getCell(`O${row}`).value = { formula: `IF(M${row}=0,"○ Sin gasto",IF(N${row}>=0.1,"◐ Dentro del margen",IF(N${row}>=0,"⚠ Apretado","● Sobre presupuesto")))` };
+    ws1.getCell(`O${row}`).value = { formula: `IF(M${row}=0,"○ Sin gasto",IF(N${row}>=0.1,"◐ Dentro del margen",IF(N${row}>=0,"Apretado","● Sobre presupuesto")))` };
     ws1.getCell(`O${row}`).style = { ...styleCalc, alignment:{horizontal:'left'} };
 
     if (dias > 0) cursor.setDate(cursor.getDate() + dias);
@@ -1211,7 +1211,7 @@ async function fcExportXLSX() {
   ws1.getCell(`N${totalRow}`).style = { ...styleTotal, numFmt: FMT_PCT };
 
   // Leyenda
-  ws1.getCell(`A${totalRow + 2}`).value = '🟢 Verde = EDITABLE  |  ⬜ Gris = calculado automáticamente';
+  ws1.getCell(`A${totalRow + 2}`).value = 'Verde = EDITABLE  |  ⬜ Gris = calculado automáticamente';
   ws1.getCell(`A${totalRow + 2}`).style = { font:{italic:true,color:{argb:'FF6B7280'},size:9} };
 
   // ════════════════════════════════════════════════════════════
@@ -1860,8 +1860,8 @@ function fcExportTaskadeCSV() {
   });
 
   // Tareas administrativas
-  csv.push([q('💰 Otros costos'), q(`${otrosPct}% del subtotal`), '', '', '', Math.round(r.otrosCostos)].join(','));
-  csv.push([q('✅ Cierre y entrega'), q('Inspección final, punch list, entrega al cliente'), '', '', '', ''].join(','));
+  csv.push([q('Otros costos'), q(`${otrosPct}% del subtotal`), '', '', '', Math.round(r.otrosCostos)].join(','));
+  csv.push([q('Cierre y entrega'), q('Inspección final, punch list, entrega al cliente'), '', '', '', ''].join(','));
 
   const blob = new Blob(['﻿' + csv.join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -1915,7 +1915,7 @@ function fcSelfTest() {
     cimentacion_sub: Math.round(r.etapas.find(e=>e.etapa==='Cimentación').subtotal) // 0
   };
   const ok = checks.subtotal === 65016 && checks.sumaDias === 80 && checks.cimentacion_sub === 0;
-  console.log('fcSelfTest', ok ? '✅ PASS' : '❌ FAIL', checks);
+  console.log('fcSelfTest', ok ? 'PASS' : 'FAIL', checks);
   return { ok, checks, resultado: r };
 }
 

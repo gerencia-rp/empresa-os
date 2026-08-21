@@ -96,7 +96,7 @@ function rmDiffAgainstVersion(versionRow) {
 async function rmCreateChangeOrder() {
   if (!rmState.currentProject?.id) return alert('Guardá el proyecto primero.');
   const lastApproved = rmState.versions.find(v => v.approved_at);
-  if (!lastApproved) return alert('No hay versión aprobada todavía. Primero "📋 Aprobar versión actual".');
+  if (!lastApproved) return alert('No hay versión aprobada todavía. Primero "Aprobar versión actual".');
 
   const diff = rmDiffAgainstVersion(lastApproved);
   if (!diff.added.length && !diff.removed.length && !diff.modified.length) {
@@ -168,7 +168,7 @@ async function rmRejectChangeOrder(coId) {
 function rmRenderVersions(body) {
   if (!rmState.currentProject) {
     body.innerHTML = rmRenderCompare() + `<div class="text-center py-8 text-slate-500 text-sm">
-      Cargá un proyecto desde <strong>📁 Proyectos</strong> para ver su historial de versiones y change orders.
+      Cargá un proyecto desde <strong>${osIcon('folder', {size:12})} Proyectos</strong> para ver su historial de versiones y change orders.
     </div>`;
     return;
   }
@@ -182,12 +182,12 @@ function rmRenderVersions(body) {
   body.innerHTML = rmRenderCompare() + `
     <div class="flex justify-between items-end mb-3 flex-wrap gap-2">
       <div>
-        <h2 class="text-lg font-bold">📜 Historial — ${rmState.currentProject.name}</h2>
+        <h2 class="text-lg font-bold">${osIcon('notebook')} Historial — ${rmState.currentProject.name}</h2>
         <p class="text-xs text-slate-500">Versiones aprobadas del presupuesto y change orders ejecutados.</p>
       </div>
       <div class="flex gap-2">
-        <button onclick="rmApproveBudgetVersion()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">📋 Aprobar versión actual</button>
-        ${lastApproved ? `<button onclick="rmCreateChangeOrder()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded">🔄 Crear Change Order</button>` : ''}
+        <button onclick="rmApproveBudgetVersion()" class="bg-slate-900 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('clipboard-check')} Aprobar versión actual</button>
+        ${lastApproved ? `<button onclick="rmCreateChangeOrder()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded">${osIcon('refresh')} Crear Change Order</button>` : ''}
       </div>
     </div>
 
@@ -195,7 +195,7 @@ function rmRenderVersions(body) {
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
       <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">Versiones aprobadas (${rmState.versions.length})</div>
       ${rmState.versions.length === 0 ? `
-        <div class="p-6 text-center text-xs text-slate-400">Sin versiones aún. Click "📋 Aprobar versión actual" para snapshot del Editor.</div>
+        <div class="p-6 text-center text-xs text-slate-400">Sin versiones aún. Click "Aprobar versión actual" para snapshot del Editor.</div>
       ` : `
         <table class="w-full text-xs">
           <thead class="bg-slate-50">
@@ -208,7 +208,7 @@ function rmRenderVersions(body) {
                 <td class="p-2">${v.label || '—'}</td>
                 <td class="p-2 text-right font-bold">${rmFmt(v.budget_total)}</td>
                 <td class="p-2 text-right text-slate-500">${v.sqft ? '$' + (v.budget_total/v.sqft).toFixed(0) : '—'}</td>
-                <td class="p-2 text-slate-700">${v.approved_by || '<span class="text-amber-600">⏳ borrador</span>'}</td>
+                <td class="p-2 text-slate-700">${v.approved_by || '<span class="text-amber-600">' + osIcon('hourglass', {size:12}) + ' borrador</span>'}</td>
                 <td class="p-2 text-right text-slate-500">${v.approved_at ? rmFmtDate(v.approved_at) : '—'}</td>
                 <td class="p-2 text-slate-500">${(v.activities || []).length}</td>
               </tr>
@@ -222,12 +222,12 @@ function rmRenderVersions(body) {
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <div class="bg-slate-100 px-3 py-2 text-xs font-bold uppercase text-slate-700">Change Orders (${rmState.changeOrders.length})</div>
       ${rmState.changeOrders.length === 0 ? `
-        <div class="p-6 text-center text-xs text-slate-400">Sin change orders. Modificá actividades en el Editor y click "🔄 Crear Change Order".</div>
+        <div class="p-6 text-center text-xs text-slate-400">Sin change orders. Modificá actividades en el Editor y click "Crear Change Order".</div>
       ` : `
         <div class="divide-y divide-slate-100">
           ${rmState.changeOrders.map(co => {
             const tone = co.status === 'approved' ? 'emerald' : co.status === 'rejected' ? 'red' : co.status === 'executed' ? 'blue' : 'amber';
-            const icon = co.status === 'approved' ? '✅' : co.status === 'rejected' ? '❌' : co.status === 'executed' ? '⚙️' : '⏳';
+            const icon = co.status === 'approved' ? osIcon('check-circle', {size:12}) : co.status === 'rejected' ? osIcon('x-circle', {size:12}) : co.status === 'executed' ? osIcon('settings', {size:12}) : osIcon('hourglass', {size:12});
             return `
               <div class="p-3">
                 <div class="flex justify-between items-start gap-3 flex-wrap">
@@ -253,8 +253,8 @@ function rmRenderVersions(body) {
                 </div>
                 ${co.status === 'pending' ? `
                   <div class="mt-2 flex gap-2">
-                    <button onclick="rmApproveChangeOrder('${co.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1 rounded">✅ Aprobar</button>
-                    <button onclick="rmRejectChangeOrder('${co.id}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-1 rounded">❌ Rechazar</button>
+                    <button onclick="rmApproveChangeOrder('${co.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1 rounded">${osIcon('check')} Aprobar</button>
+                    <button onclick="rmRejectChangeOrder('${co.id}')" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-1 rounded">${osIcon('x')} Rechazar</button>
                   </div>
                 ` : co.client_approved_by ? `
                   <div class="mt-2 text-[10px] text-slate-500">Aprobado por ${co.client_approved_by} el ${rmFmtDate(co.client_approved_at)}</div>
@@ -267,10 +267,10 @@ function rmRenderVersions(body) {
     </div>
 
     <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px] text-blue-950">
-      <strong>💡 Flujo recomendado:</strong>
+      <strong>${osIcon('lightbulb')} Flujo recomendado:</strong>
       <ol class="mt-1 ml-4 list-decimal space-y-0.5">
-        <li>Editor → ajustás presupuesto → click "<strong>📋 Aprobar versión actual</strong>" → snapshot v1 con firma del cliente</li>
-        <li>Cliente pide cambio → modificás actividades en el Editor → click "<strong>🔄 Crear Change Order</strong>" → snapshot v2 + diff vs v1</li>
+        <li>Editor → ajustás presupuesto → click "<strong>Aprobar versión actual</strong>" → snapshot v1 con firma del cliente</li>
+        <li>Cliente pide cambio → modificás actividades en el Editor → click "<strong>Crear Change Order</strong>" → snapshot v2 + diff vs v1</li>
         <li>Cliente revisa el delta y aprueba o rechaza el CO desde acá</li>
         <li>El SOW Lender usa siempre la última versión aprobada (vista <code class="bg-blue-100 px-1 rounded">remodel_latest_approved_version</code>)</li>
       </ol>
@@ -290,7 +290,7 @@ function rmRenderCompare() {
   const picked = ids.map(id => projs.find(p => p.id === id)).filter(Boolean);
   const rows = [['Sqft', p => p.sqft || '—'], ['Presupuesto', p => money(p.budget_total)], ['Gasto real', p => p.real_total ? money(p.real_total) : '—'], ['$/sqft (est)', p => psf(p)], ['Estado', p => p.status || '—'], ['Actividades', p => (p.activities && (Array.isArray(p.activities) ? p.activities.length : Object.keys(p.activities).length)) || 0]];
   return `<div class="mb-4 border border-slate-200 rounded-lg p-3">
-    <div class="text-sm font-bold mb-2">⚖️ Comparar hasta 3 propiedades</div>
+    <div class="text-sm font-bold mb-2">${osIcon('scale')} Comparar hasta 3 propiedades</div>
     <div class="flex gap-2 mb-3 flex-wrap">${[0, 1, 2].map(sel).join('')}</div>
     ${picked.length ? `<table class="w-full text-xs"><thead><tr><th class="text-left p-1"></th>${picked.map(p => `<th class="text-left p-1 font-bold">${(p.name || '').replace(/</g, '&lt;')}</th>`).join('')}</tr></thead><tbody>${rows.map(([lab, fn]) => `<tr class="border-t border-slate-100"><td class="p-1 text-slate-500">${lab}</td>${picked.map(p => `<td class="p-1 font-semibold">${fn(p)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<div class="text-xs text-slate-400">Elegí proyectos para compararlos lado a lado.</div>'}
   </div>`;
