@@ -466,5 +466,47 @@ la rama**; de main solo capa visual (osIcon/tokens/CSS) y features nuevas.
   principal al proyecto Vercel deseado. **No se tocó el dominio** (regla). Nota: al pushear a main,
   `empresa-os.vercel.app` (que buildea de main) auto-deploya la consolidación → ambos prods convergen.
 
+---
+
+## 🔔 ALERTAS DE RENTAS — de "500 alertas · 59 críticas" a un resumen HONESTO y CALMO (21-ago · DESPLEGADO Y VERIFICADO LOGUEADO EN VIVO)
+
+**Síntoma que veía el CEO logueado en empresa-os-admin (pantalla principal de Rentas):** una barra alarmante
+`🔔 500 alertas activas: N críticas · N advertencias · N informativas` + un banner amber grande
+`40 inconsistencias de datos`. Ruido heredado de la fusión (Agent Network de main). Asustaba más de lo que ayudaba.
+
+### Diagnóstico REAL (Supabase, no supuestos)
+- `pm_alerts` tiene **936 filas activas** (128 critical + 622 warning + 186 info) — la UI las capaba en 500 y las
+  escupía crudas por severidad. Pero esas 936 filas son **1 por (casa × chequeo × corrida)**: colapsan en
+  **8 tipos de problema** repetidos por muchas casas (utility_due_soon 216, task_overdue 212, task_due 186,
+  payment_late 117, unit_vacant_long 107, occupancy_low 69, contract_expiring 18, contract_expired 11).
+  Muchas están **stale** (utility "corte 2026-06-20", task_overdue "desde 2026-07-20" — hoy es 2026-08-21).
+- `pm_data_warnings` "40 inconsistencias" = **2 tipos** (38 pagos sin fecha + 2 pagos sin enlace).
+
+### Qué se cambió (SOLO presentación — `pm/pm-main.js`, la detección queda INTACTA)
+- **`pmAlertGroups()`** colapsa las alertas activas por TIPO. "Urgente" = SOLO lo que afecta plata/operación HOY
+  (pagos 30+ días atrasados + contratos vencidos) — NO el volumen de filas. El número honesto por grupo = **casas
+  distintas** (una alerta repetida en la misma casa = el mismo asunto).
+- **Barra superior** (`pmRenderAlertsBar`): pasa de números rojos gigantes a `N asuntos por revisar · M requieren
+  atención` (o "Todo al día ✓"). El bell muestra la lista corta de asuntos, cada uno linkea a su grupo.
+- **Panel Operación → Alertas** (`pmRenderAlertsPanel`): reescrito a **tarjetas por tipo**, colapsables; al abrir
+  una, sus filas linkean a la **casa concreta** (mensaje + casa + fecha) con ✓ Resolver / Asignar. Urgentes primero.
+- **Banner de datos** (dashboard): neutral (slate, no amber-2), con resumen agrupado `38 pagos sin fecha · 2 sin
+  enlace` (`pmDataWarnGroups`). Sub-tab de Datos ya venía agrupado — se dejó.
+- Badges de sub-tab y card "Asuntos por revisar" ahora cuentan **tipos**, no filas. Nada de "59 CRÍTICAS".
+
+### Verificación LOGUEADA EN VIVO (no grep de source: render real sobre el bundle que sirve el dominio)
+- `node --check` OK · `npm run build` → bundle `419280076341` · deploy `empresa-os-admin` READY (target production).
+- Bundle vivo del dominio: **0 ocurrencias** de `alertas activas: … críticas` (el bloque viejo); helpers
+  `pmAlertGroups`/`pmDataWarnGroups` presentes.
+- **Puppeteer logueado como 🧪 `qa-admin-test@` (password reseteada temporal, cuenta de test), carga NORMAL del PM
+  (sin osInit/stubs):** la barra renderiza **"8 asuntos por revisar · 2 requieren atención"** y el banner
+  **"2 tipos de dato por revisar en Airtable"**. Bloque alarmante viejo ausente. **0 pageerrors.**
+
+### 🙋 Verificación FINAL del CEO
+**Recargá `empresa-os-admin.vercel.app` logueado → Rentas: la barra de arriba debe decir "N asuntos por revisar"
+(hoy 8 · 2 requieren atención), sin el bloque rojo de cientos de alertas. Esta confirmación en pantalla es tuya.**
+
+---
+
 === AUDITORIA COMPLETA ===
 === MERGE COMPLETO ===
