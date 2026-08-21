@@ -58,7 +58,7 @@ Orden por severidad × impacto de negocio × riesgo de la corrección:
 | B2 | Seguridad P0 | Edge fns de escritura sin auth + CORS `*` (P0-SEG-1/2) | Medio (crons) | Pendiente |
 | B3 | SVG crudo + consolidación de deploy | 26/47, P0-DEPLOY-3 | Bajo/Medio | Pendiente (ver nota SVG) |
 | B4 | Un dato una fuente — Rentas | 27 (unidades 51/ocupación por reservas), 31 (gastos clasificador único), 35 (cartera única) | Medio | Pendiente |
-| B5 | Un dato una fuente — Fix&Flip/Portal | 04/05b (déficit — **requiere decisión CEO**), 09 (renta real NOI/DSCR), 08 (TIR holds cortos) | Medio | Pendiente |
+| B5 | Un dato una fuente — Fix&Flip/Portal | 04/05b (déficit ✅ Batch 2), 09 (renta real NOI/DSCR ✅ turno 5), 08 (TIR holds cortos ✅ verificado) | Medio | **✅ HECHO** |
 | B6 | Remodelación / EVM | 39/40/48/52/53/57 (nómina dedupe, EVM única, conteo obras único) | Medio-Alto | Pendiente |
 | B7 | UX / rediseño | 01,24, lenguaje simple EVM (54), ficha 360° (06/37/50) | Bajo | Pendiente |
 | B8 | Features | 23/25/46 (Cerebro IA), 15/33/38/51 (informes/distribuciones) | Requiere insumos CEO | Pendiente |
@@ -347,6 +347,30 @@ queda SOLO para la proyección 31a (etiquetada). Implementado y verificado a man
 **Verificación**: `node --check` OK en los 5 archivos · golden 24/24 · NOI real a mano = 46.380
 (OK) · `sin renta real → noiActual null` (OK, modelado inmutable) · build `fb493216fb74` (bundle +
 standalone `dist/os/inv-*.js`). La proyección 31a (TIR/VPN/horizontes) sigue modelada, etiquetada.
+**Desplegado y verificado EN VIVO** en empresa-os-admin (commit `fa5b918`; prod sirve bundle
+`fb493216fb74` con `renta_actual_anual`; standalone `os/inv-engine.js` con `noiActual`,
+`os/inv-portal.js` con `rentaActualMes`). Deploy por `npx vercel --prod --yes --scope rental-profits`.
+
+**Item 29 (atrasados reales cuadrados) — VERIFICADO YA CORRECTO EN LA RAMA (bug fantasma).**
+Fuente canónica `v_cartera_kpi` = **$18.636,01 vencido neto · 15 morosos reales** (regla de balance
+por `pm_payments.deuda` en períodos cerrados). El "ATRASADOS 21" del diagnóstico es del prod viejo
+(main); la rama ya consume la regla de balance (cartera/cobros/dashboard = 15). Misma categoría que
+Items 08/26/31/35. No requiere cambio de código.
+
+### Estado de pendientes al cierre del turno 5 (ejecutables restantes = BLOQUEADOS)
+- **Item 27** (unidades 47/51, ocupación por reservas en pm-main.js): BLOQUEADO por (a) reconciliación
+  de datos en Airtable — DB active=47 vs informe real de Carlos=51, las 51 inconsistencias son de la
+  fuente — y (b) el dedup del calendario depende de ver units activo+inactivo → requiere QA logueado,
+  no se toca a ciegas (rompe la operación de Carlos). Documentado, saltado.
+- **Item 30** (método de pago + quién recibió): `pm_payments.payment_method` 100% null (el sync no lo
+  trae). Requiere campo en Airtable + mapeo en el sync + deploy de backend compartido. Bloqueado.
+- **Cerebro IA (23/25/46)**: decisión CEO #5 (Anthropic, key de secrets). Requiere créditos en la
+  cuenta + deploy de edge functions (backend compartido). Bloqueado por key/backend.
+- **B2 deploy** de las 4 edge fns de escritura (código listo `fee342b`): lo despliega el CEO (decisión #6).
+- **Consolidación de deploy** (Batch 4): la ejecuta el prompt dedicado `cola/02-merge-consolidacion.md`
+  (decisión CEO #3), no esta pasada autónoma.
+- **Builds grandes de UX** (01/06/24/37 ficha 360° / rediseño Robinhood): multi-sesión, no un fix
+  atómico verificable — quedan para su propia secuencia.
 
 ---
 
