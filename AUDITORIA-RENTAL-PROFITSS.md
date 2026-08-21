@@ -781,4 +781,61 @@ botón único de chat 🧠. Confirmación final en pantalla, en ambos dominios, 
 
 ---
 
+## Turno 12 (21-ago · pasada 1) — VERIFICACIÓN FINAL DE CIERRE (re-chequeo independiente) ✅
+
+No confié en lo declarado por turnos previos: re-verifiqué todo desde cero, sobre los bundles EN VIVO y
+la DB de prod. Resultado: **todo cuadra.**
+
+### 1. Los dos dominios — iguales y limpios (evidencia sobre el bundle EN VIVO, no por grep del source)
+- **HTTP 200** en ambos. **Mismo bundle servido:** admin y público = `assets/bundle.f96670667c83.js`.
+- **Byte-idénticos:** descargué el JS de ambos dominios → **mismo SHA-1 `186a79a8…`** (3.773.631 bytes).
+  Son el mismo archivo → iguales por construcción.
+- Verificado sobre el bundle del **público** (`empresa-os.vercel.app/assets/bundle.f96670667c83.js`):
+
+| Chequeo | Evidencia en el bundle público en vivo | Estado |
+|---|---|---|
+| (a) SVG crudo | `osInjectReturnBar(e,t,a)` + `osEnterClassic(e,t,a,s)` (ícono en slot aparte, 4 args) | ✅ |
+| (b) alertas honestas | `pmAlertGroups` (×4) + `pmTenantDebt` (×3) presentes (barra resumen por saldo) | ✅ |
+| (c) unidades/ocupación | `pmPhysOccupancy` presente · regla vieja `"habitaciones de la casa juntas"` = **0** | ✅ |
+| (d) asistente una puerta | `cerebro-input` presente · `jvAbrirCerebro` presente (Jarvis = CTA, no 2º chat) | ✅ |
+| HORIZONTES 3/5/8 | `HORIZONTES=[3,5,8]` · viejos `[4,6,8]` = **0** | ✅ |
+| renta real | `renta_actual` presente | ✅ |
+
+### 2. Números contra Supabase prod (`nezbaljfhhyznhltpjnk`) — re-consultados hoy, intactos
+| Número | Query | Resultado | Esperado |
+|---|---|---|---|
+| Déficit total activo | `sum(ff_deals.deficit_total)` (no null) | **$297.690,36** | $297.690 ✅ |
+| Capitol | `deficit_total` where address ~ capitol | **$0,00** | $0 ✅ |
+| Virginia | `deficit_total` where address ~ virginia | **$70.529,00** | $70.529 ✅ |
+| Cartera vencida neta | `v_cartera_inquilino` `sum(vencido_neto)` >0 | **$18.636,01 · 15 morosos** | $18.636 / 15 ✅ |
+| Ocupación | `v_ocupacion` | **51 uds · 36 ocup · 70,59%** | 51/36/70,59% ✅ |
+| Horizontes | bundle | **3/5/8** | 3/5/8 ✅ |
+| Renta salud financiera | bundle usa `renta_actual` (rent-roll) | presente | rent-roll ✅ |
+
+### 3. Ítems para el equipo (verificados hoy, ningún software los resuelve solo)
+- **Método de pago 100% vacío:** `pm_payments active=true` = **305 pagos · 0 con `payment_method`**.
+  Hay que crear/llenar el campo en Airtable. Documentado en `RESUMEN-FINAL-CEO.md`.
+- **Unidades dudosas de Carlos (9909 Childress):** casa completa + 6 hab contadas doble; 4 hab
+  desactivadas sin "Estado" → total 51 en vez de 47. A reconciliar en Airtable.
+
+### 4. Backend del asistente
+- Edge fn `cerebro` **viva** (POST sin auth → **HTTP 401**, gateada correctamente). En turnos 7/9 ya
+  respondió logueada con números reales ($297.690 · $18.636 · 70,59%) sobre este mismo backend.
+
+### 5. Respaldos / reversión (presentes)
+`backup-main-antes-propagar` (público antes de igualar) · `backup-main-antes-fusion` ·
+`backup-rama-antes-merge`. Ninguna corrección borró datos de producción.
+
+### Conclusión honesta
+- **Ambos dominios** (admin y público) están **limpios, iguales y byte-idénticos**; los 4 bugs visibles
+  ya no existen en ninguno. La bifurcación causa-raíz de los "bugs fantasma" quedó cerrada.
+- **Todos los números** cuadran con Supabase prod al centavo.
+- **Dead-code inofensivo conocido:** queda 1 referencia muerta `getElementById('jv-ask')` dentro de
+  `jvAsk` (nadie la invoca; `jvChatUI` ya no renderiza ese input) — idéntica en ambos dominios, no la
+  introdujo esta pasada.
+- La confirmación FINAL en pantalla, logueado, en los dos dominios, es del CEO
+  (checklist en `RESUMEN-FINAL-CEO.md`).
+
+---
+
 === AUDITORIA COMPLETA ===

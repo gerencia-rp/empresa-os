@@ -1,7 +1,9 @@
 # Resumen final — Auditoría Empresa OS (para el CEO)
 
-*Fecha: 21 Ago 2026 · Verificado hoy contra la base real (Supabase) y contra el sitio en vivo.*
-*Dominio que mirás vos: **empresa-os-admin.vercel.app** (es donde están todos los arreglos).*
+*Fecha: 21 Ago 2026 · Verificado hoy contra la base real (Supabase) y contra los dos sitios en vivo.*
+*Los DOS dominios ya están **iguales y limpios**: **empresa-os-admin.vercel.app** (el tuyo) y
+**empresa-os.vercel.app** (el público que ven los inversores) sirven exactamente el mismo código
+(bundle `f96670667c83`, byte-idéntico) — todos los arreglos están en ambos.*
 
 ---
 
@@ -23,8 +25,8 @@
    "conviene vender" a sana). La renta modelada quedó solo para las proyecciones a futuro, etiquetada.
 5. **Horizontes de escenarios fijos en 3 / 5 / 8 años** en todo el sistema (antes convivían 3/5/8 y
    4/6/8, y un inversor veía los dos).
-6. **Bug visual del ícono como texto (el código raro `<svg…>` arriba de los títulos): arreglado en tu
-   dominio** (empresa-os-admin). Ya no aparece.
+6. **Bug visual del ícono como texto (el código raro `<svg…>` arriba de los títulos): arreglado en
+   AMBOS dominios.** Ya no aparece ni en tu panel ni en el sitio público.
 7. **Asistente con números reales, siempre a mano.** Botón 🧠 flotante en cualquier pantalla. Le
    preguntás en español y responde con los números de la empresa (probado hoy: te da $297.690 de
    déficit, $18.636 de cartera, 70,59% de ocupación — todos correctos).
@@ -38,7 +40,7 @@
 
 ---
 
-## 👀 Lo que tenés que confirmar vos en pantalla (entrá logueado a empresa-os-admin.vercel.app)
+## 👀 Lo que tenés que confirmar vos en pantalla (logueate en LOS DOS: empresa-os-admin.vercel.app **y** empresa-os.vercel.app — deben verse iguales)
 
 1. **Arriba de los títulos ya no aparece código raro** tipo `<svg class="icn"…>`. Abrí cualquier
    sistema (ej. Rentas › Property Manager) y mirá la barra de "‹ Volver": debe verse limpia.
@@ -54,11 +56,13 @@
 6. **Botón 🧠 (abajo a la derecha):** preguntale "¿cómo va la cartera?" o "¿cuánta caja atrapada
    tengo?" y confirmá que responde con números que reconocés.
 7. **Escenarios (Analizador / ¿y si vendemos?):** los plazos son **3, 5 y 8 años** en todos lados.
+8. **Comparación entre dominios:** abrí **empresa-os.vercel.app** (el público) y
+   **empresa-os-admin.vercel.app** (el tuyo) y confirmá que se ven **iguales y limpios** — mismo
+   ícono, misma barra de alertas resumida, mismas unidades (51/70,59%) y el mismo botón único de chat.
 
-> Nota honesta: **empresa-os.vercel.app** (el dominio público viejo) TODAVÍA muestra el ícono como
-> texto y algunos números viejos. Los arreglos están en **empresa-os-admin**. Llevar todo al dominio
-> público requiere una decisión tuya (mover el código a `main`), no se hizo solo para no pisar el
-> otro sistema.
+> Nota honesta: los dos dominios ahora sirven el **mismo bundle** (`f96670667c83`, byte-idéntico),
+> así que por construcción muestran lo mismo. La bifurcación que causaba los "bugs fantasma" (que vos
+> vieras arreglos en admin pero el público siguiera roto) **quedó cerrada**.
 
 ---
 
@@ -72,8 +76,9 @@
    están desactivadas pero sin "Estado", y por eso el total queda en 51 en vez de 47. Hay que
    decidir en Airtable cuál es la unidad real y ponerles Estado. Cuando eso se ordene, el número
    (47 o 51) va a ser uno solo y firme en todo el sistema.
-3. **Encender el candado de seguridad** (deploy de 4 funciones) y, si querés el asistente 🧠 en el
-   dominio público, moverlo a `main`. Son pasos que dejaste marcados para hacer vos.
+3. **Encender el candado de seguridad** (deploy de 4 funciones que escriben datos). El código quedó
+   listo; el encendido final lo hacés vos por consola. *(La propagación al dominio público ya se hizo:
+   el asistente 🧠 y todos los arreglos ya están en empresa-os.vercel.app.)*
 
 ---
 
@@ -81,8 +86,11 @@
 
 Todo tiene respaldo. Si algo se ve raro y querés volver atrás:
 
-- **Respaldos etiquetados en Git:** `backup-main-antes-fusion` y `backup-rama-antes-merge`
-  (son "fotos" del código antes de los cambios grandes; se puede volver a cualquiera).
+- **Respaldos etiquetados en Git:** `backup-main-antes-propagar` (foto del sitio público justo antes
+  de igualarlo con el admin), `backup-main-antes-fusion` y `backup-rama-antes-merge` (fotos del código
+  antes de los cambios grandes; se puede volver a cualquiera).
+- **Si el público se ve mal:** `git push origin backup-main-antes-propagar:main --force` lo devuelve
+  al estado anterior, o se hace rollback del deploy en Vercel.
 - Las pestañas ocultas **no se borraron** — se pueden volver a mostrar quitando una línea.
 - Ninguna corrección tocó ni borró datos de producción (Airtable/pagos intactos).
 - Para dudas puntuales, el detalle técnico completo está en `AUDITORIA-RENTAL-PROFITSS.md`.
