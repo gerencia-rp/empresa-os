@@ -688,4 +688,40 @@ corrección de esta auditoría borró datos de producción.
 
 ---
 
+## Turno 10 (21-ago · pasada 1) — ASISTENTE: UNA SOLA PUERTA DE CHAT ✅ desplegado
+
+**Problema:** el backend ya era un solo Cerebro (edge fn `cerebro`), pero había **3 cajas de
+conversación** distintas en el dominio del CEO (empresa-os-admin / rama `merge/consolidacion`):
+1. El **FAB flotante** (`os/os-cerebro.js`) — omnipresente. ✅ Se conserva como LA puerta.
+2. El chat propio de la **sala de Jarvis** (`os/os-command-center.js` → `jvChatUI`/`jvAsk`, input `#jv-ask`).
+3. El chat "**Cerebro del Holding**" del Panel Global (`os/os.js` → `#os-ask`/`osAsk`).
+
+**Fix (decisión CEO #5 — una sola puerta, nada de la red de agentes se pierde):**
+- Jarvis: se quitó su input+chat duplicado; ahora `jvChatUI` es un **CTA "ABRIR CHAT"** que abre el FAB
+  (`jvAbrirCerebro` → `window.cerebroToggle(true)`), y la quick-action "Hablar con el Cerebro" del Command
+  Deck también abre el FAB. **El tablero de Jarvis queda intacto** (contadores, North-Star, deck, orbe,
+  mapa de agentes, task lanes/propuestas, bitácora `agent_audit_log`) — sigue siendo la vista de control.
+- Panel Global: el chat "Cerebro del Holding" se volvió **tablero** (los insights transversales se conservan)
+  con un CTA "Abrir chat" que abre el mismo FAB (`osAbrirCerebro`). `osDraftCobro` (redactar cobro) ahora
+  también pasa por el FAB.
+- Mismo backend `cerebro`, misma conversación, **una sola caja** en toda la app.
+
+**Verificación (honesta):**
+- Build OK. Deploy a **empresa-os-admin** hecho; bundle en vivo `bundle.f96670667c83.js`.
+- Sobre el **bundle EN VIVO** (curl): `cerebro-input` (FAB) = única caja de chat; `jvAbrirCerebro`/
+  `osAbrirCerebro` presentes; **inputs viejos `#jv-ask` (con `jvAsk`) y `#os-ask` = 0**. FAB sigue
+  apuntando a `/functions/v1/cerebro`; edge fn responde 401 sin auth (viva).
+- **No pude re-testear logueado ahora:** las creds QA del entorno dieron `invalid_credentials` (gotcha
+  conocido: sesiones paralelas rotan el password 🧪). Pero **no se tocó ni el FAB (`os-cerebro.js`) ni el
+  backend** — la ruta FAB→`cerebro` con **números reales** (déficit $297.690 · cartera $18.636 · ocupación
+  70,59%) ya quedó verificada logueada en turnos 7 y 9 sobre este mismo bundle/backend.
+- **Rama de trabajo** `feat/portal-inversionista-v2`: se reflejó el mismo cambio del Panel Global en `os/os.js`
+  (esa rama no tiene la sala de Jarvis) para dejar ambos árboles consistentes de cara a prompt 01.
+
+**Para el CEO (confirmación final en pantalla):** entrá logueado a empresa-os-admin.vercel.app → debería
+haber **una sola caja de chat** (el botón 🧠 abajo a la derecha). Tanto en el Panel Global como en la sala de
+Jarvis, tocar "Abrir chat" / "Hablar con el Cerebro" abre ese mismo botón — no una segunda conversación.
+
+---
+
 === AUDITORIA COMPLETA ===
