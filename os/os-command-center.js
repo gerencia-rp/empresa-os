@@ -3,7 +3,7 @@
 // Sidebar de navegación + 8 vistas. Todo con datos REALES:
 //   agent_registry (roster 18 agentes: capa/area/riesgo/estado) ·
 //   agent_proposals (task lanes + propuestas) · agent_audit_log (corridas/bitácora) ·
-//   ct_findings (alertas 🔴) · /api/brain-chat (Cerebro).
+//   ct_findings (alertas 🔴) · edge fn `cerebro` (el mismo Cerebro orquestador del FAB).
 // Badges working/en-espera/idle DERIVADOS de datos (última corrida + pendientes).
 // Escrituras: SOLO Aprobar/Rechazar (human-in-the-loop) → agent_proposals + audit_log.
 // Guard: el router bloquea /jarvis a no-admin; doble-check acá.
