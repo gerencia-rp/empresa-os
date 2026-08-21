@@ -743,7 +743,7 @@ function jvCmd(k) {
     case 'cobranza': return (typeof osNav === 'function') ? osNav('/cobros') : null;
     case 'alertas': return (typeof osNav === 'function') ? osNav('/contable') : null;
     case 'verificar': return (typeof osNav === 'function') ? osNav('/mapa') : null;
-    case 'cerebro': { const el = document.getElementById('jv-ask'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); } return; }
+    case 'cerebro': return jvAbrirCerebro();
     default: return;
   }
 }
@@ -751,9 +751,25 @@ window.jvCmd = jvCmd;
 function jvCore() {
   return '<div class="jv-core"><div class="jv-orbw"><div class="jv-ring jv-r1"></div><div class="jv-ring jv-r2"></div><div class="jv-orb"></div></div><div class="t">CEREBRO EJECUTIVO</div></div>';
 }
+// UNA SOLA PUERTA DE CHAT: el FAB omnipresente (os/os-cerebro.js) es la única caja
+// de conversación de toda la app. Acá NO se renderiza un segundo chat — este CTA
+// abre el MISMO Cerebro flotante (mismo backend `cerebro`, misma conversación).
 function jvChatUI() {
-  return '<div class="jv-chatbar"><input id="jv-ask" placeholder="Hablá con el Cerebro…  ej: ¿qué está atrasado hoy? / ¿qué propuestas tengo pendientes?" onkeydown="if(event.key===\'Enter\')jvAsk()"><button class="jv-send" id="jv-send" onclick="jvAsk()"' + (JV.chatBusy ? ' disabled' : '') + '>ENVIAR</button></div><div class="jv-chat" id="jv-chat">' + jvChatHTML() + '</div>';
+  return '<div class="jv-chatbar" role="button" tabindex="0" style="cursor:pointer" onclick="jvAbrirCerebro()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jvAbrirCerebro();}" title="Abrir el Cerebro">'
+    + '<span class="jv-cta-orb" style="display:flex;align-items:center;color:var(--jc-pink)">' + osIcon('brain', { size: 16 }) + '</span>'
+    + '<span style="flex:1;color:var(--jc-mut);font-size:14px;pointer-events:none">Hablá con el Cerebro — ¿qué está atrasado hoy? · ¿qué propuestas tengo pendientes?</span>'
+    + '<button class="jv-send" onclick="event.stopPropagation();jvAbrirCerebro()">ABRIR CHAT</button></div>';
 }
+// Abre el FAB (Cerebro flotante). Puerta única de conversación en toda la app.
+function jvAbrirCerebro(q) {
+  if (typeof window.cerebroToggle === 'function') {
+    window.cerebroToggle(true);
+    if (q && typeof window.cerebroAsk === 'function') setTimeout(function () { window.cerebroAsk(q); }, 140);
+    return;
+  }
+  if (typeof window.cerebroAsk === 'function') return window.cerebroAsk(q || '');
+}
+window.jvAbrirCerebro = jvAbrirCerebro;
 function jvChatHTML() {
   if (!JV.chat.length) return '';
   return JV.chat.map(m => m.role === 'user' ? '<div class="jv-bub u">' + OS_E(m.content) + '</div>'

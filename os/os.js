@@ -603,8 +603,7 @@ function osGlobal(comp) {
   // Cerebro del Holding = transversal (mezcla datos de todas las empresas) → solo admin
   const brain = isAdm ? `<div class="card brain"><div class="bh"><div class="orb"></div><div><b>Cerebro del Holding</b><span>ANÁLISIS TRANSVERSAL · REGLAS</span></div></div>
         ${insights.slice(0, 5).map(i => `<div class="insight"><div class="ic ${i.sev === 'critical' ? 'r' : i.sev === 'warning' ? 'y' : 'b'}">●</div><div class="tx">${i.tx}<span class="tag">${i.tag}${i.impact ? ' · ' + OS_M(i.impact) : ''}</span>${i.sev === 'critical' && i.accion && window.kitNext ? kitNext('', i.accion, i.quien) : ''}</div></div>`).join('')}
-        <div class="ask"><input id="os-ask" placeholder="Preguntá al Cerebro del holding…" onkeydown="if(event.key==='Enter')osAsk()"><button onclick="osAsk()">Enviar</button></div>
-        <div id="os-chat" class="cc-chat"></div>
+        <div class="ask" role="button" tabindex="0" style="cursor:pointer" onclick="osAbrirCerebro()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();osAbrirCerebro();}" title="Abrir el Cerebro"><input placeholder="Hablá con el Cerebro…" readonly style="cursor:pointer;pointer-events:none"><button onclick="event.stopPropagation();osAbrirCerebro()">Abrir chat</button></div>
       </div>` : '';
   return `<h1>Panel <span>Global</span> · Rental Profitss</h1><div class="sub">${isAdm ? 'Vista macro del holding — todas las empresas y áreas en un solo lugar.' : 'Tus áreas del holding.'} Los datos fluyen desde Airtable + QuickBooks (solo lectura).</div>
     <div class="grid k4">${kpis}</div>
@@ -639,8 +638,20 @@ function osEmpresa(comp) {
 
 // ─── ÁREA · OPERACIÓN ───
 function osOperacion(comp) { return opsPanel(comp); }
-function osDraftCobro(casa, deuda) { osAsk(`Redactá un mensaje de cobro cordial pero firme para el inquilino de ${casa}, que debe ${OS_M(deuda)} este mes. Recordale el saldo, ofrecé un plan si hace falta, y pedí confirmación de pago. Español neutro.`); }
+function osDraftCobro(casa, deuda) { osAbrirCerebro(`Redactá un mensaje de cobro cordial pero firme para el inquilino de ${casa}, que debe ${OS_M(deuda)} este mes. Recordale el saldo, ofrecé un plan si hace falta, y pedí confirmación de pago. Español neutro.`); }
 window.osDraftCobro = osDraftCobro;
+// Puerta única de chat: el "Cerebro del Holding" del panel Global abre el FAB
+// omnipresente (os-cerebro.js) — una sola caja de conversación en toda la app.
+function osAbrirCerebro(q) {
+  if (typeof window.cerebroToggle === 'function') {
+    window.cerebroToggle(true);
+    if (q && typeof window.cerebroAsk === 'function') setTimeout(function () { window.cerebroAsk(q); }, 140);
+    return;
+  }
+  if (typeof window.cerebroAsk === 'function') return window.cerebroAsk(q || '');
+  return osAsk(q); // fallback defensivo si el FAB no montó
+}
+window.osAbrirCerebro = osAbrirCerebro;
 
 // ─── ÁREA · CONTABLE ───
 function osContable(comp) {
