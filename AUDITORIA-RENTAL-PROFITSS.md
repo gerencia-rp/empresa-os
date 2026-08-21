@@ -159,6 +159,7 @@ bundle `b3fd39163a92` contiene los fixes del turno 3.
 ---
 
 ### Batch 4 — Consolidación de deploy: PARADA por divergencia sustantiva (regla CEO 3d) · 2026-08-20 ⏸
+### → DESBLOQUEADA y EJECUTADA · 2026-08-21 (turno 6) ✅ — ver "Batch 7" abajo
 
 El CEO autorizó fusionar rama→main **con backup y seguro**. Hecho el paso seguro; **la fusión NO se ejecuta**
 porque cae exactamente en la cláusula "si los commits de main son sustantivos/ambiguos o hay conflictos reales, PARÁ".
@@ -434,3 +435,36 @@ riesgo medio), C-P0-1 NOI/DSCR/CoC con renta real (pm_payments) en indicadores d
 reconciliación (ocupadas iguales entre vistas, Σopex Gastos=Finanzas); (3) linter anti-interpolación sin
 `esc()`; (4) **resolver la bifurcación de diseño rama↔main** — es la causa raíz de los "bugs fantasma".
 
+
+---
+
+## FASE 3 — CORRECCIÓN (turno 6 · 2026-08-21) — Batch 7: CONSOLIDACIÓN rama ↔ main ✅
+
+**Decisión CEO #3 desbloqueó el Batch 4** (que estaba parado esperando decisión de diseño). Base = la
+RAMA (números/lógica correctos + Portal v2 + arreglos de auditoría); se le montan encima **Jarvis/Agent
+Network** y el **rebrand royal** de main. Regla de oro: en todo conflicto de datos/lógica/números **gana
+la rama**; de main solo capa visual (osIcon/tokens/CSS) y features nuevas.
+
+- **Respaldos:** `backup-main-antes-fusion` (`2ca0bd8`, ya existía) + `backup-rama-antes-merge` (`49c8933`,
+  nuevo). Rama de trabajo `merge/consolidacion` (nunca sobre main ni la rama directo).
+- **Automerge limpio:** 129 de 135 archivos de main (Jarvis nuevos + rebrand sobre archivos que la rama no
+  tocó). **6 archivos con conflicto real** (31 hunks) resueltos a mano — detalle y tabla en
+  **`MERGE-CONSOLIDACION.md`**. En cada core la RAMA ganó la lógica (déficit=`ff_deals.deficit_total`
+  positivo · horizontes 3/5/8 · distribución automática · Ledger con servicio de deuda · rent-roll REAL
+  Item 09 · dedup nómina · rcVerdictoSimple · tabs ocultos · guard TIR rehab · sort déficit) y main aportó
+  el visual (osIcon/colores royal/labels sin emoji).
+- **GATE re-verificado contra Supabase prod (`nezbaljfhhyznhltpjnk`) — PASA 100%:**
+  Σ `ff_deals.deficit_total` activas **$297,690.36** · Capitol **$0** · Virginia **$70,529** · Stonleigh
+  **$70,855** · `v_cartera_kpi.vencido_neto` **$18,636.01** (15 morosos) · `HORIZONTES=[3,5,8]` constante
+  única (0 casos 4/6/8) · XIRR no anualiza holds <1 año (`inv-indicadores.js tirNA=dias<365`). Build OK
+  (bundle `fa78be29789f`), `node --check` 6/6 OK. **Ningún número regresó → no hubo que revertir.**
+- **Publicado:** commit del merge `5b92bf2` (2 padres: rama `49c8933` + main `2ca0bd8`) + doc `0ea01a5`.
+  Desplegado a **empresa-os-admin** (bundle `fa78be29789f` sirviendo en vivo, osIcon 2086× = rebrand +
+  `deficit_total`/`HORIZONTES`/`jarvis` = rama+main). Fusionado a **main** por fast-forward que preserva el
+  merge commit (`origin/main` = `0ea01a5`). Rama `merge/consolidacion` pusheada.
+- ⚠️ **ÚNICO PASO MANUAL DEL CEO (irreversible de cara al usuario):** apuntar el dominio de producción
+  principal al proyecto Vercel deseado. **No se tocó el dominio** (regla). Nota: al pushear a main,
+  `empresa-os.vercel.app` (que buildea de main) auto-deploya la consolidación → ambos prods convergen.
+
+=== AUDITORIA COMPLETA ===
+=== MERGE COMPLETO ===
