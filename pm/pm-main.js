@@ -336,28 +336,65 @@ function pmRentableSubunitsOf(propertyId) {
 function pmHouseUnitsOf(propertyId) {
   return pmUnitsOf(propertyId).filter(u => u.unit_type === 'casa_completa' || u.unit_type === 'habitacion');
 }
+// ══════════════════════════════════════════════════════════════════════════
+// INVENTARIO RENTABLE ÚNICO — una sola definición para TODA la app (Item 27/B4)
+// ──────────────────────────────────────────────────────────────────────────
+// Fuente canónica = la MISMA regla que v_ocupacion / OS Global / Rentas CC:
+//   unidad rentable = pm_unit del espejo NUEVO (external_id 'unit-rec…') con unit_type,
+//   de propiedad activa. CADA habitación cuenta individual (meta = 51 físicas).
+//   Se dedupean las legacy (mismo code+tipo+renta) para no inflar; los external_id viejos
+//   ('unit-{casa}-{slug}') quedan afuera (son fantasmas del sync viejo).
+// La OCUPACIÓN sale de RESERVAS VIGENTES hoy (pmActiveBookingOf) O del Estado 'ocupada'
+//   de Airtable — hoy coinciden 1:1 (verificado en Supabase) — con un ÚNICO denominador
+//   en Resumen, Disponibilidad, KPIs y Analítica.
+// (La vieja regla "habitaciones de la casa juntas = 1" daba 36 y DIVERGÍA del headline
+//  v_ocupacion=51 → retirada del CONTEO. El drill por casa muestra cada habitación igual.)
+// ══════════════════════════════════════════════════════════════════════════
+function pmIsPhysUnit(u){ return !!u && u.active !== false && /^unit-rec/.test(u.external_id || '') && !!u.unit_type; }
+// Unidades físicas rentables de una casa (deduped), independientes del filtro de "archivados".
+function pmPhysUnitsOf(propertyId){
+  const raw = (pmaState._raw && pmaState._raw.units) || pmaState.units || [];
+  return pmDedupeUnits(raw.filter(u => u.property_id === propertyId && pmIsPhysUnit(u)));
+}
+// ¿ocupada AHORA? = reserva vigente hoy O Estado 'ocupada' (Airtable). Robusto a status stale.
+function pmUnitOccupiedNow(u){ return !!u && (!!pmActiveBookingOf(u.id) || pmUnitState(u) === 'ocupada'); }
+// Inventario rentable del portafolio (todas las casas activas), deduped = 51 físicas.
+function pmRentableInventory(){
+  const activeProps = new Set(pmaState.properties.filter(p => p.active !== false).map(p => p.id));
+  const raw = (pmaState._raw && pmaState._raw.units) || pmaState.units || [];
+  return pmDedupeUnits(raw.filter(u => pmIsPhysUnit(u) && activeProps.has(u.property_id)));
+}
+// Ocupación del portafolio — cifra ÚNICA (v_ocupacion; fallback = inventario físico + reservas).
+// Invariante GARANTIZADA: ocupadas + libres + reservadas + mantenimiento = total.
+function pmPhysOccupancy(){
+  const oc = pmaState.ocupView;
+  if (oc && +oc.unidades_rentables > 0){
+    const total = +oc.unidades_rentables, occupied = +oc.ocupadas || 0,
+          reserved = +oc.reservadas || 0, maintenance = +oc.mantenimiento || 0;
+    return { total, occupied, reserved, maintenance,
+             free: Math.max(0, total - occupied - reserved - maintenance),
+             pct: total ? occupied / total : 0, fuente: 'v_ocupacion' };
+  }
+  const inv = pmRentableInventory();
+  const occupied    = inv.filter(pmUnitOccupiedNow).length;
+  const reserved    = inv.filter(u => !pmUnitOccupiedNow(u) && pmUnitState(u) === 'reservada').length;
+  const maintenance = inv.filter(u => !pmUnitOccupiedNow(u) && pmUnitState(u) === 'mantenimiento').length;
+  return { total: inv.length, occupied, reserved, maintenance,
+           free: Math.max(0, inv.length - occupied - reserved - maintenance),
+           pct: inv.length ? occupied / inv.length : 0, fuente: 'físico' };
+}
 function pmRentableUnitsOf(propertyId) {
-  const indep = pmIndepUnitsOf(propertyId).length;          // casa_completa + estudios + aptos
-  const hasRoom = pmRoomsOf(propertyId).length > 0 ? 1 : 0;  // todas las habitaciones juntas = 1
-  const n = indep + hasRoom;
+  const n = pmPhysUnitsOf(propertyId).length;
   if (n > 0) return n;
   // Fallback si la casa aún no tiene unidades cargadas: Casas.Unidades (Airtable) → total_units.
   const p = pmaState.properties.find(x => x.id === propertyId);
   return Math.max(1, parseInt(p?.total_units) || 1);
 }
 function pmOccupiedRentableUnitsOf(propertyId) {
-  const indepOcc = pmIndepUnitsOf(propertyId).filter(u => pmUnitOccupied(u)).length;
-  const rooms = pmRoomsOf(propertyId);
-  const roomsOcc = rooms.length && rooms.some(u => pmUnitOccupied(u)) ? 1 : 0; // grupo habitaciones ocupado si ≥1 ocupada
-  return Math.min(indepOcc + roomsOcc, pmRentableUnitsOf(propertyId));
+  return pmPhysUnitsOf(propertyId).filter(pmUnitOccupiedNow).length;
 }
-// Reservadas (mismo criterio de colapso de habitaciones; no cuenta si ya está ocupada)
 function pmReservedRentableUnitsOf(propertyId) {
-  const isRes = u => pmUnitState(u) === 'reservada';
-  const indepRes = pmIndepUnitsOf(propertyId).filter(u => isRes(u) && !pmUnitOccupied(u)).length;
-  const rooms = pmRoomsOf(propertyId);
-  const roomsRes = (!rooms.some(u => pmUnitOccupied(u)) && rooms.some(isRes)) ? 1 : 0;
-  return indepRes + roomsRes;
+  return pmPhysUnitsOf(propertyId).filter(u => !pmUnitOccupiedNow(u) && pmUnitState(u) === 'reservada').length;
 }
 // Totales del portafolio (solo propiedades activas)
 function pmTotalRentableUnits() {
@@ -1204,7 +1241,7 @@ function pmRenderPropertiesList() {
         </div>
       </div>
       ${view === 'availability' ? pmRenderAvailability() : `
-      <div class="text-xs text-slate-500">${props.length} propiedades · ${pmTotalRentableUnits()} unidades rentables (${pmTotalOccupiedRentableUnits()} ocupadas · ${pmFreeRentableUnits()} libres) · ${pmaState.bookings.filter(b => ['activo','confirmado','reservada'].includes(b.status)).length} reservas activas</div>
+      <div class="text-xs text-slate-500">${(() => { const o = pmPhysOccupancy(); return `${props.length} propiedades · ${o.total} unidades rentables (${o.occupied} ocupadas · ${o.free} libres · ${Math.round(o.pct*100)}% ocupación)`; })()} · ${pmaState.bookings.filter(b => ['activo','confirmado','reservada'].includes(b.status)).length} reservas activas</div>
       ${!props.length ? `
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
           <div class="text-5xl mb-2">🏠</div>
@@ -1419,15 +1456,9 @@ function pmRenderPropertyCardInline(p) {
   // Dedup de units fantasma: dos pm_units activas con mismo code+renta (legacy + nueva del mirror)
   // → conservar UNA, prefiriendo la OCUPADA (luego reservada/activa). Same code + renta DISTINTA
   // = unidades reales distintas (se conservan ambas).
-  const _uByKey = {};
-  // SOLO unidades activas del espejo (las inactivas son legacy del sync viejo — soft-deleted,
-  // nunca se muestran acá aunque showArchived esté prendido). El set activo = base Modelo Nuevo.
-  for (const u of pmUnitsOf(p.id).filter(x => x.is_active !== false)) {
-    const k = `${(u.code||u.id)}|${u.target_rent||0}`;
-    const score = x => (pmActiveBookingOf(x.id)?4:0) + (pmaState.bookings.some(b=>b.unit_id===x.id&&['confirmado','reservada'].includes(b.status))?2:0) + (x.is_active!==false?1:0);
-    if (!_uByKey[k] || score(u) > score(_uByKey[k])) _uByKey[k] = u;
-  }
-  const units = Object.values(_uByKey);
+  // INVENTARIO FÍSICO ÚNICO (mismo que el portafolio y v_ocupacion): unidades 'unit-rec…'
+  // deduped. Así las filas de la card SUMAN exactamente el conteo de arriba (no diverge).
+  const units = pmPhysUnitsOf(p.id);
   // Conteos FÍSICOS por unidad, TODOS desde pmUnitState (= Estado de Airtable) → coherentes
   // con los badges y mutuamente excluyentes. libres = nº Disponible, ocupadas = nº Ocupada, etc.
   const occupiedUnits    = units.filter(u => pmUnitState(u) === 'ocupada');
@@ -1451,7 +1482,8 @@ function pmRenderPropertyCardInline(p) {
   const rentRes = pmReservedRentableUnitsOf(p.id);
   const rentFree = Math.max(0, rentN - rentOcc - rentRes);
   const physLabel = `${rentN} unid`;
-  const rentNote = units.length !== rentN ? ` (${units.length} habitaciones)` : '';
+  const _rooms = units.filter(u => u.unit_type === 'habitacion').length;
+  const rentNote = _rooms ? ` (incluye ${_rooms} hab)` : '';
 
   return `
     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden ${expanded?'ring-2 ring-emerald-200':''}">
@@ -5273,10 +5305,11 @@ function pmRenderFinance() {
   const activePropIds = new Set(activeProps.map(p=>p.id));
   const units = pmaState.units.filter(u => activePropIds.has(u.property_id));
   const occUnits = units.filter(u => pmUnitOccupied(u));
-  // Ocupación sobre UNIDADES RENTABLES (modelo de renta), no sobre pm_units físicas.
-  const rentableTotal = pmTotalRentableUnits();
-  const occRentable = pmTotalOccupiedRentableUnits();
-  const occPct = rentableTotal ? occRentable/rentableTotal : 0;
+  // Ocupación = cifra ÚNICA del portafolio (misma que Resumen/KPIs/Global, vía v_ocupacion).
+  const _occAg = pmPhysOccupancy();
+  const rentableTotal = _occAg.total;
+  const occRentable = _occAg.occupied;
+  const occPct = _occAg.pct;
   const activeBs = pmActiveBookings().filter(b => activePropIds.has(b.property_id));
   const monthlyRentRoll = activeBs.reduce((s,b)=>s+pmMonthlyRent(b),0);
   const avgRentRoom = rentableTotal ? monthlyRentRoll/rentableTotal : 0;
