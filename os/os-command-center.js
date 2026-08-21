@@ -990,8 +990,10 @@ async function jvAsk(q) {
   JV.chatBusy = true; JV.chat.push({ role: 'user', content: question }); JV.chat.push({ role: 'assistant', content: '', thinking: true }); jvRenderChat();
   const history = JV.chat.filter(m => !m.thinking && !m.error).slice(0, -1).map(m => ({ role: m.role, content: m.content }));
   try {
-    const tok = await (async () => { try { const s = await sb.auth.getSession(); return (s && s.data.session && s.data.session.access_token) || ''; } catch (e) { return ''; } })();
-    const r = await fetch('/api/brain-chat', { method: 'POST', headers: { 'content-type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify({ question, snapshot: jvSnapshot(), history }) });
+    // Un solo cerebro: el chat del control room usa el MISMO orquestador `cerebro`
+    // (snapshot server-side de números reales + delegación en los agentes de área).
+    const tok = await (async () => { try { const s = await sb.auth.getSession(); return (s && s.data.session && s.data.session.access_token) || window.SUPABASE_ANON_KEY; } catch (e) { return window.SUPABASE_ANON_KEY; } })();
+    const r = await fetch(window.SUPABASE_URL + '/functions/v1/cerebro', { method: 'POST', headers: { 'content-type': 'application/json', 'apikey': window.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + tok }, body: JSON.stringify({ question, history, screen: 'Sala de control de agentes (/jarvis)' }) });
     const data = await r.json().catch(() => ({})); JV.chat.pop();
     JV.chat.push(r.ok ? { role: 'assistant', content: data.answer || 'Sin respuesta.' } : { role: 'assistant', content: data.error || ('Error (HTTP ' + r.status + ').'), error: true });
   } catch (e) { JV.chat.pop(); JV.chat.push({ role: 'assistant', content: 'No pude conectar: ' + (e.message || e), error: true }); }
