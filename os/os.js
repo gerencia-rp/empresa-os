@@ -914,7 +914,10 @@ function osOpenSystem(sysType, empresaSlug) {
   }
   if (!found || !window.openSystem) { if (window.toast) toast('No encontré ese sistema en tu cuenta todavía.', 'error'); return; }
   const e = OS_EMPRESAS[empresaSlug];
-  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), (e ? `${osIco(e.icon, { size: 15 })} ${e.name}` : 'Panel'), found.name || 'Sistema');
+  // El ícono va SEPARADO del texto: el markup SVG se pasa como su propio slot (se renderiza crudo),
+  // el nombre viaja como texto plano y se escapa en la barra. Nunca meter el <svg> en un slot escapado.
+  const eico = e ? osIco(e.icon, { size: 15 }) : '';
+  osEnterClassic(empresaSlug ? `/${empresaSlug}` : (OS._returnTo || '/'), e ? e.name : 'Panel', found.name || 'Sistema', eico);
   openSystem(areaId, found.id); // lógica intacta (abre su modal)
   // convertir el modal en PÁGINA COMPLETA (sin backdrop, ocupa todo el marco del OS)
   const m = document.getElementById('modal'); if (m) m.classList.add('os-syspage');
@@ -923,14 +926,14 @@ window.osOpenSystem = osOpenSystem;
 
 // ─── Puente OS ↔ sistemas clásicos: oculta el OS mientras el sistema está abierto y
 //     lo restaura al cerrar (×, ESC, backdrop o "Volver"). No toca la lógica del sistema.
-function osEnterClassic(returnTo, empresaLabel, sysName) {
+function osEnterClassic(returnTo, empresaLabel, sysName, empresaIco) {
   OS._classicOpen = true; OS._returnTo = returnTo || '/';
-  OS._sysEmpresa = empresaLabel || 'Panel'; OS._sysName = sysName || 'Sistema';
+  OS._sysEmpresa = empresaLabel || 'Panel'; OS._sysName = sysName || 'Sistema'; OS._sysEmpresaIco = empresaIco || '';
   // el OS se oculta; el sistema se muestra a PÁGINA COMPLETA con su propio marco (topbar + mesh).
   const root = document.getElementById('os-root'); if (root) root.style.display = 'none';
   const app = document.getElementById('app'); if (app) app.style.visibility = 'hidden'; // shell viejo fuera de vista
   osInjectReskin(); osApplyReskin();
-  osInjectReturnBar(OS._sysEmpresa, OS._sysName);
+  osInjectReturnBar(OS._sysEmpresa, OS._sysName, OS._sysEmpresaIco);
   // Envolver closeModal UNA vez para volver al OS cuando el sistema se cierra.
   if (!OS._closeWrapped && typeof window.closeModal === 'function') {
     OS._closeWrapped = true; const orig = window.closeModal;
@@ -946,12 +949,14 @@ function osExitClassic() {
   osNav(OS._returnTo || '/');
 }
 window.osExitClassic = osExitClassic;
-function osInjectReturnBar(empresaLabel, sysName) {
+function osInjectReturnBar(empresaLabel, sysName, empresaIco) {
   document.getElementById('os-return-bar')?.remove();
   const t = (window.posGetTheme && posGetTheme()) || 'dark';
   const bar = document.createElement('div'); bar.id = 'os-return-bar'; bar.setAttribute('data-theme', t);
+  // empresaIco = markup SVG del ícono (generado por osIco, fuente interna confiable) → se inyecta CRUDO.
+  // El texto (empresaLabel/sysName) SIEMPRE escapado con OS_E. Ícono y texto en slots separados.
   bar.innerHTML = `<div class="osrb-logo" onclick="osExitClassic()" title="Volver al panel">FR</div>
-    <div class="osrb-crumb"><a onclick="osExitClassic()">${OS_E(empresaLabel || 'Panel')}</a><span class="sep">›</span><b>${OS_E(sysName || 'Sistema')}</b></div>
+    <div class="osrb-crumb"><a onclick="osExitClassic()" style="display:inline-flex;align-items:center;gap:6px">${empresaIco || ''}${OS_E(empresaLabel || 'Panel')}</a><span class="sep">›</span><b>${OS_E(sysName || 'Sistema')}</b></div>
     <button class="osrb-back" onclick="osExitClassic()">← Volver</button>
     <button class="osrb-theme" onclick="osReturnBarTheme()" title="Tema claro/oscuro">◐</button>`;
   document.body.appendChild(bar);
