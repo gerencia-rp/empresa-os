@@ -551,4 +551,73 @@ texto arriba (breadcrumbs/headers). Esta verificación final es del CEO, no auto
 
 ---
 
+## FASE 3 — CORRECCIÓN (turno 8 · 2026-08-21) — Item 27/B4 UNIDADES Y OCUPACIÓN CONSISTENTES
+
+**Problema (confirmado en Supabase prod):** el número de unidades y la ocupación DIVERGÍAN entre vistas
+del PM porque convivían DOS definiciones:
+- **Física (v_ocupacion) = 51 unidades · 36 ocupadas · 70.59%** — la que ya usan el headline del PM,
+  el OS Global (`os.js:435`) y el Rentas CC (`command-center.js:329`). Cada habitación cuenta individual.
+- **Regla del dueño ("habitaciones de la casa juntas = 1") = 36 total** — la que usaban el subtítulo de
+  la lista de propiedades, las cards por casa y la Analítica del PM (`pmRentableUnitsOf` y derivadas).
+  Daba 36 y se leía como contradicción contra el headline 51 (peor: 36 total ≈ 36 ocupadas → "todo lleno").
+
+**Fix (código, `pm/pm-main.js`):** una SOLA definición de inventario rentable para TODA la app.
+- `pmIsPhysUnit` / `pmPhysUnitsOf` / `pmRentableInventory`: unidad rentable = `pm_unit` del espejo nuevo
+  (`external_id 'unit-rec…'`) con `unit_type`, de propiedad activa, deduped (misma regla que v_ocupacion).
+- `pmPhysOccupancy`: cifra ÚNICA del portafolio desde `v_ocupacion` (`pmaState.ocupView`), con
+  **invariante garantizada `ocupadas + libres + reservadas + mantenimiento = total`**.
+- `pmUnitOccupiedNow`: ocupada = **reserva vigente hoy** (`pmActiveBookingOf`, decisión de la tarea) **O**
+  Estado 'ocupada' (Airtable) — hoy coinciden 1:1 (verificado: 36=36, `status_sin_booking=0`,
+  `booking_sin_status=0`).
+- `pmRentableUnitsOf` / `pmOccupiedRentableUnitsOf` / `pmReservedRentableUnitsOf` **redefinidas al conteo
+  físico** → todos sus consumidores (subtítulo, cards, Analítica, KPIs) quedan consistentes en 51/36 sin
+  perseguir 15 call-sites. La card por casa usa el MISMO inventario → sus filas SUMAN el conteo de arriba.
+
+**Verificado (Supabase prod, a mano):** `v_ocupacion` = 51/36/70.59% · unit-rec typed = 51 (51 claves
+distintas, el dedup no colapsa ninguna) · ocupación por status = ocupación por reserva vigente = 36
+(idénticas) · invariante 36+libres+1+4 = 51.
+
+**Verificación EN VIVO (bundle servido, no source):** `node --check` OK · `npm run build` en el worktree
+de la línea consolidada → bundle `4681be5b0a0b`. Cherry-pick del fix (commit `ae993fc`) sobre
+**`merge/consolidacion`** (la línea que alimenta `empresa-os-admin`, +62 commits vs la rama feat — deployar
+la rama feat habría REGRESADO prod 62 commits). Deploy `npx vercel --prod` (project.json = empresa-os-admin)
+→ `READY, target production`. `empresa-os-admin.vercel.app` sirve `4681be5b0a0b`: `pmPhysOccupancy` presente,
+`"habitaciones juntas = 1"` = 0 ocurrencias, **0 pageerrors** al cargar.
+
+**⚠ Verificación logueada BLOQUEADA por credenciales (honesto):** el harness
+`scripts/qa-unidades-consistencia.mjs` (login por formulario → lee `pmPhysOccupancy()` y el subtítulo en
+carga normal) NO pudo loguear: las creds `RP_QA_ADMIN_*` del entorno dan **"Email o contraseña incorrectos"**
+(gotcha conocido del CLAUDE.md: sesiones paralelas pisan el password del usuario 🧪 QA). Es un tema de
+acceso/dato, NO del código. La confirmación en pantalla logueada queda para el CEO / una corrida con la
+contraseña QA reseteada. El harness queda listo para re-correr.
+
+**⚠ Alcance del deploy (idéntico al turno 7):** arreglado y verificado en vivo en
+**`empresa-os-admin.vercel.app` (`4681be5b0a0b`)**. `empresa-os.vercel.app` (público, auto-deploy de `main`)
+sigue con el código viejo; aplicar el fix ahí exige `main` → bloqueado por decisión CEO #3. Acción humana:
+cherry-pick de `ae993fc` a `main` cuando el CEO lo autorice (cambio quirúrgico en `pm/pm-main.js`).
+
+### 🙋 PARTE DE DATOS — para Carlos (reconciliar en Airtable; el código NO lo puede resolver)
+El código ya muestra la lógica correcta, pero la fuente (Airtable → espejo) tiene unidades dudosas que
+inflan/ensucian el conteo. Concretamente (verificado en Supabase):
+- **9909 Childress Dr — doble conteo casa vs habitaciones.** Tiene UNA unidad `Casa Completa` ($3.600)
+  Y SEIS `Habitación 1..6` ($800 c/u). Una casa por-habitaciones NO debería tener también la "Casa
+  Completa" como unidad rentable (o al revés): se cuenta la casa DOS veces. Definir cuál es la unidad real.
+- **Childress Habitaciones 2, 3, 5 y 6 = `is_active=false` con Estado (status) VACÍO/null.** Están
+  desactivadas pero `v_ocupacion` (fuente canónica del holding) las CUENTA en el total (por eso 51 y no 47).
+  Si NO son rentables, marcarlas fuera del espejo nuevo; si SÍ, ponerles Estado (Ocupada/Disponible) para
+  que dejen de caer en "libres" por defecto. Hoy son las 4 unidades sin Estado que rompen el desglose
+  (36 ocup + 6 disp + 1 reserv + 4 mant = 47, faltan 4 para 51).
+- **Meta 51 vs 47 activas.** `unit-rec` con `is_active=true` = 47; con las 4 de Childress = 51 (el número
+  del informe de Carlos 18-ago y de `v_ocupacion`). Confirmar cuál es el correcto: si las 4 no van, el
+  sistema entero (Global, Rentas CC, PM) baja solo a 47 (una sola fuente); si van, quedan en 51.
+- **47 unidades legacy con `external_id` viejo** (`unit-{casa}-{slug}`, `is_active=false`): son fantasmas
+  del sync viejo, ya excluidas por la regla `unit-rec%`. No requieren acción, quedan documentadas.
+
+### 🙋 Verificación FINAL del CEO
+**El CEO (o una corrida con la contraseña QA reseteada) debe entrar logueado a `empresa-os-admin.vercel.app`,
+abrir Rentas / Property Manager y confirmar que el Resumen, la lista de propiedades, las cards y la Analítica
+muestran el MISMO número de unidades (51) y la MISMA ocupación (70.59%). Confirmación final del CEO.**
+
+---
+
 === AUDITORIA COMPLETA ===
