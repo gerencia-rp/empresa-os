@@ -724,4 +724,61 @@ Jarvis, tocar "Abrir chat" / "Hablar con el Cerebro" abre ese mismo botón — n
 
 ---
 
+## Turno 11 (21-ago · pasada 1) — PROPAGACIÓN A `main`: sitio público IGUALADO al de admin ✅
+
+**Autorizado por el CEO (decisión #3).** Hasta hoy había DOS productos: `empresa-os-admin.vercel.app`
+(rama `merge/consolidacion`, limpio) y `empresa-os.vercel.app` (público, `main`, con el código viejo).
+Esa bifurcación era la causa raíz de los "bugs fantasma": el CEO veía arreglos en admin pero el sitio
+que ven los inversores seguía roto. Este turno los dejó **byte-idénticos**.
+
+### Topología (verificada antes de tocar nada)
+- `origin/main` (690a669) era **ancestro directo** de `merge/consolidacion` (f27acca): fast-forward LIMPIO,
+  8 commits de diferencia, **0 divergentes** → sin conflictos, sin reescritura de historia.
+- Los 8 commits = exactamente los arreglos verificados: `960fcb7` (SVG), `7fccce4` (alertas honestas),
+  `ae993fc` (unidades/ocupación únicas), `dbc6c30`+`79a0b47`+`f27acca` (asistente/una-puerta) + 2 docs.
+- Escaneo de secretos en el diff completo: **0 hardcodes** (la edge fn `cerebro` usa `Deno.env.get`).
+
+### Ejecución (con respaldo)
+1. **Backup ANTES:** `backup-main-antes-propagar` → 690a669 (estado público real) creado y pusheado.
+   Coexisten `backup-main-antes-fusion` y `backup-rama-antes-merge`.
+2. **Fast-forward:** `git push origin merge/consolidacion:main` → `690a669..f27acca`. `origin/main` ahora
+   = `merge/consolidacion` (0 commits de diferencia). Ref local `main` también actualizado por higiene.
+3. **Deploy público:** Vercel auto-deployó `main` → deployment `dpl_C4wjV8f3PtLtayLK2zPEhw22WEEK`
+   (target production, sha f27acca) en estado **READY**.
+
+### Verificación por dominio (sobre el bundle EN VIVO, no por grep del source)
+Ambos dominios sirven el **MISMO bundle `f96670667c83`** (byte-idéntico) → iguales por construcción.
+Descargué el JS servido por el **público** (`empresa-os.vercel.app/assets/bundle.f96670667c83.js`, 3,77 MB):
+
+| Fix | Evidencia en el bundle PÚBLICO en vivo | Estado |
+|---|---|---|
+| (a) SVG crudo | `osInjectReturnBar(e,t,a)` (ícono en slot aparte) + `osEnterClassic(e,t,a,s)` (4 args, nombre y SVG separados) | ✅ arreglado |
+| (b) alertas honestas | `pmAlertGroups` presente + texto `asunto${...}"s":""} por revisar` (barra resumen, no cientos); regla balance `pmTenantDebt` presente | ✅ |
+| (c) unidades/ocupación | `pmPhysOccupancy` presente; regla vieja `"habitaciones de la casa juntas"` = **0** ocurrencias | ✅ |
+| (d) asistente | `cerebro-fab`/`cerebro-input` presentes; `jvChatUI()` renderiza CTA "ABRIR CHAT"→`jvAbrirCerebro()`, ya **no** un `<input id=jv-ask>` | ✅ carga, una puerta |
+| HORIZONTES | `HORIZONTES=[3,5,8]`; viejos `[4,6,8]` = **0** | ✅ |
+| renta real | `renta_actual` (16×) / `rentaActualMes` (5×) presentes | ✅ |
+
+- **HTTP 200** en ambos dominios. **Admin sigue = `f96670667c83`** (no se rompió).
+- **HONESTIDAD:** en el bundle queda 1 referencia muerta `getElementById('jv-ask')` dentro de la función
+  `jvAsk` (nadie la invoca; `jvChatUI` ya no renderiza ese input). Es dead-code inofensivo e **idéntico en
+  ambos dominios** — no lo introdujo la propagación. La corrección de turno 10 lo dejó así.
+
+### Números re-chequeados contra Supabase prod (`nezbaljfhhyznhltpjnk`) — sin cambios
+La propagación es **solo frontend**; ambos dominios leen la misma DB. Confirmado hoy:
+déficit total activo **$297.690,36** · cartera vencida neta **$18.636,01 / 15 morosos** ·
+ocupación **51 uds / 36 ocup / 70,59%**. Idénticos al turno 9.
+
+### Reversión disponible
+Si el CEO ve algo mal en el público: `git push origin backup-main-antes-propagar:main --force` (vuelve a
+690a669) o rollback del deploy en Vercel. **No se dejó el sitio público peor que antes** — quedó mejor
+(los 4 bugs viejos ya no están).
+
+**Para el CEO (confirmación final en pantalla):** entrá a **empresa-os.vercel.app** (el que ven los
+inversores) y a **empresa-os-admin.vercel.app**: deberían verse **iguales y limpios** — sin el SVG crudo en
+las migas, con la barra de alertas resumida (no cientos), unidades/ocupación consistentes (51/70,59%) y el
+botón único de chat 🧠. Confirmación final en pantalla, en ambos dominios, es tuya.
+
+---
+
 === AUDITORIA COMPLETA ===
