@@ -620,4 +620,72 @@ muestran el MISMO número de unidades (51) y la MISMA ocupación (70.59%). Confi
 
 ---
 
+## FASE 6 — VERIFICACIÓN FINAL HONESTA (turno 9 · 2026-08-21)
+
+Re-verificación punta a punta con **evidencia real** (nada por build ni por grep del source): números leídos
+directo de Supabase prod, código leído del **bundle EN VIVO** que sirve el dominio, y el asistente probado
+con **login real**. Informe de negocio en `RESUMEN-FINAL-CEO.md`.
+
+### 1. Números clave contra Supabase prod (`nezbaljfhhyznhltpjnk`) — TODOS OK
+| Número | Esperado | Verificado hoy | Fuente |
+|---|---|---|---|
+| Déficit total activo | $297.690 | **$297.690,36** (18 casas no-null, 13 con caja >0) | `Σ ff_deals.deficit_total` (no vendidas) |
+| Capitol | $0 | **0** | `ff_deals.deficit_total` |
+| Virginia | $70.529 | **70529** | `ff_deals.deficit_total` |
+| Cartera vencida neta | $18.636 · 15 morosos | **$18.636,01 · 15 morosos** (27 casos, 2 neteados) | `v_cartera_kpi` |
+| Ocupación | 51/36/70.59% | **51 uds / 36 ocup / 70,59%** (6 disp · 1 reserv · 4 mant) | `v_ocupacion` |
+| Horizontes | 3/5/8 | **`HORIZONTES=[3,5,8]`** en bundle vivo, `[4,6,8]`=0 | constante única |
+| Renta salud | rent-roll actual | **`renta_actual`/`rentaActualMes`** presentes en bundle vivo | `inv_indicadores_data` |
+
+Nada regresó. La invariante de ocupación cierra en 47 (36+6+1+4); los 4 faltantes hasta 51 son las
+habitaciones de Childress sin Estado (dato de Airtable, parte de Carlos — no es bug de código).
+
+### 2. Bugs VISIBLES contra el bundle EN VIVO — con evidencia
+Bundle servido por `empresa-os-admin.vercel.app` hoy = **`296d7ebf18f1`** (más nuevo que el `4681be5b0a0b`
+del turno 8; incluye los fixes acumulados).
+
+- **(a) SVG crudo como texto (fix 01) — CONFIRMADO ARREGLADO EN EL DOMINIO DEL CEO.**
+  Evidencia real (no el grep estático, que es inválido porque el escape ocurre en runtime): en el bundle
+  admin la barra es `osInjectReturnBar(e,t,a)` → `` `${a||""}${OS_E(e||"Panel")}` `` (ícono CRUDO + texto
+  ESCAPADO por separado), y el caller pasa el ícono como argumento aparte: `osEnterClassic(returnTo,
+  r.name, a.name, n)` (4 args, nombre y SVG separados). **HONESTIDAD:** el dominio PÚBLICO
+  `empresa-os.vercel.app` (bundle `fa78be29789f`) TODAVÍA tiene el bug — ahí `osInjectReturnBar(e,t)` (2
+  args) hace `${OS_E(e)}` sobre un label que el caller arma como `` `${osIco(r.icon)} ${name}` `` → el
+  `<svg>` se escapa entero y sale como texto. Sigue **gated por decisión CEO #3** (no tocar `main`);
+  acción humana = cherry-pick de `960fcb7` a `main`.
+- **(b) Rentas sin bloque alarmante de cientos de alertas (fix 02) — verificado a nivel código/dato.**
+  El bundle vivo usa la **regla de cobranza por BALANCE** (`pmTenantDebt`/`pmPayStatus`/`pmLateBookings`,
+  10 usos) y consume `v_cartera_kpi`/`vencido_neto`/`morosos_reales` → los atrasados se topan en **15
+  morosos reales**, no cientos. Los "atrasados falsos" (marcaban gente al día) están fuera. La
+  confirmación visual final del panel logueado es del CEO.
+- **(c) Unidades/ocupación consistentes (fix 03) — CONFIRMADO EN VIVO.** `pmPhysOccupancy` presente (3
+  ocurrencias) y la definición vieja `"habitaciones de la casa juntas"` = **0** ocurrencias en el bundle
+  admin → una sola definición (51/36/70.59%) en todas las vistas.
+- **(d) Asistente con números reales (fix 04) — BACKEND CONFIRMADO EN VIVO.** Login real (usuario 🧪
+  `qa-admin-test@`, password reseteado por SQL para la prueba — cuenta de test) → POST a la edge fn
+  `cerebro`. Respondió: **déficit $297.690 (18 casas) · cartera $18.636 (15 morosos) · ocupación 70,59%
+  (36/51)** — TODOS cuadran con Supabase. El botón flotante `cerebro-fab` está en el bundle admin (6
+  ocurrencias). **HONESTIDAD:** en el bundle admin COEXISTEN el `cerebro-fab` (chat de números reales,
+  omnipresente) y `jvAgent`/`jv-nav` (Jarvis = mapa/orquestación de agentes, pantalla). El chat de
+  números reales existe y funciona; **no están fusionados en una única UI** (Jarvis = red de agentes;
+  Cerebro = chat). Cumple "asistente que responde con números reales"; la unificación total de ambas
+  superficies en una sola queda como refinamiento, no como bug.
+
+### 3. Dato para el equipo (verificado hoy)
+`pm_payments` activos = **305**, con `payment_method` = **0** (100% null). Nadie puede inventar el método
+de pago / quién recibió: hay que crear y llenar ese campo en Airtable. Documentado en `RESUMEN-FINAL-CEO.md`.
+
+### 4. Respaldos / reversión
+Tags presentes (local y remoto): **`backup-main-antes-fusion`** + **`backup-rama-antes-merge`**. Ninguna
+corrección de esta auditoría borró datos de producción.
+
+### Conclusión honesta
+- **Dominio del CEO (empresa-os-admin):** los 4 bugs visibles están corregidos y verificados con evidencia
+  (a/c/d confirmados en vivo; b confirmado a nivel código+dato, confirmación en pantalla del CEO).
+- **Dominio público (empresa-os):** sigue con el código viejo (bug SVG + números viejos) — gated por
+  decisión CEO #3. Es la causa raíz de los "bugs fantasma": dos dominios sirviendo productos distintos.
+- La confirmación FINAL en pantalla, logueado, es del CEO (puntos en `RESUMEN-FINAL-CEO.md`).
+
+---
+
 === AUDITORIA COMPLETA ===
