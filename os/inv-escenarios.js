@@ -62,7 +62,7 @@
     const coc = (flujo != null && +c.aporte > 0) ? flujo / +c.aporte : null;
     const dscr = (servicio > 0) ? noi / servicio : null;
     const equity = (c.deuda_saldo != null && +c.arv > 0) ? +c.arv - +c.deuda_saldo : null;
-    return { vacancia: vac, egi, noi, cap, servicio, flujo, coc, dscr, dscrAlerta: dscr != null && dscr < 1.20, equity };
+    return { vacancia: vac, egi, noi, cap, servicio, flujo, coc, dscr, dscrAlerta: dscr != null && dscr < 1.20, equity, renta_mensual: +c.renta_mensual || 0, renta_fuente: c.renta_fuente || null };
   }
 
   // ─── waterfall simple: capital primero, luego split del excedente ───
@@ -194,7 +194,9 @@
       casa: ind.casa, property_id: ind.property_id,
       aporte: holding ? +holding.inversion_aportada : null,
       pct: holding ? +holding.reparto_pct : 0,
-      renta_mensual: (+ind.renta_anual || 0) / 12,
+      // SALUD con renta REAL (rent-roll actual) cuando existe; si no, la modelada (CEO #4)
+      renta_mensual: (+ind.renta_actual_anual > 0 ? +ind.renta_actual_anual : (+ind.renta_anual || 0)) / 12,
+      renta_fuente: (+ind.renta_actual_anual > 0 ? (ind.renta_actual_fuente || 'rent-roll Rentas') : ((+ind.renta_anual > 0) ? 'renta del modelo' : null)),
       gastos_anuales: +ind.gastos_anuales || 0,
       arv: ind.paper_value != null ? +ind.paper_value : null,
       arv_fuente: ind.paper_fuente || null,
@@ -209,7 +211,7 @@
       costo_total: ind.all_in != null ? +ind.all_in : null,
       cap_mercado: nz(P.cap_mercado_pct),                       // override por casa (opcional) del cap de mercado
       tipo_contrato: (P.tipo_contrato && String(P.tipo_contrato).trim()) ? String(P.tipo_contrato).trim() : 'N/D',
-      porCompletar: (ind.deuda_vigente == null && !ind.vendida) || !(+ind.renta_anual > 0),
+      porCompletar: (ind.deuda_vigente == null && !ind.vendida) || !(+ind.renta_actual_anual > 0 || +ind.renta_anual > 0),
     };
   }
   // defaults de config desde ff_uw_config (filas esc_*) — editable, cero hardcode

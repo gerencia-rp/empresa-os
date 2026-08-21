@@ -55,7 +55,10 @@
     o.multEquity = (o.equityInv != null && o.equityInv > 0 && o.equityHoy != null) ? o.equityHoy / o.equityInv : null;
     o.ltv = (deuda != null && V > 0) ? deuda / V : null;
     o.ltvSem = o.ltv == null ? null : (o.ltv < 0.70 ? 'verde' : (o.ltv <= 0.85 ? 'ambar' : 'rojo'));
-    o.yieldOnCost = (C > 0 && c.renta_anual != null && +c.renta_anual > 0) ? +c.renta_anual / C : null;
+    // yield on cost = renta REAL (rent-roll actual) ÷ inversión; cae a la modelada si no hay real (CEO #4)
+    o.rentaSalud = (c.renta_actual_anual != null && +c.renta_actual_anual > 0) ? +c.renta_actual_anual : (c.renta_anual != null ? +c.renta_anual : null);
+    o.rentaSaludFuente = (c.renta_actual_anual != null && +c.renta_actual_anual > 0) ? (c.renta_actual_fuente || 'rent-roll Rentas') : (c.renta_anual != null && +c.renta_anual > 0 ? 'renta del modelo' : null);
+    o.yieldOnCost = (C > 0 && o.rentaSalud != null && o.rentaSalud > 0) ? o.rentaSalud / C : null;
     o.aprecAnual = (dias != null && dias >= 365 && +c.compra > 0 && V != null) ? Math.pow(V / +c.compra, 365 / dias) - 1 : null;
     return o;
   }

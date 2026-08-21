@@ -308,6 +308,48 @@ Item 39 (GAP/Utilidad tooltips) ya resuelto en turno 3 (`5a6d25f`).
 
 ---
 
+## FASE 3 — CORRECCIÓN (turno 5 · 2026-08-21) — Item 09 RENTA REAL para salud financiera
+
+**Decisión CEO #4 desbloqueó el Item 09** (antes "requiere decisión de negocio"): la SALUD
+FINANCIERA (NOI/CAP/DSCR/CoC/flujo) usa **RENT-ROLL ACTUAL** = lo que la casa cobra hoy según
+contrato vigente (`pm_payments`), NO la renta modelada `ff_deals.renta_mensual`. La modelada
+queda SOLO para la proyección 31a (etiquetada). Implementado y verificado a mano.
+
+**Hallazgos de datos (verificados en Supabase prod):**
+- **Dos espacios de property_id**: `ff_deals.property_id` = `properties.id` (backbone, 28/28) ≠
+  `pm_payments.property_id` = `pm_properties.id`. Puente = `pm_properties.property_id` → backbone
+  (verificado: 18/19 rentadas resuelven; solo Garden Path sin rent-roll del período).
+- **Trap del mes en curso incompleto**: Stonleigh ago-26 = $750 (n=1, a medio facturar) vs
+  jul-26 = $3.593 (n=5, completo). Usar el mes en curso crudo SUBESTIMA casas por habitación.
+  → **Regla robusta**: por casa, el `billing_ym` con MÁS unidades facturadas (desempate: más
+  reciente) en ventana de 4 meses. Resultado sano: Stonleigh 3.593 · Childress 4.850 (=modelada) ·
+  Garden Path 2.775. Bethune real $5.000 > modelada $2.400 · Bartlett $1.000 (1 hab, subperformance
+  REAL — honesto). **Impacto**: DSCR modelado 1.06 ("vender") → real 1.91 (sano) en el caso golden.
+
+**Cambios (todos verificados):**
+- **Migración `20260821100000`**: `inv_indicadores_data` += `renta_actual_anual` +
+  `renta_actual_fuente` (regla robusta vía puente pm_properties→backbone). DROP+CREATE (cambia el
+  tipo de retorno); 0 vistas dependientes; `inv_portal_como` (plpgsql, `to_jsonb(i)`) recoge las
+  columnas nuevas solo. `renta_anual` (modelada) intacta para proyección.
+- **inv-engine.js**: nuevo `p.rentaActualMes` → expone `noiActual/capActualValor/capActualCosto/
+  dscrActual` + `rentaActualMes/rentaActualFuente`. **null si no hay renta real → los modelados no
+  cambian** (goldens `test-inv-rehab` **24/24** intactos). NOI real verificado a mano = 46.380.
+- **inv-portal.js**: `ipEngineParams` inyecta `rentaActualMes` del row de indData; renderers (KPI
+  cards DSCR/CAP + tooltips + snapshot del asistente) **prefieren el real y lo etiquetan**
+  ("renta real · rent-roll Rentas (mes)"), cae al modelo en rehab/sin renta.
+- **inv-admin.js**: `iaEngineParamsFromRows(...,indRow)` + `iaBaseParams` pasan la fila; tabla
+  "Estado actual por casa" ahora dice "renta = rent-roll REAL de Rentas" + badge `real` por casa.
+- **inv-escenarios.js**: `desdeDatos` usa renta real cuando existe (la tabla NOI/CAP/CoC/DSCR que
+  "alarmaba a todas"); `base()` expone `renta_fuente`. **Un dato una fuente**: motor y escenarios
+  muestran el MISMO NOI/DSCR real.
+- **inv-indicadores.js**: `yieldOnCost` usa renta real (`rentaSalud`/`rentaSaludFuente`).
+
+**Verificación**: `node --check` OK en los 5 archivos · golden 24/24 · NOI real a mano = 46.380
+(OK) · `sin renta real → noiActual null` (OK, modelado inmutable) · build `fb493216fb74` (bundle +
+standalone `dist/os/inv-*.js`). La proyección 31a (TIR/VPN/horizontes) sigue modelada, etiquetada.
+
+---
+
 ## FASE 5 — REPORTE (turno 3 · 2026-08-20)
 
 **Este turno (pasada 2 / turno 3):**

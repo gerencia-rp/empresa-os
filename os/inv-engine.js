@@ -288,6 +288,24 @@ else if (typeof globalThis !== 'undefined') globalThis.HORIZONTES = [3, 5, 8];
     const capCostoOut = sinRenta ? null : finito(capCosto);
     const dscrOut = sinRenta ? null : finito(dscr);
     const equilibrioOut = sinRenta ? null : finito(puntoEquilibrio);
+    // ── SALUD con RENTA REAL (rent-roll actual) — decisión CEO #4 ──
+    // Si la casa está rentada y hay rent-roll real (p.rentaActualMes = Σ renta_pactada del mes
+    // más completo, vía inv_indicadores_data.renta_actual_anual), la SALUD FINANCIERA
+    // (NOI/CAP/DSCR) se mide con la renta REAL cobrada, NO la modelada. La proyección 31a
+    // (tir31/vpn31/porHorizonte) sigue modelada (etiquetada). Estos campos son null cuando no
+    // hay renta real → los renderers caen al modelo (y los goldens no cambian: no pasan renta real).
+    const rentaRealMes = (typeof p.rentaActualMes === 'number' && p.rentaActualMes > 0) ? p.rentaActualMes : null;
+    let noiActual = null, capActualValor = null, capActualCosto = null, dscrActual = null;
+    if (rentaRealMes != null) {
+      const ocE = (p.ocupacionEstable != null ? p.ocupacionEstable : 1);
+      const ingR = rentaRealMes * 12;                               // renta real anual (rent-roll pactado)
+      const opFijoR = ((p.mantenimientoMes || 0) + (p.serviciosMes || 0)) * ocE * 12 + (p.hoaMes || 0) * 12;
+      const opPctR = ingR * ((p.padsplitPct || 0) + (p.comisionPct || 0));
+      noiActual = ingR - opFijoR - opPctR;
+      capActualValor = finito(noiActual / (p.arv * Math.pow(1 + valz, 1)));
+      capActualCosto = finito(noiActual / costoAllIn);
+      dscrActual = banco.cuota > 0 ? finito((noiActual / 12) / banco.cuota) : null;
+    }
     const profit = anios.reduce((s, x) => s + (x.a >= 1 ? x.fclNegocio : 0), 0) + terminal + anios[0].fclNegocio;
     const cashInvertido = -meses.reduce((s, x) => s + Math.min(0, x.fclNegocio), 0);
     const roi = profit / Math.max(cashInvertido, 1);
@@ -299,6 +317,9 @@ else if (typeof globalThis !== 'undefined') globalThis.HORIZONTES = [3, 5, 8];
       indicadores: {
         arriendoPleno, noiAnual,
         capValor: capValorOut, capCosto: capCostoOut, dscr: dscrOut, puntoEquilibrio: equilibrioOut,
+        // salud con RENTA REAL (rent-roll actual) — null si no hay renta real (cae al modelo)
+        noiActual, capActualValor, capActualCosto, dscrActual,
+        rentaActualMes: rentaRealMes, rentaActualFuente: p.rentaActualFuente || null,
         estadoOperativo,                                             // ← 3B: rehab/sin renta declarado
         vpnMensual, tirCiclo: tirMensualPeriodo != null ? Math.pow(1 + tirMensualPeriodo, 12) - 1 : null,
         tir31, tir31ConVenta, vpn31, terminal, profit: porParte(profit), roi,

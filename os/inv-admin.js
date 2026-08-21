@@ -326,7 +326,7 @@ function iaToggleGuia() { const el = document.getElementById('ia-guia-cat'); if 
 window.iaToggleGuia = iaToggleGuia;
 
 // ─── vista ───
-function iaEngineParamsFromRows(rows, holdingPct, movs) {
+function iaEngineParamsFromRows(rows, holdingPct, movs, indRow) {
   const P = {}; rows.forEach(r => P[r.key] = r);
   const g = (k, d) => { const r = P[k]; const v = r ? parseFloat(r.value) : NaN; return isNaN(v) ? d : v; };
   const draws = {}, otros = {};
@@ -343,13 +343,17 @@ function iaEngineParamsFromRows(rows, holdingPct, movs) {
     seguroMes: g('seguro_mes', 0), cicloMeses: g('ciclo_meses', 12), anios: g('anios', 31),
     repartoInv: holdingPct != null ? holdingPct : g('reparto_inv', 0.5), cashAtrapadoReal: g('cash_atrapado_real', null),
     postRefiPerfil: P.postrefi_perfil ? P.postrefi_perfil.value : null,
-    utilAnualPostRefi: g('util_anual_postrefi', null), anio0PostRefi: g('anio0_postrefi', null) };
+    utilAnualPostRefi: g('util_anual_postrefi', null), anio0PostRefi: g('anio0_postrefi', null),
+    // renta REAL para salud (NOI/CAP/DSCR) — rent-roll actual; null → cae al modelo (CEO #4)
+    rentaActualMes: (indRow && indRow.renta_actual_anual != null ? +indRow.renta_actual_anual / 12 : null),
+    rentaActualFuente: (indRow && indRow.renta_actual_fuente) || null };
 }
 
 // ─── F2: escenarios + simulador ───
 function iaBaseParams() {
   const h = IA.holdings.find(x => x.property_id === IA.casa);
-  return iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow);
+  const ind = (IA.indData || []).find(r => r.property_id === IA.casa);
+  return iaEngineParamsFromRows(IA.params, h ? +h.reparto_pct : null, IA.cashflow, ind);
 }
 function iaEstOpts() {
   const P = {}; IA.params.forEach(r => P[r.key] = r);
@@ -1584,10 +1588,10 @@ function iaTabAnalizador() {
     + '<span title="SUPUESTO — cap de mercado al que se valoran casas comparables (0.07 = 7%). Se usa para el spread/valor forzado. Override por casa: param cap_mercado_pct.">Cap de mercado /año <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff">supuesto</span> ' + cfgIn('ia-cfg-capmkt', cfg.cap_mercado_pct) + '</span>'
     + '<button class="cbtn" style="padding:5px 12px" onclick="iaSaveEscCfg()">💾 Guardar supuestos</button>'
     + '<span class="meta" style="font-size:10px">se reflejan de inmediato en el portal del inversor (Rendimiento)</span></div></div>';
-  const estado = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Estado actual por casa</div><div class="k">fuentes: ff_deals (renta/gastos) · inv_indicadores_data (papel/deuda) · inv_holdings (aporte)</div></div>'
+  const estado = '<div class="card overx" style="margin:0"><div class="chart-h"><div class="t">Estado actual por casa</div><div class="k">renta = <b>rent-roll REAL de Rentas</b> (pm_payments) cuando la casa está rentada, si no la modelada · gastos ff_deals · papel/deuda inv_indicadores_data · aporte inv_holdings</div></div>'
     + '<table class="ptable"><thead><tr><th>Casa</th><th class="dh-num" style="text-align:right">Aporte</th><th style="text-align:right">NOI</th><th style="text-align:right">Cap impl.</th><th style="text-align:right">Flujo/mes</th><th style="text-align:right">CoC</th><th style="text-align:right">Equity</th><th style="text-align:right">DSCR</th></tr></thead><tbody>'
     + escs.map(({c, e}) => '<tr' + (e.porCompletar ? ' style="opacity:.55"' : '') + '><td>' + OS_E(c.casa) + (e.porCompletar ? ' <span class="badge b-warn" style="font-size:8px">por completar</span>' : '') + '</td>'
-      + '<td style="text-align:right">' + $(c.aporte) + '</td><td style="text-align:right">' + (e.porCompletar ? '—' : $(e.base.noi)) + '</td>'
+      + '<td style="text-align:right">' + $(c.aporte) + '</td><td style="text-align:right"' + (e.base && e.base.renta_fuente ? ' title="renta usada: ' + OS_E(String(e.base.renta_fuente)) + ' (' + $(e.base.renta_mensual) + '/mes)"' : '') + '>' + (e.porCompletar ? '—' : $(e.base.noi)) + (e.base && /rent-roll/.test(e.base.renta_fuente || '') ? ' <span class="badge" style="font-size:7px;background:rgba(72,214,156,.16);color:#48d69c">real</span>' : '') + '</td>'
       + '<td style="text-align:right">' + (e.porCompletar ? '—' : p1(e.base.cap)) + '</td>'
       + '<td style="text-align:right" class="' + (e.base.flujo >= 0 ? 'up' : 'down') + '">' + (e.base.flujo != null ? $(e.base.flujo / 12) : '—') + '</td>'
       + '<td style="text-align:right">' + p1(e.base.coc) + '</td><td style="text-align:right">' + $(e.base.equity) + '</td>'

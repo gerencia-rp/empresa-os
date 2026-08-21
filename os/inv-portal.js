@@ -166,6 +166,7 @@ function ipEngineParams(pid) {
     m = k.match(/^otros_inv_m(\d+)$/); if (m) otros[+m[1]] = parseFloat(P[k].value) || 0;
   });
   const holding = IP.holdings.find(h => h.property_id === pid) || {};
+  const indRow = (IP.indData || []).find(r => r.property_id === pid) || {};   // renta real (rent-roll)
   // E2: draws ya no viven como params — se reconstruyen de los movimientos migrados;
   // hm_compra (HML al cierre) reemplaza a hm_inicial (que ahora es compra+rehab, calculado)
   const drawsEf = Object.keys(draws).length ? draws : invEngine.drawsFromMovs(IP.cashflow[pid] || [], txt(P, 'fecha_cierre'));
@@ -191,6 +192,9 @@ function ipEngineParams(pid) {
     utilAnualPostRefi: num(P, 'util_anual_postrefi', null),
     anio0PostRefi: num(P, 'anio0_postrefi', null),
     inversionAportada: +holding.inversion_aportada || null,
+    // renta REAL para salud (NOI/CAP/DSCR) — rent-roll actual; null → cae al modelo (CEO #4)
+    rentaActualMes: (indRow.renta_actual_anual != null ? +indRow.renta_actual_anual / 12 : null),
+    rentaActualFuente: indRow.renta_actual_fuente || null,
   };
 }
 function srcChip(P, k) {
@@ -442,7 +446,7 @@ function render() {
   if (IP.tab === 'rend') drawRendChart();
   if (IP.tab === 'casa') drawCasaChart(r, p.repartoInv);
   const met = ipMetrics(pid, p, r, holding);
-  IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: r.indicadores.capValor, dscr: r.indicadores.dscr, equilibrio: r.indicadores.puntoEquilibrio,
+  IP.lastSnapshot = { casa: dir, escenario, inversion: met.cap || 0, reparto: met.inv, tir31: r.indicadores.tir31PostRefi, vpn31: r.indicadores.vpn31PostRefi, vpn31_inv: r.indicadores.vpn31PostRefi * met.inv, cap: (r.indicadores.capActualValor != null ? r.indicadores.capActualValor : r.indicadores.capValor), dscr: (r.indicadores.dscrActual != null ? r.indicadores.dscrActual : r.indicadores.dscr), equilibrio: r.indicadores.puntoEquilibrio,
     // 3B: si la casa está en rehab, cap/dscr/equilibrio van null A PROPÓSITO — el asistente
     // debe decir "aún no aplica", nunca "sin dato" ni inventar un número.
     estado_operativo: r.indicadores.estadoOperativo,
@@ -452,6 +456,14 @@ function render() {
 // ─── 🏠 MI PORTAFOLIO ───
 function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
   const i = r.indicadores;
+  // SALUD con renta REAL (rent-roll actual) cuando existe; si no, cae al modelo (CEO #4).
+  // Un solo número de NOI/CAP/DSCR mostrado: el real si la casa está rentada, etiquetado.
+  const iRentaReal = i.noiActual != null;
+  const iNoi = iRentaReal ? i.noiActual : i.noiAnual;
+  const iDscr = (i.dscrActual != null ? i.dscrActual : i.dscr);
+  const iCap = (i.capActualValor != null ? i.capActualValor : i.capValor);
+  const iCapCosto = (i.capActualCosto != null ? i.capActualCosto : i.capCosto);
+  const rentaLbl = iRentaReal ? ('renta real · ' + esc(i.rentaActualFuente || 'rent-roll Rentas')) : 'renta del modelo';
   const inv = p.repartoInv;
   const estado = P.estado_casa ? P.estado_casa.value.replace(/_/g, ' ') : null;
   const cierre = P.fecha_cierre ? P.fecha_cierre.value : null;
@@ -512,16 +524,16 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
       'Equity Multiple = <b>' + (met.em != null ? met.em.toFixed(2) + '×' : '—') + '</b> en ' + (met.mesesInv || '—') + ' meses',
       'ROI anualizado = (multiple)^(12÷meses) − 1 = <b>' + $pct(met.roiAnu) + '</b>' + (met.roiAnu == null ? ' <span class="meta">(se calcula con al menos 3 meses de historia)</span>' : '')]) },
     dscr: { t: 'DSCR — cobertura de la deuda', c: 'Cuántas veces la operación de la casa cubre la cuota del banco. Arriba de 1.20× el banco está tranquilo y sobra plata; abajo de 1.0× la renta no alcanza para la cuota.', f: fx([
-      'NOI anual (renta − gastos operativos, año estabilizado del modelo) = <b>' + $money(i.noiAnual) + '</b>',
+      'NOI anual (renta − gastos operativos · <b>' + rentaLbl + '</b>) = <b>' + $money(iNoi) + '</b>',
       'Cuota mensual del banco = <b>' + $money(r.banco.cuota) + '</b>',
       // 3B: en rehab (NOI ≤ 0 / sin cuota) el DSCR no aplica — antes salía "-Infinity"
-      i.dscr != null ? 'DSCR = (NOI ÷ 12) ÷ cuota = <b>' + i.dscr.toFixed(2) + '×</b>'
+      iDscr != null ? 'DSCR = (NOI ÷ 12) ÷ cuota = <b>' + iDscr.toFixed(2) + '×</b>'
         : '<b>Aún no aplica</b> — ' + esc(ipRehabTxt(i, 'razonDscr'))]) },
     cap: { t: 'CAP rate', c: 'El rendimiento de la casa como negocio puro, sin deuda: utilidad operativa anual dividida por el valor de la propiedad. Sirve para comparar contra otras propiedades del mercado.', f: fx([
-      'NOI anual = <b>' + $money(i.noiAnual) + '</b>',
-      i.capValor != null ? 'CAP sobre valor = NOI ÷ valor (' + $money(p.arv * (1 + p.valorizacion)) + ') = <b>' + $pct(i.capValor) + '</b>'
+      'NOI anual (<b>' + rentaLbl + '</b>) = <b>' + $money(iNoi) + '</b>',
+      iCap != null ? 'CAP sobre valor = NOI ÷ valor (' + $money(p.arv * (1 + p.valorizacion)) + ') = <b>' + $pct(iCap) + '</b>'
         : '<b>Aún no aplica</b> — ' + esc(ipRehabTxt(i, 'razonCap')),
-      i.capCosto != null ? 'CAP sobre costo (all-in) = <b>' + $pct(i.capCosto) + '</b>' : '']) },
+      iCapCosto != null ? 'CAP sobre costo (all-in) = <b>' + $pct(iCapCosto) + '</b>' : '']) },
     vpn: { t: 'VPN a 31 años', c: 'Cuánto vale HOY todo el flujo futuro del negocio (31 años de operación + venta al final), descontado al ' + $pct(p.retornoEsperado) + ' anual (tu retorno esperado). Positivo = el negocio le gana a tu alternativa.', f: fx([
       'Base oficial post-refi (como el Excel): año 0 = cash atrapado real, años 1–31 = operación',
       'VPN de la casa = <b>' + $money(i.vpn31PostRefi) + '</b> · tu parte (' + $pct(met.inv) + ') = <b>' + $money(i.vpn31PostRefi * met.inv) + '</b>']) },
@@ -546,11 +558,11 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     + kpiI('Cash-on-Cash', $pct(met.cocAnualPct), (met.cocMensual != null ? $money(met.cocMensual) + ' /mes en tu bolsillo · ' : '') + (met.cocBase === 'real' ? 'con la operación real' : 'según el modelo (aún sin rentas)'), met.cocAnualPct != null && met.cocAnualPct > 0 ? 'up' : '', 'coc')
     + kpiI('ROI anualizado', $pct(met.roiAnu), met.roiAnu == null ? 'se calcula con 3+ meses de historia' : 'crecimiento anual compuesto desde tu entrada', met.roiAnu != null && met.roiAnu > 0 ? 'up' : '', 'roi')
     // 3B: casa en rehab / sin renta → estado honesto (antes: DSCR "-Infinity", equilibrio "Infinity%")
-    + kpiI('DSCR', i.dscr != null ? i.dscr.toFixed(2) + '×' : '—',
-      i.dscr != null ? 'la renta cubre la deuda' + (i.puntoEquilibrio != null ? ' · equilibrio: ' + $pct(i.puntoEquilibrio) + ' de ocupación' : '') : '🔨 ' + ipRehabTxt(i, 'razonDscr'),
-      i.dscr != null && i.dscr >= 1.2 ? 'up' : 'warn', 'dscr')
-    + kpiI('CAP rate', i.capValor != null ? $pct(i.capValor) : '—',
-      i.capValor != null ? 'NOI ' + $money(i.noiAnual) + ' ÷ valor · sobre costo ' + $pct(i.capCosto) : '🔨 ' + ipRehabTxt(i, 'razonCap'),
+    + kpiI('DSCR', iDscr != null ? iDscr.toFixed(2) + '×' : '—',
+      iDscr != null ? (iRentaReal ? 'renta real cubre la deuda' : 'la renta cubre la deuda') + (i.puntoEquilibrio != null ? ' · equilibrio: ' + $pct(i.puntoEquilibrio) + ' de ocupación' : '') : '🔨 ' + ipRehabTxt(i, 'razonDscr'),
+      iDscr != null && iDscr >= 1.2 ? 'up' : 'warn', 'dscr')
+    + kpiI('CAP rate', iCap != null ? $pct(iCap) : '—',
+      iCap != null ? 'NOI ' + $money(iNoi) + ' ÷ valor · sobre costo ' + $pct(iCapCosto) + (iRentaReal ? ' · renta real' : '') : '🔨 ' + ipRehabTxt(i, 'razonCap'),
       '', 'cap')
     + '</div>'
     + '<div class="grid k4" style="margin-top:14px">'
