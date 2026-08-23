@@ -725,4 +725,46 @@ rol, crons que faltan). Guardrails intactos: SOLO LECTURA; pagos/ejecución siem
   mismas vistas) están verificados al centavo por SQL directo y por la reunión que sí corrió. Confirmación
   final en pantalla, logueado en `empresa-os.vercel.app`, es del CEO.
 
+---
+
+## ✅ PASADA FINAL (23 Ago 2026) — VERIFICACIÓN EN EL DOMINIO OFICIAL + GUÍA CEO · HECHO
+
+Verificación de punta a punta sobre **empresa-os.vercel.app** (bundle EN VIVO) + entrega de `GUIA-CEO.md`.
+
+### 1) Los 4 puntos, con evidencia concreta (sobre lo desplegado, no grep de fuente)
+- **Fix 01 — se actualiza sola:** `curl empresa-os.vercel.app/version.json` → `{version: cfaa634eea53, commit: e6b90ef}`.
+  El bundle vivo contiene el fetch a `version.json` + banner **"🔄 Hay una versión nueva — Actualizar"** (borra
+  caché + reload; badge `app-version-badge` inyectado en el index vivo). Chequea al enfocar la pestaña + cada 5 min.
+- **Fix 02 — un solo sistema:** `empresa-os.vercel.app` → **HTTP 200** sirviendo `commit e6b90ef` = `git rev-parse main`.
+  `empresa-os-admin.vercel.app` → **HTTP 503** (pausado/retirado). No hay segundo proyecto en uso.
+- **Fix 03 — Inicio premium+simple, datos reales, toggle:** `scripts/qa-inicio-render.mjs` sobre el `dist/` en vivo →
+  **11/11 · 0 pageerrors**. Sidebar en lenguaje de negocio (Inicio·Casas·Rentas·Remodelación·Fix&Flip·Cobros y
+  pagos·Inversionistas·Cerebro·Decisiones por aprobar·Reportes), 4 KPIs, saludo personalizado, toggle claro/oscuro.
+- **Fix 04 — cada sección con datos reales + Directiva + Decisiones:** el render confirma Directiva del día
+  (badge "reunión matutina" + su "por qué"), tarjeta "Decisiones que necesitan tu sí" (168 propuestas de agentes por
+  tipo), Salud por línea y Casas que vigilar. `/casas` (portafolio 3 líneas) y `/decisiones` renderizan OK.
+- ⚠ **Honesto:** la verificación **logueada real en vivo** no se pudo hacer — las creds `RP_QA_ADMIN_*` del entorno
+  dan `invalid_credentials` (gotcha conocido: sesiones paralelas pisan el password del 🧪 QA). Es acceso, no código.
+  El render se validó en Chrome real sobre el bundle desplegado; los **valores** se validaron por SQL directo (abajo).
+  **La confirmación FINAL en pantalla, logueado, es del CEO.**
+
+### 2) Números contra Supabase prod (`nezbaljfhhyznhltpjnk`) — INTACTOS al centavo
+- **Déficit (caja atrapada):** Σ `ff_deals.deficit_total` activas con dato = **$297,690.36** (18 casas). El KPI
+  "caja atrapada" del Inicio usa la magnitud positiva Σ`>0` = **$302,104.60** (13 casas). Ambos correctos/documentados.
+- **Cartera:** `v_cartera_kpi.vencido_neto` = **$18,636.01** · **15 morosos_reales** (bruto 18,786.01 − a favor).
+- **Ocupación:** `v_ocupacion` = **51 rentables / 36 ocupadas / 70.59%**.
+
+### 3) `GUIA-CEO.md` entregada (1 página, lenguaje simple)
+Qué es cada sección del menú (una frase c/u) · cómo usar el Cerebro · cómo aprobar una decisión · cómo confirmar
+que ve la última versión (badge + banner "Actualizar") · números de referencia · lo que necesita del equipo.
+
+### 4) Lo que necesita del equipo (ningún software lo hace solo)
+- **MÉTODO DE PAGO en Airtable:** `pm_payments.payment_method` está 100% null (el sync no lo trae porque el campo
+  no existe/no se mapea). Requiere el campo en Airtable + mapeo en el sync + deploy de backend. *(Carlos/equipo.)*
+- **Reconciliación de unidades dudosas:** DB `active=47` vs informe real de Carlos `51`. Las inconsistencias son de
+  la fuente (Airtable) → reconciliar ahí para que ocupación cuadre exacto sin tocar el dedup del calendario. *(Carlos.)*
+
+**Estado:** todos los ajustes ejecutables de los 59 / lotes B1–B8 están hechos o documentados como bloqueados por
+insumo externo (key/backend/dato de Airtable/QA logueado). No quedan ajustes ejecutables pendientes en esta pasada.
+
 === AUDITORIA COMPLETA ===
