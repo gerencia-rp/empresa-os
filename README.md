@@ -4,6 +4,10 @@ Sistema operativo de la empresa: **Fix & Flip**, **Remodelación**, **Rentas**, 
 
 App live: **https://empresa-os.vercel.app**
 
+> ⚙️ **Flujo único de trabajo/deploy:** un solo proyecto Vercel (`empresa-os`, GitHub-linked),
+> una sola rama (`main`), un solo dominio (empresa-os.vercel.app). `commit → push main → auto-deploy`.
+> El proyecto `empresa-os-admin` quedó **retirado**. Detalle en [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ---
 
 ## 🚀 Setup local
