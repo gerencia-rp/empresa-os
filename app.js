@@ -380,6 +380,88 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ============================================================
+// 🔄 Auto-actualización — detecta un deploy nuevo con la pestaña abierta
+// ============================================================
+// El bundle ya lleva hash (cache-busting permanente) y el index.html no se cachea
+// fuerte, así que RECARGAR siempre trae lo último. El hueco que quedaba: un CEO con
+// la pestaña abierta días no recarga → nunca ve el deploy. Este módulo hace polling
+// liviano de /version.json (el hash del build) y, si cambió respecto al que cargó,
+// ofrece un aviso discreto "hay versión nueva — actualizar". Sin limpiar caché a mano.
+(function osAutoUpdate() {
+  // Badge de versión (siempre, incluso en dev sin build).
+  function paintBadge() {
+    const el = document.getElementById('app-version-badge');
+    if (!el) return;
+    const v = window.__APP_VERSION__;
+    if (v && v.version) {
+      el.textContent = 'v ' + (v.commit || v.version.slice(0, 7));
+      el.title = 'Versión desplegada · build ' + v.version + (v.builtAt ? ' · ' + v.builtAt : '');
+    } else {
+      el.textContent = 'dev';
+      el.title = 'Corriendo sin build (scripts sueltos)';
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', paintBadge);
+  } else {
+    paintBadge();
+  }
+
+  const BOOT = (window.__APP_VERSION__ && window.__APP_VERSION__.version) || null;
+  if (!BOOT) return; // dev local sin build → no hay manifiesto que comparar
+
+  let notified = false, checking = false;
+  async function checkForUpdate() {
+    if (notified || checking) return;
+    checking = true;
+    try {
+      const r = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) {
+        const v = await r.json();
+        if (v && v.version && v.version !== BOOT) { notified = true; showUpdateBanner(v); }
+      }
+    } catch (e) { /* red caída / offline: reintenta en el próximo tick */ }
+    finally { checking = false; }
+  }
+
+  function showUpdateBanner(v) {
+    if (document.getElementById('app-update-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'app-update-banner';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:2147483000;' +
+      'background:#0f172a;color:#f8fafc;padding:10px 14px;border-radius:12px;' +
+      'box-shadow:0 10px 34px rgba(0,0,0,.4);border:1px solid #334155;' +
+      'font:500 13px/1.35 Inter,system-ui,sans-serif;display:flex;align-items:center;gap:12px;' +
+      'max-width:calc(100vw - 32px)';
+    const txt = document.createElement('span');
+    txt.textContent = '🔄 Hay una versión nueva de Empresa OS.';
+    const btn = document.createElement('button');
+    btn.textContent = 'Actualizar';
+    btn.style.cssText = 'background:#22d3ee;color:#06283d;border:0;border-radius:8px;padding:6px 12px;font-weight:700;cursor:pointer';
+    btn.onclick = () => {
+      try { if (window.caches && caches.keys) caches.keys().then(k => k.forEach(x => caches.delete(x))); } catch (e) {}
+      window.location.reload();
+    };
+    const later = document.createElement('button');
+    later.textContent = 'Después';
+    later.style.cssText = 'background:transparent;color:#94a3b8;border:0;cursor:pointer;font-size:12px;padding:4px';
+    later.onclick = () => { b.remove(); notified = false; setTimeout(checkForUpdate, 15 * 60 * 1000); };
+    b.appendChild(txt); b.appendChild(btn); b.appendChild(later);
+    document.body.appendChild(b);
+  }
+
+  // Disparadores: al volver/enfocar la pestaña + cada 5 min + un chequeo temprano.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  });
+  window.addEventListener('focus', checkForUpdate);
+  setInterval(checkForUpdate, 5 * 60 * 1000);
+  setTimeout(checkForUpdate, 30 * 1000);
+  window.__checkForUpdate = checkForUpdate; // expuesto para QA
+})();
+
 // Captura el evento beforeinstallprompt para ofrecer instalación on-demand
 window._deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (ev) => {

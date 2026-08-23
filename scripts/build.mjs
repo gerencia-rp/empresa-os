@@ -7,6 +7,7 @@
 
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
+import { execSync } from "node:child_process";
 import path from "node:path";
 import { transform } from "esbuild";
 
@@ -128,6 +129,14 @@ const STATIC_COPY = [
   "supabase/cleaning-planner-cleanup-seed.sql"  // borrar seed de prueba
 ];
 
+// Commit corto para el badge de versión (Vercel expone VERCEL_GIT_COMMIT_SHA;
+// en local caemos al git del repo; si nada, 'local').
+function gitCommit() {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7);
+  try { return execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim(); }
+  catch { return "local"; }
+}
+
 async function fileExists(p) {
   try { await fs.access(p); return true; } catch { return false; }
 }
@@ -188,12 +197,26 @@ async function main() {
   await ensureDir(path.dirname(bundlePath));
   await fs.writeFile(bundlePath, bundleMin, "utf8");
 
+  // 3b) Manifiesto de versión (para auto-actualización + badge). La identidad de
+  //     versión = hash del bundle (cambia con cualquier cambio de contenido).
+  const version = {
+    version: hash,
+    commit: gitCommit(),
+    builtAt: new Date().toISOString()
+  };
+  // version.json vive fuera de assets/ → hereda el header must-revalidate (index.html);
+  // el poller igual lo pide con cache:'no-store' para no depender del navegador.
+  await fs.writeFile(path.join(DIST, "version.json"), JSON.stringify(version), "utf8");
+
   // 4) Procesar index.html: reemplaza el bloque <!--[BUNDLE]--> ... <!--[/BUNDLE]-->
-  //    por un solo <script src="assets/bundle.[hash].js"></script>
+  //    por (a) el global __APP_VERSION__ que la app lee para saber qué corre, y
+  //    (b) un solo <script src="assets/bundle.[hash].js"></script>.
+  //    Va en index.html (no-cache) → siempre trae la versión fresca al recargar.
   const indexHtml = await fs.readFile(path.join(ROOT, "index.html"), "utf8");
+  const versionTag = `<script>window.__APP_VERSION__=${JSON.stringify(version)};</script>`;
   const replaced = indexHtml.replace(
     /<!--\[BUNDLE\]-->[\s\S]*?<!--\[\/BUNDLE\]-->/,
-    `<script src="/${bundleName}"></script>`   // absoluto: en deep-links (/rentas/…) un path relativo resolvería a /rentas/assets/… (404)
+    `${versionTag}\n<script src="/${bundleName}"></script>`   // absoluto: en deep-links (/rentas/…) un path relativo resolvería a /rentas/assets/… (404)
   );
   await fs.writeFile(path.join(DIST, "index.html"), replaced, "utf8");
 
