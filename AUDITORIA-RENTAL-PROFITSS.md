@@ -617,5 +617,47 @@ pausado + rama remota borrada). `git worktree remove` cuando el CEO confirme que
 
 ---
 
+---
+
+## 🎨 PASADA (23 Ago 2026) — REDISEÑO DEL FRENTE: Centro de Mando premium + simple (B7 · UX) · HECHO
+
+**Pedido del CEO:** "no entiendo nada (39 agentes/escuadras/dry-run); rehacelo — top y sofisticado
+para redes PERO fácil y útil". Referencia visual: `DIAGNOSTICO-EMPRESA-OS/REFERENCIA-DISENO-FINAL.html`.
+
+**Qué se hizo (solo `os/os.js`, sin tocar lógica/datos por debajo):**
+- **Navegación en LENGUAJE DE NEGOCIO** (nuevo `osSidebar`, sidebar izq. permanente en `osShell`):
+  Inicio · Casas · Rentas · Remodelación · Fix & Flip · Cobros y pagos · Inversionistas · Cerebro ·
+  Decisiones por aprobar · Reportes. Gateada por área (admin ve todo), con semáforos vivos (dots
+  rentas/remodel/cobros/decisiones). Adiós "escuadras/dry-run/mapa de agentes" como cara.
+- **La red de agentes NO se borra**: sigue trabajando por debajo. Accesible en topbar **"Agentes"**
+  (admin → `/jarvis`) y agrupada en **Decisiones por aprobar** (168 propuestas por tipo, read-only,
+  "Abrir cola completa (Agentes)").
+- **Inicio = Centro de Mando** (reescrito `osGlobal`, viejo preservado como `osGlobalLegacy`): eyebrow
+  + saludo por hora con nombre real (`profiles.full_name`) + 4 KPIs (Caja del mes entró−salió · Caja
+  atrapada · Ocupación 36/51 · Te deben vencido) + **Directiva del día** (derivada de reglas + tus
+  números, el Cerebro no ejecuta) + **Decisiones que necesitan tu sí** (cobranza/agentes/déficit/obras)
+  + **Tu caja este mes** (barras entró/salió reales) + **Preguntarle al Cerebro** + **Salud por línea**
+  + **Casas que vigilar** (déficit, clic → ficha).
+- **Pantallas nuevas**: `/casas` (portafolio unificado Rentas+FF+Remodelación, clic → ficha 360°) y
+  `/decisiones` (cola: tus decisiones + propuestas de agentes por tipo). Rutas en `osParse`/`osTitle`/
+  guard; dispatch en `osRender`.
+- **Datos nuevos en `osLoad` (fuentes reales, sin recalcular)**: `pm_expenses` (caja del mes), RPC
+  `cartera_informe` (cartera vencida = misma def. que /cartera), `profiles.full_name`.
+- Toggle claro/oscuro intacto (verificado en ambos). Regla "sin dato = —" respetada.
+
+**Números verificados contra Supabase prod (`nezbaljfhhyznhltpjnk`) antes de cablear:**
+caja atrapada Σ`ff_deals.deficit_total>0` = **$302.104,60** (13 casas) · ocupación **36/51 (70,59%)**
+(`v_ocupacion`) · cartera vencida Σ`cartera_informe.vencido_neto` = **$18.636,01 · 15 morosos** ·
+caja del mes (ago) ingresos $37.718 / gastos $39.121,79 (la app agrupa por mes contable = mes cerrado).
+
+**Verificación EN VIVO (render sobre el bundle real):** login por formulario imposible (la cred QA del
+entorno `RP_QA_ADMIN_*` está rotada — gotcha conocido; no se toca la cuenta real del CEO). Se verificó el
+RENDER en Chrome real (`scripts/qa-inicio-render.mjs`): sirve `dist/`, inyecta el `state` léxico de
+app.js + datos de shape realista, dispara `osRender()` del bundle → **10/10 · 0 pageerrors** (sidebar
+10 ítems en lenguaje de negocio, 4 KPIs, Directiva/Decisiones/Cerebro/Salud/Casas que vigilar, `/casas`
+y `/decisiones` OK, toggle claro/oscuro). Capturas en `/tmp/inicio*.png`. Build esbuild verde
+(`node scripts/build.mjs`). **Los VALORES reales se validaron aparte por SQL directo** (arriba).
+⚠ La confirmación FINAL en pantalla (logueado, en `empresa-os.vercel.app`) es del CEO.
+
 === AUDITORIA COMPLETA ===
 === MERGE COMPLETO ===

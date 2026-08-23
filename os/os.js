@@ -163,6 +163,53 @@ function osInjectCSS() {
   #os-root .ask{display:flex;gap:8px;margin-top:14px}#os-root .ask input{flex:1;background:var(--surface-2);border:1px solid var(--glassb);border-radius:11px;padding:11px 14px;color:var(--ink);font-size:12px;outline:none}#os-root .ask input:focus{border-color:var(--accent)}
   #os-root .ask button{background:var(--grad);border:none;color:var(--accent-ink);font-weight:750;padding:0 16px;border-radius:11px;cursor:pointer;font-size:12px}
   @media (max-width:900px){#os-root .wrap{padding:16px 14px 40px}#os-root .k4,#os-root .k3,#os-root .k2{grid-template-columns:minmax(0,1fr)}#os-root .k4.units{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  /* ══ REDISEÑO CENTRO DE MANDO — topbar + sidebar en lenguaje de negocio + Inicio premium ══ */
+  #os-root .osx-top{display:flex;align-items:center;gap:13px;position:sticky;top:0;z-index:6;padding:13px 26px;border-bottom:1px solid var(--glassb);background:color-mix(in srgb,var(--bg) 74%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  #os-root .osx-live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--pos);background:color-mix(in srgb,var(--pos) 12%,transparent);border:1px solid color-mix(in srgb,var(--pos) 28%,transparent);padding:6px 12px;border-radius:999px}
+  #os-root .osx-live .pulse{width:8px;height:8px;border-radius:50%;background:var(--pos);animation:osxp 2s infinite}
+  @keyframes osxp{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pos) 55%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  @media (prefers-reduced-motion:reduce){#os-root .osx-live .pulse{animation:none}}
+  #os-root .osx-body{display:flex;min-height:calc(100vh - 62px);position:relative;z-index:1}
+  #os-root .osx-side{width:230px;flex:none;padding:16px 12px;border-right:1px solid var(--glassb)}
+  #os-root .osx-grp{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut2);margin:16px 10px 7px;font-weight:700}
+  #os-root .osx-nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--mut);font-size:13.5px;cursor:pointer;transition:.15s;text-decoration:none}
+  #os-root .osx-nav svg{width:17px;height:17px;flex:none;opacity:.9}
+  #os-root .osx-nav:hover{background:var(--glass);color:var(--ink)}
+  #os-root .osx-nav.on{background:linear-gradient(90deg,var(--accent-soft),transparent);color:var(--ink);font-weight:650;box-shadow:inset 2px 0 0 var(--accent)}
+  #os-root .osx-nav .nd{margin-left:auto;width:7px;height:7px;border-radius:50%}
+  #os-root .osx-main{flex:1;min-width:0;padding:24px 30px 60px;max-width:1340px}
+  #os-root .eyebrow{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--a2);margin-bottom:6px;font-weight:700}
+  #os-root .kpi .kn{font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5}
+  #os-root .kpi .kbig{font-size:29px;font-weight:780;letter-spacing:-.6px;font-variant-numeric:tabular-nums;margin-top:8px}
+  #os-root .kpi .kbig .u{color:var(--mut2);font-size:18px;font-weight:600}
+  #os-root .directiva{background:linear-gradient(135deg,var(--accent-soft),transparent),var(--glass);border-color:color-mix(in srgb,var(--accent) 30%,var(--glassb))}
+  #os-root .directiva .big2{font-family:'Fraunces',Georgia,serif;font-size:17px;line-height:1.42;margin:2px 0 10px;color:var(--ink);text-wrap:balance}
+  #os-root .directiva .by{font-size:11.5px;color:var(--mut);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  #os-root .chipx{font-size:10.5px;padding:3px 9px;border-radius:7px;background:var(--accent-soft);color:var(--a2);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);font-weight:600}
+  #os-root .cardh{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:9px}#os-root .cardh .tg{margin-left:auto;font-size:10.5px;color:var(--mut2);font-weight:600;letter-spacing:.3px}
+  #os-root .drow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--glassb)}#os-root .drow:last-child{border-bottom:0}
+  #os-root .drow .dt{flex:1;font-size:13px;color:var(--ink)}#os-root .drow .dt small{color:var(--mut);font-size:11.5px}
+  #os-root .drow .dcta{font-size:12.5px;font-weight:650;color:var(--a2);white-space:nowrap;cursor:pointer}#os-root .drow .dcta:hover{text-decoration:underline}
+  #os-root .drow .dn{font-family:var(--mono,monospace);font-variant-numeric:tabular-nums;color:var(--txt2);font-size:12.5px}
+  #os-root .cdot{width:9px;height:9px;border-radius:50%;flex:none}#os-root .cdot.r{background:var(--neg)}#os-root .cdot.y{background:var(--amber)}#os-root .cdot.g{background:var(--pos)}
+  #os-root .pill2{font-size:11.5px;font-weight:650;padding:3px 10px;border-radius:999px}
+  #os-root .pill2.g{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--pos)}#os-root .pill2.y{background:color-mix(in srgb,var(--amber) 16%,transparent);color:var(--amber)}#os-root .pill2.r{background:color-mix(in srgb,var(--neg) 14%,transparent);color:var(--neg)}
+  #os-root .askbig{display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:1px solid color-mix(in srgb,var(--accent) 34%,var(--glassb));border-radius:13px;padding:15px 16px;background:linear-gradient(135deg,var(--accent-soft),transparent);color:var(--ink);font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:15px;cursor:pointer;transition:.15s}
+  #os-root .askbig:hover{border-color:var(--accent);transform:translateY(-1px)}
+  #os-root .askbig .aic{width:34px;height:34px;border-radius:9px;background:var(--grad);display:grid;place-items:center;flex:none;color:#fff}
+  #os-root .hint2{font-size:12px;color:var(--mut);margin:11px 3px 0;line-height:1.55}
+  #os-root .bars2{display:flex;flex-direction:column;gap:12px;margin-top:2px}
+  #os-root .bar2{display:grid;grid-template-columns:78px 1fr 78px;align-items:center;gap:10px;font-size:12.5px}
+  #os-root .bar2 .trk{height:8px;border-radius:6px;background:var(--surface-2);overflow:hidden}#os-root .bar2 .fil{height:100%;border-radius:6px;background:var(--grad)}
+  #os-root .bar2 .bn{font-family:var(--mono,monospace);text-align:right;color:var(--txt2);font-variant-numeric:tabular-nums}
+  #os-root .grid2c{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+  @media(max-width:1000px){#os-root .grid2c{grid-template-columns:1fr}}
+  @media(max-width:820px){
+    #os-root .osx-body{flex-direction:column}
+    #os-root .osx-side{width:auto;display:flex;gap:8px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--glassb);padding:10px}
+    #os-root .osx-grp{display:none}#os-root .osx-nav{white-space:nowrap;padding:8px 12px}#os-root .osx-nav .nd{display:none}
+    #os-root .osx-main{padding:18px 16px 40px;max-width:none}#os-root .osx-top{padding:12px 16px}
+  }
   /* ── TOPBAR del OS sobre los sistemas en PÁGINA COMPLETA (marco de empresa) ── */
   #os-return-bar{position:fixed;top:0;left:0;right:0;z-index:2147483000;display:flex;align-items:center;gap:14px;height:54px;padding:0 20px;
     font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:rgba(8,9,12,.72);border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
@@ -265,6 +312,8 @@ function osParse(path) {
   if (seg[0] === 'holding') return { view: 'dash', dashEmp: 'holding' };
   if (seg[0] === 'cobros') return { view: 'cobros' };
   if (seg[0] === 'informes') return { view: 'informes' };
+  if (seg[0] === 'casas') return { view: 'casas' };
+  if (seg[0] === 'decisiones') return { view: 'decisiones' };
   if (seg[0] === 'casa' && seg[1]) return { view: 'casa', slug: seg[1] };
   if (seg[0] === 'ia') { if (window.OSIA && seg[1]) OSIA.tab = seg[1]; return { view: 'empresa', empresa: 'ia' }; } // /ia/pedir|bandeja|galeria = tab del módulo
   if (OS_EMPRESAS[seg[0]]) {
@@ -287,6 +336,8 @@ function osTitle(r) {
   if (r.view === 'dash') return 'Dashboard Ejecutivo · ' + base;
   if (r.view === 'cobros') return 'Cobranza · ' + base;
   if (r.view === 'informes') return 'Informes de Rentas · ' + base;
+  if (r.view === 'casas') return 'Casas · ' + base;
+  if (r.view === 'decisiones') return 'Decisiones por aprobar · ' + base;
   if (r.view === 'casa') return 'Ficha de casa · ' + base;
   if (r.empresa) return (OS_EMPRESAS[r.empresa].name) + ' · ' + base;
   return 'No encontrado · ' + base;
@@ -365,6 +416,13 @@ async function osLoad() {
     // 🗺️ LECTURA EN VIVO del Mapa de Conexiones: la fuente efectiva de los números con
     // alternativas implementadas la decide data_lineage (editable en /mapa, auditado, reversible).
     OS.lineage = await sb.from('data_lineage').select('metric_key,empresa,sistema,etiqueta,base,tabla,columna').limit(2000).then(r => r.data || []).catch(() => []);
+    // ── REDISEÑO CENTRO DE MANDO (Inicio premium) — fuentes reales, sin recalcular ──
+    // Caja del mes = ingresos − gastos (mes contable billing_ym). Cartera vencida = RPC cartera_informe (misma
+    // definición que /cartera: vencido_neto por inquilino, netea adelantos). Nombre del CEO para el saludo.
+    OS.expenses = await sb.from('pm_expenses').select('amount,billing_ym,category,scope,created_at').eq('active', true).then(r => r.data || []).catch(() => []);
+    OS.cartera = await sb.rpc('cartera_informe', { p_mes: new Date().toISOString().slice(0, 7), p_desde: null }).then(r => r.data || []).catch(() => []);
+    OS.userName = null;
+    try { if (typeof state !== 'undefined' && state && state.user && state.user.id) { const { data: prof } = await sb.from('profiles').select('full_name').eq('id', state.user.id).maybeSingle(); OS.userName = (prof && prof.full_name) ? prof.full_name : null; } } catch (e) {}
     OS.pnl = pnl || [];
     OS.qbCache = qbc || []; OS.qbMap = qbm || [];
     OS.hmlTotal = (hmlL || []).reduce((t, x) => t + (+x.monto_hml || 0), 0);
@@ -449,8 +507,18 @@ function osCompute() {
   const occPct = totalU ? Math.round(occU / totalU * 100) : 0;
   // Cobranza (deuda contrato − plata real): por casa ocupada, renta esperada vs cobrada en el mes.
   const cobranza = osCobranza(mb);
+  // ── Centro de Mando: CAJA DEL MES = entró (ingresos) − salió (gastos), por mes contable. ──
+  const curYm = mb.from.slice(0, 7);
+  const salioMes = (OS.expenses || []).filter(e => (e.billing_ym || (e.created_at || '').slice(0, 7)) === curYm).reduce((s, e) => s + Number(e.amount || 0), 0);
+  const caja = { entro: rentInc, salio: salioMes, neto: rentInc - salioMes };
+  // ── CARTERA VENCIDA (fuente única = RPC cartera_informe, misma que /cartera): vencido_neto por inquilino. ──
+  const cart = (OS.cartera || []);
+  const morosos = cart.filter(r => Number(r.vencido_neto || 0) > 0).sort((a, b) => Number(b.vencido_neto || 0) - Number(a.vencido_neto || 0));
+  const cartera = { vencido: morosos.reduce((s, r) => s + Number(r.vencido_neto || 0), 0), morosos: morosos.length, mora30: morosos.filter(r => r.aging && r.aging !== '0-30').length, rows: morosos };
+  // Remodelación a vigilar (obras en curso atrasadas > 10 días) — para el semáforo de "salud por línea".
+  const remoVigilar = OS.remodel.filter(o => o.proceso !== 'Finalizado' && Number(o.retraso_dias || 0) > 10).length;
   return {
-    mb,
+    mb, caja, cartera, remoVigilar,
     ff: { deals: ff.length, activos: ffActive.length, capital: ffCapital, arv: ffArv, alertas: ffAlertas, list: ff },
     // B4 (auditoría 13-jul): la ocupación oficial viene de v_ocupacion (capa de KPIs) — misma cifra en todas las pantallas
     rentas: OS.ocup
@@ -532,7 +600,8 @@ function osRouteGuard(r) {
   else if (r.view === 'contable') need = ['contable'];
   else if (r.empresa === 'ia') need = null; // IA abierta a todo usuario logueado (Bandeja se gatea en el módulo)
   else if ((r.view === 'empresa' || r.view === 'app') && OS_EMPRESAS[r.empresa]) need = [OS_EMPRESAS[r.empresa].key];
-  else if (r.view === 'casa') need = ['fix-flip', 'rentas', 'remodelacion'];
+  else if (r.view === 'casa' || r.view === 'casas') need = ['fix-flip', 'rentas', 'remodelacion'];
+  else if (r.view === 'decisiones') need = null; // read-only: cada usuario ve lo de sus áreas dentro de la vista
   else if (r.view === 'mapa') need = ['fix-flip', 'rentas', 'remodelacion', 'contable', 'operacion'];
   else if (r.view === 'cartera') need = ['rentas', 'operacion', 'contable'];
   else if (r.view === 'dash') need = r.dashEmp === 'holding' ? ['contable', 'operacion'] : [OS_EMPRESAS[r.dashEmp] ? OS_EMPRESAS[r.dashEmp].key : 'contable'];
@@ -557,8 +626,8 @@ function osRender() {
   if (!OS.loaded) { root.innerHTML = osShell('<div class="ui-loading"><div class="ui-spinner"></div><div>Cargando datos del holding…</div></div>'); return; }
   const guard = osRouteGuard(OS.route);
   if (guard) { root.innerHTML = osShell(osNoAccess(guard)); return; }
-  const comp = osCompute();
-  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), jarvis: (window.jvView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), informes: (window.osInformesView || os404), dash: (window.osDashView || os404), app: osAppView, casa: osCasa, '404': os404 }[OS.route.view] || osGlobal;
+  const comp = osCompute(); OS._comp = comp;
+  const view = { global: osGlobal, empresa: osEmpresa, operacion: osOperacion, contable: osContable, admin: (window.osAdminView || os404), jarvis: (window.jvView || os404), invadmin: (window.invAdminView || os404), mapa: (window.osLineageView || os404), cartera: (window.osCarteraView || os404), cobros: (window.osCobrosView || os404), informes: (window.osInformesView || os404), dash: (window.osDashView || os404), app: osAppView, casa: osCasa, casas: osCasasView, decisiones: osDecisionesView, '404': os404 }[OS.route.view] || osGlobal;
   root.innerHTML = osShell(view(comp));
   requestAnimationFrame(() => osMountCharts(comp));
 }
@@ -573,17 +642,134 @@ function osCrumbs() {
   return parts.join(' ');
 }
 function osShell(inner) {
-  return `<div class="bgfx"></div><div class="wrap">
-    <div class="bar"><div class="logo" data-osnav="/" style="cursor:pointer">FR</div><div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
-      <div class="crumbs">${osCrumbs()}</div>
-      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/jarvis" title="Command Center (solo dueño)">' + osIcon('bot') + ' Command</button><button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + ' Admin</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
-    </div>${inner}</div>`;
+  const r = OS.route || { view: 'global' };
+  return `<div class="bgfx"></div>
+    <header class="osx-top">
+      <div class="logo" data-osnav="/" style="cursor:pointer">FR</div>
+      <div class="brandt"><b>Flipping Rentals OS</b><span>RENTAL PROFITSS · HOLDING</span></div>
+      <div class="osx-live"><span class="pulse"></span>En vivo</div>
+      <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/jarvis" title="Mapa de Agentes · Command Center (avanzado)">' + osIcon('bot') + ' Agentes</button><button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + '</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
+    </header>
+    <div class="osx-body">
+      <nav class="osx-side">${osSidebar(r, OS._comp)}</nav>
+      <main class="osx-main">${inner}</main>
+    </div>`;
+}
+// Navegación en LENGUAJE DE NEGOCIO (adiós "escuadras/dry-run/mapa de agentes" como cara).
+// La red de agentes sigue trabajando por debajo → accesible en topbar "Agentes" (admin) y Reportes.
+function osSidebar(r, comp) {
+  const dot = comp ? {
+    rentas: comp.rentas.occPct >= 60 ? 'g' : 'y',
+    remodel: comp.remoVigilar > 0 ? 'y' : 'g',
+    cobros: comp.cartera && comp.cartera.vencido > 0 ? 'r' : 'g',
+    decisiones: (OS.agProps && OS.agProps.length) ? 'y' : '',
+  } : {};
+  const items = [
+    { g: '' , list: [ { label: 'Inicio', icon: 'layout', nav: '/', on: r.view === 'global' } ] },
+    { g: 'Tu negocio', list: [
+      { label: 'Casas', icon: 'house', nav: '/casas', area: ['rentas', 'remodelacion', 'fix-flip'], on: r.view === 'casas' || r.view === 'casa' },
+      { label: 'Rentas', icon: 'building', nav: '/rentas', area: ['rentas'], on: r.empresa === 'rentas' || r.view === 'informes', dot: dot.rentas },
+      { label: 'Remodelación', icon: 'hammer', nav: '/remodelacion', area: ['remodelacion'], on: r.empresa === 'remodelacion', dot: dot.remodel },
+      { label: 'Fix & Flip', icon: 'construction', nav: '/fix-and-flip', area: ['fix-flip'], on: r.empresa === 'fix-and-flip' },
+      { label: 'Cobros y pagos', icon: 'banknote', nav: '/cobros', area: ['rentas', 'operacion'], on: r.view === 'cobros' || r.view === 'cartera', dot: dot.cobros },
+      { label: 'Inversionistas', icon: 'users', nav: '/inversionistas', area: ['fix-flip'], on: r.view === 'invadmin' },
+    ] },
+    { g: 'Inteligencia', list: [
+      { label: 'Cerebro (Asistente)', icon: 'brain', click: 'osAbrirCerebro()' },
+      { label: 'Decisiones por aprobar', icon: 'clipboard-check', nav: '/decisiones', on: r.view === 'decisiones', dot: dot.decisiones },
+      { label: 'Reportes', icon: 'chart', nav: '/holding', area: ['contable', 'operacion', 'fix-flip', 'rentas', 'remodelacion'], on: r.view === 'dash' || r.view === 'contable' || r.view === 'operacion' || r.view === 'mapa' },
+    ] },
+  ];
+  let html = '';
+  items.forEach(sec => {
+    const rows = sec.list.filter(o => !o.area || o.area.some(osCanArea));
+    if (!rows.length) return;
+    if (sec.g) html += `<div class="osx-grp">${sec.g}</div>`;
+    rows.forEach(o => {
+      const act = o.click ? `onclick="${o.click}"` : `data-osnav="${o.nav}"`;
+      html += `<a class="osx-nav${o.on ? ' on' : ''}" ${act}>${osIcon(o.icon, { size: 17 })}<span>${o.label}</span>${o.dot ? `<span class="nd cdot ${o.dot}"></span>` : ''}</a>`;
+    });
+  });
+  return html;
+}
+function osSaludo() {
+  const h = new Date().getHours();
+  const s = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const n = OS.userName ? (' ' + String(OS.userName).trim().split(/\s+/)[0]) : '';
+  return s + (n ? ',' + n : '');
+}
+function osHoyLabel() {
+  const d = new Date(); const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${d.getDate()} ${M[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
 window.osOpenAdmin = osOpenAdmin;
 
 // ─── NIVEL 1 · GLOBAL (macro del holding) ───
 function osGlobal(comp) {
+  const isAdm = osRole() === 'admin';
+  const cA = osCanArea;
+  const ym = comp.mb.from.slice(0, 7);
+  // ── KPIs (solo los de tus áreas) ──
+  const cajaCls = comp.caja.neto >= 0 ? 'up' : 'down';
+  const cajaSign = comp.caja.neto >= 0 ? '+' : '';
+  const defTot = comp.ff.list.filter(d => d.deficit != null && d.deficit > 0).reduce((s, d) => s + d.deficit, 0);
+  const defCasas = comp.ff.list.filter(d => d.deficit != null && d.deficit > 0).length;
+  const kpis = [
+    cA('rentas') ? `<div class="card kpi"><div class="lab">Caja del mes · ${comp.mb.label}</div><div class="kbig ${cajaCls}">${cajaSign}${OS_M(comp.caja.neto)}</div><div class="kn">entró ${OS_M(comp.caja.entro)} · salió ${OS_M(comp.caja.salio)}</div>${osMonthBadge(ym)}</div>` : '',
+    cA('fix-flip') ? `<div class="card kpi"><div class="lab">Caja atrapada</div><div class="kbig">${OS_M(defTot)}</div><div class="kn">${defCasas} casas · se recupera al refinanciar/vender</div></div>` : '',
+    cA('rentas') ? `<div class="card kpi"><div class="lab">Ocupación</div><div class="kbig">${comp.rentas.ocupadas}<span class="u">/${comp.rentas.unidades}</span></div><div class="kn">${comp.rentas.occPct}% de tus unidades rentadas</div></div>` : '',
+    (cA('rentas') || cA('operacion')) ? `<div class="card kpi"><div class="lab">Te deben (vencido)</div><div class="kbig warn">${OS_M(comp.cartera.vencido)}</div><div class="kn">${comp.cartera.morosos} inquilino${comp.cartera.morosos === 1 ? '' : 's'} atrasado${comp.cartera.morosos === 1 ? '' : 's'}</div></div>` : '',
+  ].filter(Boolean).join('');
+  // ── Directiva del día (derivada de reglas + tus números reales; el Cerebro no ejecuta) ──
+  let dirTx;
+  if (comp.cartera.vencido > 0) dirTx = `Cobrá los ${comp.cartera.morosos} atrasos (${OS_M(comp.cartera.vencido)} vencido) antes de mover cualquier gasto de obra.`;
+  else if (comp.caja.neto < 0) dirTx = `La caja del mes está en rojo (${OS_M(comp.caja.neto)}): frená gastos no críticos y acelerá la cobranza.`;
+  else dirTx = `Sin urgencias de caja hoy — sostené el volumen de renta y avanzá las obras en curso.`;
+  const directiva = `<div class="card directiva"><div class="cardh">${osIcon('brain', { size: 17 })} Directiva del día <span class="tg">Cerebro · reglas · ${osHoyLabel().split(',')[1] || ''}</span></div>
+      <div class="big2">"${dirTx}"</div>
+      <div class="by"><span class="chipx">prioridad de hoy</span> revisa tus ${['rentas', 'remodelacion', 'fix-flip', 'operacion', 'contable'].filter(cA).length} líneas · números reales de tu base</div></div>`;
+  // ── Decisiones que necesitan tu sí (items reales; nunca ejecuta solo) ──
+  const dec = [];
+  if ((cA('rentas') || cA('operacion')) && comp.cartera.morosos > 0) dec.push({ d: comp.cartera.mora30 > 0 ? 'r' : 'y', t: `<b>${comp.cartera.morosos} inquilinos</b> atrasados · ${OS_M(comp.cartera.vencido)} vencido${comp.cartera.mora30 ? ` <small>· ${comp.cartera.mora30} con +30 días</small>` : ''}`, cta: 'Cobrar →', nav: '/cartera' });
+  if (isAdm && OS.agProps && OS.agProps.length) dec.push({ d: 'y', t: `<b>${OS.agProps.length} propuestas</b> de tus agentes esperando tu OK <small>· cobros, informes, conciliaciones</small>`, cta: 'Revisar →', nav: '/decisiones' });
+  if (cA('fix-flip') && defCasas > 0) dec.push({ d: 'y', t: `<b>${defCasas} casas</b> con caja atrapada · ${OS_M(defTot)} a recuperar al refinanciar/vender`, cta: 'Ver →', nav: '/fix-and-flip' });
+  if (cA('remodelacion') && comp.remoVigilar > 0) dec.push({ d: 'y', t: `<b>${comp.remoVigilar} obras</b> atrasadas más de 10 días`, cta: 'Ver →', nav: '/remodelacion' });
+  const decHtml = `<div class="card"><div class="cardh">Decisiones que necesitan tu sí <span class="tg">${dec.length} pendiente${dec.length === 1 ? '' : 's'}</span></div>
+      ${dec.length ? dec.map(x => `<div class="drow"><span class="cdot ${x.d}"></span><span class="dt">${x.t}</span><span class="dcta" data-osnav="${x.nav}">${x.cta}</span></div>`).join('') : '<div class="drow"><span class="cdot g"></span><span class="dt">Nada urgente que aprobar ahora mismo.</span></div>'}</div>`;
+  // ── Tu caja este mes (entró vs salió, real) ──
+  const maxCaja = Math.max(comp.caja.entro, comp.caja.salio, 1);
+  const cajaCard = cA('rentas') ? `<div class="card"><div class="cardh">Tu caja este mes</div>
+      <div class="bars2">
+        <div class="bar2"><span>Entró</span><span class="trk"><span class="fil" style="width:${Math.round(comp.caja.entro / maxCaja * 100)}%;background:var(--pos)"></span></span><span class="bn up">${OS_K(comp.caja.entro)}</span></div>
+        <div class="bar2"><span>Salió</span><span class="trk"><span class="fil" style="width:${Math.round(comp.caja.salio / maxCaja * 100)}%;background:var(--neg)"></span></span><span class="bn down">${OS_K(comp.caja.salio)}</span></div>
+      </div><div class="kn" style="margin-top:12px">Neto del mes: <b class="${cajaCls}">${cajaSign}${OS_M(comp.caja.neto)}</b> · renta por mes contable − gastos operativos</div></div>` : '';
+  // ── Preguntar al Cerebro ──
+  const ask = `<div class="card" style="border-color:color-mix(in srgb,var(--accent) 30%,var(--glassb))">
+      <button class="askbig" onclick="osAbrirCerebro()"><span class="aic">${osIcon('brain', { size: 18 })}</span> Preguntarle al Cerebro</button>
+      <p class="hint2">"¿Qué casa me drena más caja?" · "¿Cómo va la obra de Charles?" · "¿Cuánto le toca a cada inversionista?" — responde simple, con tus números reales, y propone (nunca paga ni cambia solo).</p></div>`;
+  // ── Salud por línea de negocio ──
+  const salud = [];
+  if (cA('rentas')) salud.push(`<div class="drow"><span class="dt">${osIcon('building', { size: 14 })} Rentas <small>· ${comp.rentas.casas} casas · ${comp.rentas.ocupadas} uds rentadas</small></span><span class="pill2 ${comp.rentas.occPct >= 60 ? 'g' : 'y'}">${comp.rentas.occPct >= 60 ? 'Sano' : 'Vigilar'}</span></div>`);
+  if (cA('remodelacion')) salud.push(`<div class="drow"><span class="dt">${osIcon('hammer', { size: 14 })} Remodelación <small>· ${comp.remodel.activas} obras activas</small></span><span class="pill2 ${comp.remoVigilar > 0 ? 'y' : 'g'}">${comp.remoVigilar > 0 ? 'Vigilar ' + comp.remoVigilar : 'Al día'}</span></div>`);
+  if (cA('fix-flip')) salud.push(`<div class="drow"><span class="dt">${osIcon('construction', { size: 14 })} Fix &amp; Flip <small>· ${comp.ff.activos} deals activos</small></span><span class="pill2 g">Al día</span></div>`);
+  if (cA('rentas') || cA('operacion')) salud.push(`<div class="drow"><span class="dt">${osIcon('banknote', { size: 14 })} Cobros <small>· cartera vencida</small></span><span class="pill2 ${comp.cartera.vencido > 0 ? 'r' : 'g'}">${comp.cartera.vencido > 0 ? OS_M(comp.cartera.vencido) : 'Al día'}</span></div>`);
+  const saludCard = salud.length ? `<div class="card"><div class="cardh">Salud por línea de negocio</div>${salud.join('')}</div>` : '';
+  // ── Casas que vigilar (drenan caja) ──
+  const vigilar = comp.ff.list.filter(d => d.deficit != null && d.deficit > 0).sort((a, b) => b.deficit - a.deficit).slice(0, 4);
+  const vigilarCard = (cA('fix-flip') && vigilar.length) ? `<div class="card"><div class="cardh">Casas que vigilar <span class="tg">drenan caja</span></div>
+      ${vigilar.map(d => `<div class="drow" style="cursor:pointer" onclick="osOpenFicha('${osSlug(d.address)}')"><span class="cdot ${d.deficit > 40000 ? 'r' : 'y'}"></span><span class="dt">${OS_E(ffShortAddr(d.address))} <small>· caja atrapada</small></span><span class="dn">${OS_M(d.deficit)}</span></div>`).join('')}</div>` : '';
+  return `<p class="eyebrow">Centro de mando · ${osHoyLabel()}</p>
+    <h1>${osSaludo()}</h1>
+    <p class="sub">Todo tu negocio en una pantalla — en simple, con números reales de tu base (Airtable + QuickBooks, solo lectura).</p>
+    <div class="grid k4">${kpis}</div>
+    <div class="grid2c" style="margin-top:16px">
+      <div>${directiva}${decHtml}${cajaCard}</div>
+      <div>${ask}${saludCard}${vigilarCard}</div>
+    </div>`;
+}
+// (legacy) tarjetas del panel Global anterior — conservadas por si se referencian; ya no es la cara.
+function osGlobalLegacy(comp) {
   const insights = osInsights(comp); const h = comp.holding;
   const isAdm = osRole() === 'admin';
   const unitCard = (slug, e, extra) => osCanArea(e.key) ? `<div class="card unit" data-osnav="/${slug}"><div class="ico">${osIco(e.icon, { size: 26 })}</div><div class="un">${e.name}</div><div class="ut">${e.tag}</div>${extra}<div class="go">Abrir ${e.name} →</div></div>` : '';
@@ -618,6 +804,67 @@ function osGlobal(comp) {
       <div class="grid k2" style="margin-top:16px">${areaCards}</div></div>
       ${brain}
     </div>`;
+}
+
+// ─── CASAS · portafolio unificado (Rentas + Fix&Flip + Remodelación) ───
+// Cada casa clickea a su Ficha 360°. Sin dedup frágil: 3 secciones por línea de negocio, dato real de cada fuente.
+function osCasasView(comp) {
+  const cA = osCanArea;
+  const secs = [];
+  // Rentas
+  if (cA('rentas')) {
+    const rows = OS.props.map(p => {
+      const us = OS.units.filter(u => u.property_id === p.id);
+      const indep = us.filter(u => OS_INDEP.includes(u.unit_type)); const rooms = us.filter(u => u.unit_type === 'habitacion');
+      const tot = indep.length + (rooms.length ? 1 : 0);
+      const occ = indep.filter(u => osUnitState(u) === 'ocupada').length + (rooms.length && rooms.some(u => osUnitState(u) === 'ocupada') ? 1 : 0);
+      const pct = tot ? Math.round(occ / tot * 100) : 0;
+      return { name: p.name, occ, tot, pct };
+    }).sort((a, b) => a.pct - b.pct);
+    secs.push(`<div class="card"><div class="cardh">${osIcon('building', { size: 16 })} Rentas <span class="tg">${rows.length} casas</span></div>
+      ${rows.map(r => `<div class="drow" style="cursor:pointer" onclick="osOpenFicha('${osSlug(r.name)}')"><span class="cdot ${r.pct >= 60 ? 'g' : r.pct > 0 ? 'y' : 'r'}"></span><span class="dt">${OS_E(ffShortAddr(r.name))} <small>· ${r.occ}/${r.tot} unidades</small></span><span class="dn">${r.pct}%</span></div>`).join('') || '<div class="drow"><span class="dt">Sin casas de rentas cargadas.</span></div>'}</div>`);
+  }
+  // Fix & Flip / Holding
+  if (cA('fix-flip')) {
+    const rows = comp.ff.list.filter(d => d.stage !== 'vendida').sort((a, b) => (b.deficit || 0) - (a.deficit || 0));
+    secs.push(`<div class="card"><div class="cardh">${osIcon('construction', { size: 16 })} Fix &amp; Flip / Holding <span class="tg">${rows.length} deals</span></div>
+      ${rows.map(d => `<div class="drow" style="cursor:pointer" onclick="osOpenFicha('${osSlug(d.address)}')"><span class="cdot ${d.deficit > 40000 ? 'r' : d.deficit > 0 ? 'y' : 'g'}"></span><span class="dt">${OS_E(ffShortAddr(d.address))} <small>· ${OS_E(d.stage || 'en proceso')}</small></span><span class="dn">${d.deficit != null ? OS_M(d.deficit) + ' atrapada' : 'en proceso'}</span></div>`).join('') || '<div class="drow"><span class="dt">Sin deals activos.</span></div>'}</div>`);
+  }
+  // Remodelación (obras en curso)
+  if (cA('remodelacion')) {
+    const rows = OS.remodel.filter(o => o.proceso !== 'Finalizado').sort((a, b) => Number(b.retraso_dias || 0) - Number(a.retraso_dias || 0));
+    secs.push(`<div class="card"><div class="cardh">${osIcon('hammer', { size: 16 })} Remodelación en curso <span class="tg">${rows.length} obras</span></div>
+      ${rows.map(o => { const addr = [o.address, o.city].filter(Boolean).join(', '); const ret = Number(o.retraso_dias || 0); return `<div class="drow" style="cursor:pointer" onclick="osOpenFicha('${osSlug(addr)}')"><span class="cdot ${ret > 10 ? 'r' : ret > 0 ? 'y' : 'g'}"></span><span class="dt">${OS_E(ffShortAddr(addr))} <small>· ${OS_E(o.proceso || '')}${ret > 0 ? ' · +' + ret + 'd' : ''}</small></span><span class="dn">${o.avance_pct != null ? Math.round(o.avance_pct) + '%' : '—'}</span></div>`; }).join('') || '<div class="drow"><span class="dt">Sin obras en curso.</span></div>'}</div>`);
+  }
+  return `<p class="eyebrow">Portafolio</p><h1>Tus <span>casas</span></h1>
+    <p class="sub">Todas tus propiedades por línea de negocio. Clic en cualquiera para abrir su ficha 360°.</p>
+    <div class="grid2c">${secs.join('') || '<div class="empty">No tenés casas en tus áreas.</div>'}</div>`;
+}
+// ─── DECISIONES POR APROBAR · cola unificada (lo tuyo + propuestas de los agentes) ───
+function osDecisionesView(comp) {
+  const cA = osCanArea; const isAdm = osRole() === 'admin';
+  const defTot = comp.ff.list.filter(d => d.deficit != null && d.deficit > 0).reduce((s, d) => s + d.deficit, 0);
+  const defCasas = comp.ff.list.filter(d => d.deficit != null && d.deficit > 0).length;
+  const dec = [];
+  if ((cA('rentas') || cA('operacion')) && comp.cartera.morosos > 0) dec.push({ d: comp.cartera.mora30 > 0 ? 'r' : 'y', t: `<b>${comp.cartera.morosos} inquilinos</b> atrasados · ${OS_M(comp.cartera.vencido)} vencido${comp.cartera.mora30 ? ` <small>· ${comp.cartera.mora30} con +30 días</small>` : ''}`, cta: 'Cobrar →', nav: '/cartera' });
+  if (cA('fix-flip') && defCasas > 0) dec.push({ d: 'y', t: `<b>${defCasas} casas</b> con caja atrapada · ${OS_M(defTot)} a recuperar al refinanciar/vender`, cta: 'Ver →', nav: '/fix-and-flip' });
+  if (cA('remodelacion') && comp.remoVigilar > 0) dec.push({ d: 'y', t: `<b>${comp.remoVigilar} obras</b> atrasadas más de 10 días`, cta: 'Ver →', nav: '/remodelacion' });
+  const ceoCard = `<div class="card"><div class="cardh">Tus decisiones <span class="tg">${dec.length} pendiente${dec.length === 1 ? '' : 's'}</span></div>
+    ${dec.length ? dec.map(x => `<div class="drow"><span class="cdot ${x.d}"></span><span class="dt">${x.t}</span><span class="dcta" data-osnav="${x.nav}">${x.cta}</span></div>`).join('') : '<div class="drow"><span class="cdot g"></span><span class="dt">Nada urgente que aprobar ahora mismo.</span></div>'}</div>`;
+  // Propuestas de agentes (la red trabajando por debajo) — agrupadas por tipo, read-only.
+  const TIPO_ES = { recordatorio_cobro: 'Recordatorios de cobro', nudge: 'Recordatorios a responsables', informe: 'Informes automáticos', conciliacion: 'Conciliaciones contables', archivar_tarea: 'Archivar tareas viejas', refechar_tarea: 'Reprogramar tareas', nomina: 'Nómina', cuello_botella: 'Cuellos de botella', plan_ocupacion: 'Planes de ocupación', precio_dinamico: 'Precio dinámico' };
+  let agCard = '';
+  if (isAdm && OS.agProps && OS.agProps.length) {
+    const g = {}; OS.agProps.forEach(p => { const k = p.tipo_accion || 'otro'; g[k] = (g[k] || 0) + 1; });
+    const rows = Object.entries(g).sort((a, b) => b[1] - a[1]);
+    agCard = `<div class="card"><div class="cardh">Propuestas de tus agentes <span class="tg">${OS.agProps.length} en cola</span></div>
+      <p class="hint2" style="margin:0 0 8px">La red de agentes trabaja por debajo y deja todo listo para tu OK. Nada se ejecuta ni se paga solo.</p>
+      ${rows.map(([k, n]) => `<div class="drow"><span class="cdot y"></span><span class="dt">${OS_E(TIPO_ES[k] || k)}</span><span class="dn">${n}</span></div>`).join('')}
+      <div class="drow"><span class="dt"></span><span class="dcta" data-osnav="/jarvis">Abrir cola completa (Agentes) →</span></div></div>`;
+  }
+  return `<p class="eyebrow">Cola de trabajo</p><h1>Decisiones <span>por aprobar</span></h1>
+    <p class="sub">Lo que necesita tu sí, y lo que tus agentes dejaron propuesto. Vos aprobás — el sistema nunca paga ni cambia solo.</p>
+    <div class="grid2c"><div>${ceoCard}</div><div>${agCard}</div></div>`;
 }
 
 // ─── NIVEL 2 · EMPRESA ───
