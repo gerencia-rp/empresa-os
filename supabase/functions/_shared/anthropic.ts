@@ -41,6 +41,18 @@ export interface AnthropicCallResult {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// ── Ruteo de modelo por ROL (ahorro declarado, no global) ──
+// Los que DECIDEN → Opus (calidad); los que barren VOLUMEN → Haiku (barato, ventana grande).
+// Espeja agent_registry.modelo (migr 20260823130000). Fuente de verdad = la columna en DB;
+// esto es el fallback en código cuando no se pasa el modelo del registry.
+export const MODEL_OPUS = "claude-opus-4-8";
+export const MODEL_HAIKU = "claude-haiku-4-5-20251001";
+const DECIDE_CAPAS = new Set(["comando", "gerente", "financiero", "finance", "signal", "meta", "integrity"]);
+export function modelForRole(capa?: string): string {
+  const k = (capa || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  return DECIDE_CAPAS.has(k) ? MODEL_OPUS : MODEL_HAIKU;
+}
+
 /**
  * Llama Anthropic con retry + timeout + logging.
  * Backoff: 1s, 3s, 9s.

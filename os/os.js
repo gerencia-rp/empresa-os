@@ -421,6 +421,10 @@ async function osLoad() {
     // definición que /cartera: vencido_neto por inquilino, netea adelantos). Nombre del CEO para el saludo.
     OS.expenses = await sb.from('pm_expenses').select('amount,billing_ym,category,scope,created_at').eq('active', true).then(r => r.data || []).catch(() => []);
     OS.cartera = await sb.rpc('cartera_informe', { p_mes: new Date().toISOString().slice(0, 7), p_desde: null }).then(r => r.data || []).catch(() => []);
+    // 🧠 Directiva del día que ARMÓ la reunión matutina del Cerebro (cron 07:35, edge cerebro-reunion):
+    // la foto del holding consolidada de las 3 áreas + números transversales. La usa el Inicio (prefiere
+    // esto sobre las reglas client-side). Solo lectura; si no hay foto de hoy, cae a las reglas.
+    OS.directiva = await sb.from('pm_informes').select('corte,payload').eq('tipo', 'foto_ejecutiva_holding').is('archived_at', null).order('corte', { ascending: false }).limit(1).maybeSingle().then(r => r.data).catch(() => null);
     OS.userName = null;
     try { if (typeof state !== 'undefined' && state && state.user && state.user.id) { const { data: prof } = await sb.from('profiles').select('full_name').eq('id', state.user.id).maybeSingle(); OS.userName = (prof && prof.full_name) ? prof.full_name : null; } } catch (e) {}
     OS.pnl = pnl || [];
@@ -721,14 +725,25 @@ function osGlobal(comp) {
     cA('rentas') ? `<div class="card kpi"><div class="lab">Ocupación</div><div class="kbig">${comp.rentas.ocupadas}<span class="u">/${comp.rentas.unidades}</span></div><div class="kn">${comp.rentas.occPct}% de tus unidades rentadas</div></div>` : '',
     (cA('rentas') || cA('operacion')) ? `<div class="card kpi"><div class="lab">Te deben (vencido)</div><div class="kbig warn">${OS_M(comp.cartera.vencido)}</div><div class="kn">${comp.cartera.morosos} inquilino${comp.cartera.morosos === 1 ? '' : 's'} atrasado${comp.cartera.morosos === 1 ? '' : 's'}</div></div>` : '',
   ].filter(Boolean).join('');
-  // ── Directiva del día (derivada de reglas + tus números reales; el Cerebro no ejecuta) ──
-  let dirTx;
-  if (comp.cartera.vencido > 0) dirTx = `Cobrá los ${comp.cartera.morosos} atrasos (${OS_M(comp.cartera.vencido)} vencido) antes de mover cualquier gasto de obra.`;
-  else if (comp.caja.neto < 0) dirTx = `La caja del mes está en rojo (${OS_M(comp.caja.neto)}): frená gastos no críticos y acelerá la cobranza.`;
-  else dirTx = `Sin urgencias de caja hoy — sostené el volumen de renta y avanzá las obras en curso.`;
-  const directiva = `<div class="card directiva"><div class="cardh">${osIcon('brain', { size: 17 })} Directiva del día <span class="tg">Cerebro · reglas · ${osHoyLabel().split(',')[1] || ''}</span></div>
-      <div class="big2">"${dirTx}"</div>
-      <div class="by"><span class="chipx">prioridad de hoy</span> revisa tus ${['rentas', 'remodelacion', 'fix-flip', 'operacion', 'contable'].filter(cA).length} líneas · números reales de tu base</div></div>`;
+  // ── Directiva del día ──
+  // Fuente 1 (preferida): la REUNIÓN matutina del Cerebro (cron 07:35 → pm_informes foto_ejecutiva_holding)
+  //   ya consolidó las 3 áreas + números y dejó UNA directiva con su "por qué" y un acta en memoria.
+  // Fuente 2 (fallback): reglas client-side con tus números, si todavía no corrió la reunión de hoy.
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const dp = (OS.directiva && OS.directiva.corte === hoyISO) ? OS.directiva.payload : null;
+  let dirTx, dirBy;
+  if (dp && dp.directiva) {
+    dirTx = dp.directiva;
+    dirBy = `<span class="chipx">reunión 07:35</span> ${OS_E(dp.porque || 'prioridad del día')} · consolidó Fix &amp; Flip, Rentas y Remodelación`;
+  } else {
+    if (comp.cartera.vencido > 0) dirTx = `Cobrá los ${comp.cartera.morosos} atrasos (${OS_M(comp.cartera.vencido)} vencido) antes de mover cualquier gasto de obra.`;
+    else if (comp.caja.neto < 0) dirTx = `La caja del mes está en rojo (${OS_M(comp.caja.neto)}): frená gastos no críticos y acelerá la cobranza.`;
+    else dirTx = `Sin urgencias de caja hoy — sostené el volumen de renta y avanzá las obras en curso.`;
+    dirBy = `<span class="chipx">prioridad de hoy</span> revisa tus ${['rentas', 'remodelacion', 'fix-flip', 'operacion', 'contable'].filter(cA).length} líneas · números reales de tu base`;
+  }
+  const directiva = `<div class="card directiva"><div class="cardh">${osIcon('brain', { size: 17 })} Directiva del día <span class="tg">Cerebro · ${dp ? 'reunión matutina' : 'reglas'} · ${osHoyLabel().split(',')[1] || ''}</span></div>
+      <div class="big2">"${OS_E(dirTx)}"</div>
+      <div class="by">${dirBy}</div></div>`;
   // ── Decisiones que necesitan tu sí (items reales; nunca ejecuta solo) ──
   const dec = [];
   if ((cA('rentas') || cA('operacion')) && comp.cartera.morosos > 0) dec.push({ d: comp.cartera.mora30 > 0 ? 'r' : 'y', t: `<b>${comp.cartera.morosos} inquilinos</b> atrasados · ${OS_M(comp.cartera.vencido)} vencido${comp.cartera.mora30 ? ` <small>· ${comp.cartera.mora30} con +30 días</small>` : ''}`, cta: 'Cobrar →', nav: '/cartera' });

@@ -18,6 +18,31 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
+## 🧠 CAPA DE INTELIGENCIA PROACTIVA (23-ago-2026) — reunión, memoria, ruteo, crons · EN VIVO
+
+- 🧠 **REUNIÓN DIARIA DEL CEREBRO** — edge fn **`cerebro-reunion`** (rol mínimo `agentes_ia_exec`, kill switch
+  `agent_registry.'Cerebro Matutino'`, test de aislamiento, audit log; patrón idéntico a los gerentes de área).
+  - `mode=reunion` (cron `cerebro-reunion-matutina` `35 12 * * *` UTC = 07:35 Austin, tras los 3 gerentes 07:30):
+    consolida `foto_ejecutiva_ff/_rentas/_remodelacion` + números transversales → **UNA Directiva del día** +
+    cola de decisiones (cada una con fuente) → escribe `pm_informes` tipo **`foto_ejecutiva_holding`** (dedup por
+    día) + **ACTA** en `pm_brain_memory` (tipo='decisión', fuente='cerebro-reunion'). El **Inicio (`os/os.js`
+    `osGlobal`) prefiere esta directiva** (`OS.directiva`, badge "reunión matutina" + "por qué") con fallback a
+    reglas client-side. Verificado en vivo (200, números exactos, `acta_creada:true`).
+  - `mode=compactar` (cron `cerebro-memoria-compactar` `0 8 * * *` = 03:00 Austin): dedup por (tipo, texto norm) +
+    embedding coseno ≥0.94 → **freshness-wins** (más nueva gana; vieja `activo=false`+`superseded_by`, REVERSIBLE,
+    nunca DELETE; suma `hits`). `pm_brain_memory` += `superseded_by`/`hits`. Verificado (dedup + reversibilidad).
+  - ⚠ Gotchas cazados: (1) con RLS ON, el grant NO alcanza — el rol exec necesita **policies RLS** propias
+    (`exec_ins/exec_sel/exec_upd` en `pm_brain_memory`, espejo de `pm_informes`). (2) `pm_brain_memory.tipo`
+    tiene CHECK `('hecho','decisión','aprendizaje','nota')` — usar **'decisión' CON tilde**.
+- 🧭 **RUTEO DE MODELO POR ROL** — `agent_registry.modelo`: DECIDEN (Comando/Gerente/Financiero/Finance/Signal/
+  Meta/Integrity)=**`claude-opus-4-8`** (22) · VOLUMEN (Reportes/Optimización/Ejecución/Ops)=**`claude-haiku-4-5-20251001`**
+  (18). Helper `modelForRole(capa)` en `supabase/functions/_shared/anthropic.ts`. Declarado por rol, no global.
+- 🔒 **AUDITORÍA DE SEGURIDAD SEMANAL** — `security_audit_run()` (SQL, cron `security-audit-weekly` lun 08:15 UTC):
+  cuenta vistas `public` sin `security_invoker` + tablas sin RLS → `notification_log`. Verificada (5 vistas
+  `market_*` sin invoker = data pública, 0 tablas sin RLS).
+- Migrs `20260823130000..133000`. Edge deploy: `npx supabase functions deploy cerebro-reunion` (o MCP;
+  `verify_jwt=false`, hace su propia auth bearer=SERVICE_KEY / requireAuth admin — patrón ff-gerente).
+
 ## 🚨 REGLA DURA — DÓNDE MIRAR PROD (06-ago, tras perder una sesión entera por esto) · HISTÓRICO (pre-consolidación 23-ago)
 
 - **Hay DOS proyectos Vercel con el MISMO repo y builds distintos.** `empresa-os.vercel.app` = producción de **`main`** · **`empresa-os-admin.vercel.app`** = donde van los `vercel --prod` de las ramas (es el de `.vercel/project.json`).

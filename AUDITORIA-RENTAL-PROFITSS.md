@@ -659,5 +659,70 @@ y `/decisiones` OK, toggle claro/oscuro). Capturas en `/tmp/inicio*.png`. Build 
 (`node scripts/build.mjs`). **Los VALORES reales se validaron aparte por SQL directo** (arriba).
 ⚠ La confirmación FINAL en pantalla (logueado, en `empresa-os.vercel.app`) es del CEO.
 
-=== AUDITORIA COMPLETA ===
 === MERGE COMPLETO ===
+
+---
+
+## 🧠 PASADA (23 Ago 2026) — HACERLO FUNCIONAL: inteligencia proactiva por debajo (B7/B8) · HECHO
+
+**Pedido del CEO:** "que el tablero no sea solo bonito — que FUNCIONE de verdad": datos reales en cada
+pantalla + prender la inteligencia (reunión diaria del Cerebro, memoria que aprende, ruteo de modelo por
+rol, crons que faltan). Guardrails intactos: SOLO LECTURA; pagos/ejecución siempre tras confirmación humana.
+
+### 1) Datos reales (confirmado, ya estaba de pasadas previas)
+- Inicio: KPIs vivos (caja del mes `pm_expenses` por mes contable · caja atrapada Σ`ff_deals.deficit_total` ·
+  ocupación `v_ocupacion` · cartera vencida RPC `cartera_informe`). Casas: ficha 360°. Rentas/Cobros:
+  `v_ocupacion`+`v_cartera_kpi`+`cartera_informe`. Remodelación: `v_remodel_avance_vivo`. Inversionistas:
+  `inv_holdings`/`inv_distributions`. Todo fuente única, sin recalcular.
+
+### 2) 🧠 REUNIÓN DIARIA DEL CEREBRO (nuevo, verificado en vivo)
+- **Edge fn `cerebro-reunion` (mode=reunion)** — corre 07:35 Austin (cron `cerebro-reunion-matutina`
+  `35 12 * * *` UTC), después de los 3 gerentes de área (07:30). Consolida las 3 fotos ejecutivas de área
+  (`foto_ejecutiva_ff/_rentas/_remodelacion`) + los números transversales en **UNA Directiva del día** (una
+  prioridad + su "por qué", por reglas + tus números) + la **cola de decisiones que necesitan tu sí** (cada
+  una con su fuente). Deja la foto en `pm_informes` (`foto_ejecutiva_holding`, dedup por día) y un **ACTA en
+  memoria** (`pm_brain_memory` tipo='decisión', fuente='cerebro-reunion'). Rol de mínimo privilegio
+  `agentes_ia_exec` + kill switch + test de aislamiento (PII denied) + audit log, igual que los gerentes.
+- **VERIFICADO EN VIVO** (invocado por `cron_invoke_function`, respuesta pg_net 200): Directiva de hoy =
+  *"Cobra los 15 atrasos ($18,636 vencido) antes de mover cualquier gasto de obra"* · números exactos
+  (caja atrapada **$302.104,60** / 13 casas · vencido **$18.636,01** / 15 morosos · ocupación **70,59%** ·
+  168 propuestas en cola) · `acta_creada: true`. Dos bugs reales cazados y arreglados en el proceso
+  (RLS de `pm_brain_memory` sin policy para el rol exec → policies `exec_*`; `tipo` sin tilde violaba el
+  CHECK → `'decisión'`). El **Inicio prefiere esta directiva** (badge "reunión matutina" + su "por qué")
+  con fallback a reglas si aún no corrió — render real 11/11 · 0 pageerrors (`scripts/qa-inicio-render.mjs`).
+
+### 3) 🌙 MEMORIA QUE APRENDE (nuevo, verificado)
+- **`cerebro-reunion` (mode=compactar)** — cron `cerebro-memoria-compactar` `0 8 * * *` UTC (03:00 Austin).
+  Dedup por (tipo, texto normalizado) + casi-duplicados/contradicciones por embedding coseno ≥0.94:
+  **freshness-wins** (gana la más nueva; la vieja `activo=false` + `superseded_by`, REVERSIBLE, nunca DELETE;
+  suma `hits`). `pm_brain_memory` += `superseded_by`/`hits` (migr `20260823130000`).
+- **VERIFICADO EN VIVO**: sembré un duplicado → `dedup_exacto:1`, `memorias_activas` 16→15, aislamiento
+  PASS-denied; restauré la memoria real (demostrando reversibilidad) y limpié el probe.
+
+### 4) 🧭 RUTEO DE MODELO POR ROL (nuevo)
+- `agent_registry.modelo` sembrado por capa (migr `20260823130000`): los que **DECIDEN** (Comando/Gerente/
+  Financiero/Finance/Signal/Meta/Integrity) = **`claude-opus-4-8`** (22 agentes) · los que **barren VOLUMEN**
+  (Reportes/Optimización/Ejecución/Ops) = **`claude-haiku-4-5-20251001`** (18 agentes). Helper `modelForRole()`
+  en `_shared/anthropic.ts`. El Cerebro conversacional (decisor) ya usa Opus (`CEREBRO_MODEL`). Declarado por
+  rol, no global.
+
+### 5) ⏰ CRONS QUE FALTABAN (nuevo, activos)
+- `cerebro-reunion-matutina` (07:35 Austin) · `cerebro-memoria-compactar` (03:00 Austin) ·
+  `security-audit-weekly` (lun 03:15 Austin). Migr `20260823133000`.
+- 🔒 **Auditoría de seguridad semanal** `security_audit_run()` (migr `20260823131000`): cuenta vistas
+  `public` sin `security_invoker` + tablas sin RLS → `notification_log`. **VERIFICADA corriendo ahora**:
+  encontró 5 vistas `market_*` sin security_invoker (data pública de referencia, bajo riesgo) · 0 tablas
+  sin RLS. Hallazgo real, no inventado.
+
+### Archivos
+- Nuevo: `supabase/functions/cerebro-reunion/index.ts`. Migrs `20260823130000..133000`.
+- `_shared/anthropic.ts` (+`modelForRole`), `os/os.js` (Inicio lee `foto_ejecutiva_holding`),
+  `scripts/qa-inicio-render.mjs` (+check de la rama reunión). Build bundle `cfaa634eea53`.
+
+### ⚠ Honestidad de verificación
+- El round-trip conversacional del LLM logueado (pregunta → respuesta del Cerebro) **no se pudo probar**:
+  la cred QA del entorno está rotada (gotcha conocido). PERO los **datos** que respondería (mismo snapshot,
+  mismas vistas) están verificados al centavo por SQL directo y por la reunión que sí corrió. Confirmación
+  final en pantalla, logueado en `empresa-os.vercel.app`, es del CEO.
+
+=== AUDITORIA COMPLETA ===

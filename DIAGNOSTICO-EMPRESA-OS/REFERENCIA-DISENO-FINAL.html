@@ -1,0 +1,158 @@
+<title>Flipping Rentals OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --bg:#0a0e13; --bg2:#0d131a; --panel:#121a23; --panel2:#16202b; --line:#1f2b38;
+    --ink:#e9eef5; --ink2:#aab6c6; --muted:#6f7d8f;
+    --acc:#7c6cff; --acc2:#5b8dff; --accsoft:#171a33;
+    --good:#3fd08a; --good-bg:#0f2620; --warn:#e6b24d; --warn-bg:#2a2210; --bad:#ff6b6b; --bad-bg:#2a1414;
+    --disp:'Sora',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+     radial-gradient(1200px 500px at 80% -10%, rgba(124,108,255,.10), transparent 60%),
+     radial-gradient(900px 400px at -5% 10%, rgba(91,141,255,.08), transparent 55%),
+     var(--bg);
+    color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .tnum{font-variant-numeric:tabular-nums}
+  .topbar{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line);background:rgba(10,14,19,.7);backdrop-filter:blur(8px)}
+  .brand{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 6px 20px rgba(124,108,255,.35)}
+  .brand-name{font-family:var(--disp);font-weight:700;letter-spacing:-.01em}
+  .brand-sub{font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+  .live{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--good);background:var(--good-bg);border:1px solid #1c3a30;padding:6px 12px;border-radius:999px}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(63,208,138,.6);animation:p 2s infinite}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(63,208,138,.5)}70%{box-shadow:0 0 0 7px rgba(63,208,138,0)}100%{box-shadow:0 0 0 0 rgba(63,208,138,0)}}
+  @media (prefers-reduced-motion:reduce){.live .pulse{animation:none}}
+  .app{display:flex;min-height:640px}
+  .side{width:224px;flex:none;padding:18px 12px;border-right:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),transparent)}
+  .side .grp{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:16px 10px 7px}
+  .nav{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--ink2);font-size:14px;cursor:default;transition:.15s}
+  .nav svg{width:17px;height:17px;opacity:.85;flex:none}
+  .nav:hover{background:var(--panel);color:var(--ink)}
+  .nav.on{background:linear-gradient(90deg,var(--accsoft),transparent);color:#fff;font-weight:600;box-shadow:inset 2px 0 0 var(--acc)}
+  .nav .d{margin-left:auto;width:7px;height:7px;border-radius:50%}
+  .main{flex:1;min-width:0;padding:24px 26px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc2);margin:0 0 6px}
+  h1{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.02em;margin:0 0 3px;text-wrap:balance}
+  .sub{color:var(--ink2);margin:0 0 20px;font-size:14px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:16px}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .kpi{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:15px;padding:16px 17px;overflow:hidden}
+  .kpi::after{content:"";position:absolute;inset:0 0 auto 0;height:2px;background:linear-gradient(90deg,var(--acc),var(--acc2));opacity:.6}
+  .kpi .lbl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .kpi .val{font-family:var(--disp);font-weight:700;font-size:27px;letter-spacing:-.02em}
+  .kpi .note{font-size:12px;color:var(--ink2);margin-top:4px}
+  .kpi .val.good{color:var(--good)} .kpi .val.warn{color:var(--warn)}
+  .grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:14px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:17px 19px;margin-bottom:14px}
+  .card h3{font-family:var(--disp);font-weight:600;font-size:15px;margin:0 0 13px;display:flex;align-items:center;gap:9px}
+  .card h3 .tag{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:500;letter-spacing:.08em}
+  .directiva{background:linear-gradient(135deg,rgba(124,108,255,.14),rgba(91,141,255,.06)),var(--panel);border-color:#2a2f52}
+  .directiva .big{font-family:var(--disp);font-size:17px;line-height:1.4;margin:2px 0 10px;color:#fff;text-wrap:balance}
+  .directiva .by{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+  .chip{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:7px;background:var(--accsoft);color:#b9b2ff;border:1px solid #2a2f52}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:0}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .r{background:var(--bad)} .y{background:var(--warn)} .g{background:var(--good)}
+  .row .t{flex:1;font-size:14px;color:var(--ink)} .row .t small{color:var(--muted);font-size:12px}
+  .row .cta{font-size:13px;font-weight:600;color:var(--acc2);white-space:nowrap}
+  .pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px}
+  .pill.g{background:var(--good-bg);color:var(--good)} .pill.y{background:var(--warn-bg);color:var(--warn)} .pill.r{background:var(--bad-bg);color:var(--bad)}
+  .ask{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid #2a2f52;border-radius:13px;padding:15px 16px;
+    background:linear-gradient(135deg,rgba(124,108,255,.18),rgba(91,141,255,.05));color:#fff;font-family:var(--disp);font-weight:600;font-size:15px}
+  .ask .ic{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;flex:none}
+  .hint{font-size:12.5px;color:var(--ink2);margin:11px 3px 0}
+  .bars{display:flex;flex-direction:column;gap:11px;margin-top:2px}
+  .bar{display:grid;grid-template-columns:110px 1fr 54px;align-items:center;gap:10px;font-size:13px}
+  .bar .track{height:8px;border-radius:6px;background:#0e1620;overflow:hidden}
+  .bar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--acc2),var(--acc))}
+  .bar .n{font-family:var(--mono);text-align:right;color:var(--ink2)}
+  .foot{margin:18px 22px 0;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+  .foot b{color:var(--ink2)}
+</style>
+
+<div class="topbar">
+  <div class="brand"></div>
+  <div><div class="brand-name">Flipping Rentals OS</div><div class="brand-sub">Rental Profitss · Holding</div></div>
+  <div class="live"><span class="pulse"></span>Sistema operativo · en vivo</div>
+</div>
+
+<div class="app">
+  <nav class="side">
+    <div class="nav on">🏠 <span>Inicio</span></div>
+    <div class="grp">Tu negocio</div>
+    <div class="nav">🏘️ <span>Casas</span></div>
+    <div class="nav">🔑 <span>Rentas</span><span class="d g"></span></div>
+    <div class="nav">🔨 <span>Remodelación</span><span class="d y"></span></div>
+    <div class="nav">💠 <span>Fix &amp; Flip</span><span class="d g"></span></div>
+    <div class="nav">💵 <span>Cobros y pagos</span><span class="d r"></span></div>
+    <div class="nav">👥 <span>Inversionistas</span></div>
+    <div class="grp">Inteligencia</div>
+    <div class="nav">🧠 <span>Cerebro (Asistente)</span></div>
+    <div class="nav">✅ <span>Decisiones por aprobar</span><span class="d y"></span></div>
+    <div class="nav">📊 <span>Reportes</span></div>
+  </nav>
+
+  <main class="main">
+    <p class="eyebrow">Centro de mando · 23 Ago, 12:47</p>
+    <h1>Buenos días, Nicolás</h1>
+    <p class="sub">Todo tu negocio en una pantalla — en simple, con números reales.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Caja del mes</div><div class="val good tnum">+$3,984</div><div class="note">entró $53,585 · salió $49,601</div></div>
+      <div class="kpi"><div class="lbl">Caja atrapada</div><div class="val tnum">$297,690</div><div class="note">se recupera al refinanciar/vender</div></div>
+      <div class="kpi"><div class="lbl">Ocupación</div><div class="val tnum">36<span style="color:var(--muted);font-size:18px">/51</span></div><div class="note">71% de tus unidades rentadas</div></div>
+      <div class="kpi"><div class="lbl">Te deben (vencido)</div><div class="val warn tnum">$18,636</div><div class="note">15 inquilinos atrasados</div></div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <div class="card directiva">
+          <h3>🧠 Directiva del día <span class="tag">Cerebro · 07:30</span></h3>
+          <div class="big">"Sostené el volumen de renta y cobrá los 5 atrasos grandes antes de mover cualquier gasto de obra."</div>
+          <div class="by"><span class="chip">prioridad del día</span> firmada por el Cerebro Ejecutivo · revisa las 5 áreas</div>
+        </div>
+        <div class="card">
+          <h3>Decisiones que necesitan tu sí <span class="tag">4 pendientes</span></h3>
+          <div class="row"><span class="dot r"></span><span class="t">Distribución de <b>$12,400</b> lista para 3 inversionistas <small>· registrar en QBO + Airtable al aprobar</small></span><span class="cta">Revisar →</span></div>
+          <div class="row"><span class="dot y"></span><span class="t">Pago de intereses HML de <b>2 casas</b> vence en 3 días</span><span class="cta">Ver →</span></div>
+          <div class="row"><span class="dot y"></span><span class="t">5 inquilinos con <b>+30 días</b> de atraso</span><span class="cta">Cobrar →</span></div>
+          <div class="row"><span class="dot g"></span><span class="t">Obra Wellington: propuesta de draw lista</span><span class="cta">Aprobar →</span></div>
+        </div>
+        <div class="card">
+          <h3>De dónde viene tu caja este mes</h3>
+          <div class="bars">
+            <div class="bar"><span>Rentas</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="n tnum">$53.6k</span></div>
+            <div class="bar"><span>Fix &amp; Flip</span><span class="track"><span class="fill" style="width:0%"></span></span><span class="n tnum">—</span></div>
+            <div class="bar"><span>Refis (cash-out)</span><span class="track"><span class="fill" style="width:44%"></span></span><span class="n tnum">$23.1k</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="border-color:#2a2f52">
+          <button class="ask"><span class="ic">🧠</span> Preguntarle al Cerebro</button>
+          <p class="hint">"¿Qué casa me drena más caja?" · "¿Cómo va la obra de Charles?" · "¿Cuánto le toca a Wellington?" — responde simple, con tus números reales, y propone (nunca paga ni cambia solo).</p>
+        </div>
+        <div class="card">
+          <h3>Salud por línea de negocio</h3>
+          <div class="row"><span class="t">🔑 Rentas <small>· 16 casas · 36 uds</small></span><span class="pill g">Sano</span></div>
+          <div class="row"><span class="t">🔨 Remodelación <small>· 8 obras activas</small></span><span class="pill y">Vigilar 2</span></div>
+          <div class="row"><span class="t">💠 Fix &amp; Flip <small>· 2 en venta</small></span><span class="pill g">Al día</span></div>
+          <div class="row"><span class="t">💵 Cobros <small>· cartera vencida</small></span><span class="pill r">$18,636</span></div>
+        </div>
+        <div class="card">
+          <h3>Casas que vigilar <span class="tag">drenan caja</span></h3>
+          <div class="row"><span class="dot r"></span><span class="t">6504 Stonleigh <small>· caja atrapada</small></span><span class="n mono tnum" style="color:var(--ink2)">$70,855</span></div>
+          <div class="row"><span class="dot r"></span><span class="t">902 Virginia</span><span class="n mono tnum" style="color:var(--ink2)">$70,529</span></div>
+          <div class="row"><span class="dot y"></span><span class="t">2315 Dove Springs</span><span class="n mono tnum" style="color:var(--ink2)">$30,430</span></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="foot">Esto es una <b>propuesta de diseño final</b> (números reales de tu base; los agentes trabajan por debajo). Menús en tu idioma, una pantalla que se lee en 10 segundos, y el Cerebro que responde y propone — nunca ejecuta pagos solo. Se ve premium para mostrar, y es simple para usar.</p>
+  </main>
+</div>

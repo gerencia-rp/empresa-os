@@ -86,6 +86,17 @@ chk('saludo personalizado', inicio.saludo);
 chk('KPIs con montos reales ($297k/$302k, $18,636, etc.)', inicio.montos.length >= 4);
 await page.screenshot({ path: '/tmp/inicio.png', fullPage: true });
 
+// ── Rama NUEVA: la Directiva la produce la REUNIÓN matutina del Cerebro (pm_informes foto_ejecutiva_holding) ──
+const reunion = await page.evaluate(() => {
+  const hoy = new Date().toISOString().slice(0, 10);
+  OS.directiva = { corte: hoy, payload: { directiva: 'Cobra los 15 atrasos ($18,636 vencido) antes de mover cualquier gasto de obra.', porque: 'La mora es plata que ya es tuya y no entro: recuperarla es lo mas barato.' } };
+  OS.route = osParse('/'); osRender();
+  const t = document.querySelector('#os-root .osx-main')?.innerText || '';
+  return { badge: /reuni[oó]n matutina/i.test(t), directiva: t.includes('Cobra los 15 atrasos'), porque: /mora es plata/i.test(t) };
+});
+chk('Directiva viene de la reunión matutina (badge + texto + por qué)', reunion.badge && reunion.directiva && reunion.porque, JSON.stringify(reunion));
+await page.evaluate(() => { OS.directiva = null; OS.route = osParse('/'); osRender(); });
+
 // Casas
 await page.evaluate(() => { OS.route = osParse('/casas'); osRender(); }); await sleep(400);
 const casas = await page.evaluate(() => { const t = document.querySelector('#os-root .osx-main')?.innerText || ''; return { title: /Tus casas/.test(t), rows: document.querySelectorAll('#os-root .drow').length, rentas: /Rentas/.test(t), ff: /Fix . Flip/.test(t) || /Holding/.test(t), remo: /Remodelaci/.test(t) }; });
