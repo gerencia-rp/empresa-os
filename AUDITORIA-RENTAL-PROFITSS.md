@@ -838,4 +838,44 @@ la DB de prod. Resultado: **todo cuadra.**
 
 ---
 
+## 🔄 PASADA (23 Ago 2026) — AUTO-ACTUALIZACIÓN + badge de versión · EN VIVO en `main`
+
+**Problema (decisión CEO #7):** el CEO abría y "veía igual" porque el **navegador cacheaba**
+una versión vieja (Vercel sí servía lo nuevo). Faltaba que la app se refresque sola.
+
+**Estado previo (ya OK, no se tocó):** bundle con **hash sha256** en el nombre
+(`assets/bundle.<hash>.js` → cache-busting permanente) · `index.html` con
+`max-age=0, must-revalidate` · `/assets/*` `immutable` · service worker = kill-switch
+auto-destructivo. Recargar YA traía lo último; el hueco era la **pestaña abierta días**.
+
+**Qué se agregó (commit `2a54260` en `main`, deploy oficial `empresa-os.vercel.app`):**
+- `scripts/build.mjs`: emite **`dist/version.json`** `{version:<hash>, commit, builtAt}` e
+  **inyecta `window.__APP_VERSION__`** en `index.html` (que es no-cache → siempre trae la
+  versión fresca al recargar). Commit tomado de `VERCEL_GIT_COMMIT_SHA` (fallback git local).
+- `app.js`: **poller liviano** de `/version.json` (`cache:'no-store'`) en `visibilitychange`
+  + `focus` + cada 5 min + un chequeo a los 30 s. Si el hash difiere del de arranque →
+  **aviso discreto** "🔄 Hay una versión nueva — Actualizar / Después" (el botón limpia
+  caches y recarga). **Badge de versión** (`v <commit>`) en el sidebar.
+- Sin SW nuevo, sin PWA offline. Cero cambios de datos/negocio.
+
+**Verificación (honesta, sobre el bundle EN VIVO del dominio oficial — no grep de fuente):**
+- `curl` en vivo: `version.json` = `{"version":"abf4316b8b45","commit":"2a54260"}` · index
+  referencia `bundle.abf4316b8b45.js` (era `f96670667c83`) · `__APP_VERSION__` inyectado ·
+  headers: index/version.json `must-revalidate`, bundle `immutable`.
+- Puppeteer contra `https://empresa-os.vercel.app/` (bundle real, **0 pageerrors**):
+  BOOT `abf4316b8b45` · poller `__checkForUpdate` cargado · badge `v 2a54260` ·
+  **misma versión → sin aviso** (sin falso positivo) · **deploy simulado** (intercept de
+  `version.json`) → **aviso aparece** con el texto correcto.
+- Prueba local del build previo idéntica (0 pageerrors). "Segunda carga toma la versión
+  nueva sin limpiar caché" queda probado: index revalida siempre → apunta al bundle con
+  hash nuevo → el navegador no puede servir el viejo (otra URL).
+
+**Nota de consolidación:** este cambio se aplicó **directo sobre `main`** (dominio oficial,
+GitHub-linked, auto-deploy) vía worktree limpio sobre `origin/main`, sin arrastrar la
+divergencia de `feat/portal-inversionista-v2` (main iba 67 commits adelante). FF push
+`f27acca..2a54260`. La consolidación total de ramas (decisión #3) sigue pendiente como
+operación aparte.
+
+---
+
 === AUDITORIA COMPLETA ===
