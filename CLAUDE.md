@@ -4,7 +4,21 @@ Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code
 
 ---
 
-## 🚨 REGLA DURA — DÓNDE MIRAR PROD (06-ago, tras perder una sesión entera por esto)
+## ✅ CONSOLIDADO A UN SOLO SISTEMA (23-ago-2026, decisión CEO #3) — LEER PRIMERO
+
+- **Ya NO hay dos proyectos.** UN solo proyecto Vercel (`empresa-os`, GitHub-linked), UNA sola
+  rama (`main`), UN solo dominio (**empresa-os.vercel.app**). Flujo único: `commit → push main →
+  auto-deploy`. Detalle en `CONTRIBUTING.md` y en la pasada CONSOLIDACIÓN de `AUDITORIA-RENTAL-PROFITSS.md`.
+- **`empresa-os-admin` está PAUSADO/retirado** (proyecto `prj_5Buo…`; su dominio da 503). No deployar
+  ahí nunca más. Las ramas `feat/portal-inversionista-v2` y `merge/consolidacion` fueron **absorbidas
+  en main y borradas en origin**. Respaldo: tag `backup-antes-consolidar-uno`.
+- ⚠ La "REGLA DURA — DÓNDE MIRAR PROD" de abajo queda como **contexto histórico** (explica de dónde venía
+  el lío de "bugs fantasma"): describe el estado pre-consolidación de dos proyectos. Ya no aplica al flujo
+  de trabajo — hoy solo existe `main → empresa-os.vercel.app`.
+
+---
+
+## 🚨 REGLA DURA — DÓNDE MIRAR PROD (06-ago, tras perder una sesión entera por esto) · HISTÓRICO (pre-consolidación 23-ago)
 
 - **Hay DOS proyectos Vercel con el MISMO repo y builds distintos.** `empresa-os.vercel.app` = producción de **`main`** · **`empresa-os-admin.vercel.app`** = donde van los `vercel --prod` de las ramas (es el de `.vercel/project.json`).
 - `empresa-os` **sí auto-deploya por push**, pero una rama que no es `main` solo genera **PREVIEWS** (`target: null`): su alias de producción **se queda en el último build de `main`**. Por eso una feature de rama "no aparece en prod" **ni siquiera en incógnito** — no es caché, es **otro build**.

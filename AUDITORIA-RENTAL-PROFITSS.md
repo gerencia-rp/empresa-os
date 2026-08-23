@@ -1,8 +1,9 @@
 # AUDITORÍA RENTAL PROFITSS — Flipping Rentals OS
 
 > Fuente de verdad del proceso de auditoría/corrección. Se actualiza por lote.
-> Rama: `feat/portal-inversionista-v2` · Deploy que ve el CEO: **empresa-os-admin.vercel.app**
+> Rama ÚNICA: `main` · Deploy oficial ÚNICO: **empresa-os.vercel.app** (proyecto GitHub-linked `empresa-os`, auto-deploy desde main).
 > Regla de oro: **un dato, una fuente** (Airtable manda; la app no recalcula lo que la fuente ya tiene).
+> ⚠ 23-ago: consolidado a UN solo sistema (ver pasada CONSOLIDACIÓN al final). `empresa-os-admin` **retirado/pausado**.
 
 ---
 
@@ -567,6 +568,52 @@ Mapa y diseño completos en **`COMBINAR-ASISTENTES.md`**.
 CUALQUIER pantalla — es la ÚNICA entrada de chat; (2) preguntá algo transversal ("¿cuánta caja atrapada
 hay?") y debe responder $297.690 simple; (3) preguntá de un área ("¿cómo viene la obra?") y debe citar al
 agente de Remodelación; (4) en `/jarvis` el chat es el mismo Cerebro. Confirmación en pantalla es tuya.**
+
+---
+
+## 🔗 PASADA (23 Ago 2026) — CONSOLIDACIÓN: UN SOLO SISTEMA (decisión CEO #3) · HECHO
+
+**Objetivo:** acabar con "dos proyectos / dos dominios / dos ramas" (causa raíz de los
+"bugs fantasma"). Un solo proyecto Vercel (`empresa-os`, GitHub-linked), una sola rama
+(`main`), un solo dominio (`empresa-os.vercel.app`).
+
+**Diagnóstico de topología (git + Vercel, verificado):**
+- `merge/consolidacion` ya estaba **100% contenida en `origin/main`** (ancestro). Nada que fusionar.
+- `feat/portal-inversionista-v2` tenía 11 commits propios, **todos superseded por main en mejor
+  forma**: `UN asistente combinado` (main dbc6c30) > `asistente omnipresente` (portal 4407bfe) ·
+  `UNA sola puerta de chat` (main f27acca) > cerebro FAB (portal) · item 27 unidades/ocupación
+  ÚNICOS (main ae993fc) > portal 3e38cac · fix SVG barra (main 960fcb7) > portal 36fa5ca ·
+  auto-actualización+badge (main 2a54260) > portal a5d9a9c (espejo).
+- Único aporte real de la rama que main no tenía: `scripts/qa-unidades-consistencia.mjs` (harness QA).
+- **`empresa-os-admin` es un proyecto Vercel SEPARADO** (`prj_5Buo…`) que auto-deployaba
+  `feat/portal-inversionista-v2` por GitHub **y** recibía `vercel --prod` manuales. Ése era el vector
+  de los deploys de producción paralelos ("bug fantasma").
+
+**Ejecución (con respaldo):**
+1. Tag `backup-antes-consolidar-uno` sobre `origin/main` (pusheado).
+2. `main` local → `origin/main` (ff a `2a54260`).
+3. `git merge -s ours feat/portal-inversionista-v2` → gana el árbol de main (más nuevo/verificado);
+   la rama queda **ancestro de main** → fin de la bifurcación. `merge/consolidacion` ya era ancestro.
+4. Preservado el harness QA único (`node --check` OK).
+5. `CONTRIBUTING.md` + nota en `README.md`: flujo único `commit → push main → auto-deploy`.
+6. Push a `main` (`2a54260..b6b9235`). El build da el **mismo bundle `abf4316b8b45`** que ya estaba
+   en vivo (árbol de producto byte-idéntico → deploy cero-riesgo).
+7. Borradas en `origin` las ramas absorbidas `feat/portal-inversionista-v2` y `merge/consolidacion`
+   (mata el auto-deploy GitHub del proyecto admin). SHAs preservados (ancestros de main): a5d9a9c / f27acca.
+8. **`empresa-os-admin` pausado** (archivado, reversible) → cierra el vector `vercel --prod` manual.
+
+**Verificación EN VIVO (no grep de fuente):**
+- Vercel: deploy `dpl_VUMX…` **READY · target production · ref main · commit b6b9235** en `empresa-os`.
+- `curl https://empresa-os.vercel.app/` → **HTTP 200** · `version.json` `commit:"b6b9235"` = `git rev-parse main` · bundle `abf4316b8b45`.
+- `curl https://empresa-os-admin.vercel.app/` → **HTTP 503** (pausado/retirado).
+- Números Supabase prod intactos al centavo: **déficit $297.690,36 · cartera $18.636,01/15 morosos · ocupación 51/36/70,59%**.
+
+**Estado final:** UNA rama (`main`), UN proyecto (`empresa-os`), UN dominio (`empresa-os.vercel.app`).
+Flujo único en `CONTRIBUTING.md`. Bifurcación cerrada.
+
+**Pendiente humano (no bloquea):** el worktree local `../empresa-os-admin` sigue con
+`merge/consolidacion` checked-out (por eso esa rama no se borró en local); inofensivo (proyecto
+pausado + rama remota borrada). `git worktree remove` cuando el CEO confirme que no hay trabajo sin guardar ahí.
 
 ---
 
