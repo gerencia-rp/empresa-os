@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command // empty'); case \"$cmd\" in *\"git commit\"*|*\"git push\"*) d=$(git -C \"/Users/nicolaslara/Desktop/CLAUDE CODE/empresa-os\" diff --cached -- . 2>/dev/null; git -C \"/Users/nicolaslara/Desktop/CLAUDE CODE/empresa-os\" diff -- . 2>/dev/null); if printf '%s' \"$d\" | grep -qE 'pat[A-Za-z0-9]{14}\\.[A-Za-z0-9]{40,}|sk-[A-Za-z0-9_-]{20,}|AC[0-9a-f]{32}|SK[0-9a-f]{32}'; then echo \"BLOQUEADO: posible secreto en el diff (guardia anti-secretos). Revisa antes de commit/push.\"; exit 2; fi ;; esac; exit 0",
+            "statusMessage": "Guardia anti-secretos"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in *.js|*.mjs) out=$(node --check \"$f\" 2>&1) || { echo \"Error de sintaxis JS en $f:\"; echo \"$out\"; exit 2; } ;; esac; exit 0",
+            "statusMessage": "Chequeando sintaxis JS"
+          }
+        ]
+      }
+    ]
+  }
+}

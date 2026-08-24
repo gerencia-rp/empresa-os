@@ -4,7 +4,7 @@
 // "Servicio de deuda" del encabezado cuadra con la suma de esas filas.
 import puppeteer from 'puppeteer-core';
 
-const BASE = process.env.QA_BASE || 'https://empresa-os-admin.vercel.app';
+const BASE = process.env.QA_BASE || 'https://empresa-os.vercel.app';
 const CHROME = process.env.QA_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const EMAIL = process.env.QA_EMAIL || 'qa-admin-test@rentalprofitss.com';
 const PASS = process.env.QA_PASS;

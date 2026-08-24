@@ -1,10 +1,10 @@
-// CARGA REAL: login por el formulario en empresa-os-admin.vercel.app, y de ahí al PORTAL
+// CARGA REAL: login por el formulario en empresa-os.vercel.app, y de ahí al PORTAL
 // del inversionista (misma sesión, navegación normal — SIN forzar osInit ni stubs de datos).
 // Uso: QA_PASS=… node scripts/qa-flujo-deuda.mjs
 // Verifica la pestaña 📅 Flujo Mensual de 5003 Michelle Ct: deuda mes a mes + neto real.
 import puppeteer from 'puppeteer-core';
 
-const BASE = process.env.QA_BASE || 'https://empresa-os-admin.vercel.app';
+const BASE = process.env.QA_BASE || 'https://empresa-os.vercel.app';
 const CHROME = process.env.QA_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const EMAIL = 'qa-admin-test@rentalprofitss.com';
 const PASS = process.env.QA_PASS;
