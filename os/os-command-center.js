@@ -730,7 +730,8 @@ async function jvMapaSave(id) {
   try {
     const { error } = await sb.from('agent_registry').update({ responsabilidad: resp, estado: est, nivel_riesgo: rsk, dueno_humano: duh, skills, tareas, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
-    await sb.from('agent_audit_log').insert({ agent_id: id, input: { accion: 'editar_ficha', por: jvMe() }, output: { campos: ['responsabilidad', 'estado', 'riesgo', 'dueno_humano', 'skills', 'tareas'], estado: est }, resultado: 'ok' }).catch(() => {});
+    const { error: auditError } = await sb.from('agent_audit_log').insert({ agent_id: id, input: { accion: 'editar_ficha', por: jvMe() }, output: { campos: ['responsabilidad', 'estado', 'riesgo', 'dueno_humano', 'skills', 'tareas'], estado: est }, resultado: 'ok' });
+    if (auditError) console.warn('No se pudo registrar la edición en la bitácora:', auditError.message);
     JV.mapEdit = null; await jvLoad(true);
   } catch (e) { alert('No se pudo guardar la ficha: ' + (e.message || e)); }
   finally { JV.mapBusy = false; }
@@ -749,7 +750,8 @@ async function jvMapaMove(id, dir) {
     const a = list[idx], b = list[j];
     const { error: e1 } = await sb.from('agent_registry').update({ orden: b.orden }).eq('id', a.id); if (e1) throw e1;
     const { error: e2 } = await sb.from('agent_registry').update({ orden: a.orden }).eq('id', b.id); if (e2) throw e2;
-    await sb.from('agent_audit_log').insert({ agent_id: id, input: { accion: 'reordenar', por: jvMe(), dir }, output: { de: a.orden, a: b.orden }, resultado: 'ok' }).catch(() => {});
+    const { error: auditError } = await sb.from('agent_audit_log').insert({ agent_id: id, input: { accion: 'reordenar', por: jvMe(), dir }, output: { de: a.orden, a: b.orden }, resultado: 'ok' });
+    if (auditError) console.warn('No se pudo registrar el reordenamiento en la bitácora:', auditError.message);
     await jvLoad(true);
   } catch (e) { alert('No se pudo reordenar: ' + (e.message || e)); }
   finally { JV.mapBusy = false; }
