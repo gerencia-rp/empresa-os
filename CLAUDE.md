@@ -2,7 +2,7 @@
 
 Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code, Claude Desktop, Cowork). Léelo siempre al iniciar una sesión. Mantenelo actualizado con cada decisión técnica importante.
 
-## 🛡️ HARDENING INTEGRAL · FASE 1 (24-ago-2026) — LOCAL, PENDIENTE DEPLOY
+## 🛡️ HARDENING INTEGRAL · FASE 1 (24-ago-2026) — DESPLEGADA
 
 - `api/_fetch.mjs` fija timeouts para las integraciones Vercel críticas (Supabase/Auth/REST, Claude, Voyage, cron, Storage, WhatsApp y Resend). Las lecturas idempotentes pueden reintentar con backoff; las escrituras no se reintentan automáticamente.
 - `/api/health` se reescribe internamente a `brain-chat?resource=health` para no superar el límite de funciones serverless. Reporta Supabase, configuración, versión, región y latencia sin revelar secretos.

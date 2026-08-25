@@ -70,7 +70,10 @@ async function healthHandler(req, res) {
   const checks = {};
   try {
     const supa = process.env.SUPABASE_URL || 'https://nezbaljfhhyznhltpjnk.supabase.co';
-    const r = await fetchWithTimeout(`${supa}/auth/v1/health`, { headers: { accept: 'application/json' } }, 4000, 1);
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const r = await fetchWithTimeout(`${supa}/auth/v1/health`, {
+      headers: { accept: 'application/json', apikey: serviceKey, authorization: `Bearer ${serviceKey}` },
+    }, 4000, 1);
     checks.supabase = { ok: r.ok, status: r.status, ms: Date.now() - started };
   } catch (error) {
     checks.supabase = { ok: false, error: error.message, ms: Date.now() - started };
