@@ -2,6 +2,15 @@
 
 Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code, Claude Desktop, Cowork). Léelo siempre al iniciar una sesión. Mantenelo actualizado con cada decisión técnica importante.
 
+## 🧠 CONTRATO DE CONOCIMIENTO DEL EQUIPO IA (25-ago-2026) — EN PRODUCCIÓN
+
+- Cada agente recibe **contexto común del holding** y **especialidad profunda en su área**. Cerebro y gerentes reciben además contexto transversal de todas las empresas.
+- La fuente de verdad propuesta es `agent_knowledge_domains` + `agent_knowledge_assignments`; la vista `v_agent_knowledge_readiness` expone fuentes, métricas, sistemas, profundidad y verificación por agente.
+- **Asignado no significa verificado.** `verified_at` solo se completa después de una prueba real en la que el agente responde con dato, fuente única y fecha de corte. La actividad administrativa en `agent_audit_log` tampoco cuenta como ejecución de negocio.
+- Fuentes base por dominio: holding (`v_holding_pnl`, fotos ejecutivas, memoria y decisiones), Fix & Flip (`ff_deals`, `v_ff_portafolio_kpi`, ledger), Rentas (`v_ocupacion`, cartera, espejos PM), Remodelación (`v_remodel_avance_vivo`, costos, nómina e inspecciones) y Gobernanza IA (`agent_registry`, ejecuciones, propuestas y cron).
+- Migración `20260825110000_agent_knowledge_system.sql` aplicada: 23/23 agentes actuales con perfil completo y cero brechas de asignación. No marcar dominios verificados sin evidencia real.
+- Migración `20260825113000_complete_agent_team.sql` aplicada: Auditor y Arquitecto tienen revisión semanal; Draws/HML corre diario y Calidad de Obra semanal. Primera prueba real: 4/4 funciones OK; Draws señaló 3 obras para revisión y Calidad 5 obras sin inspección completa reciente. Solo generan evidencia/propuestas; no modifican operación.
+
 ---
 
 ## ✅ CONSOLIDADO A UN SOLO SISTEMA (23-ago-2026, decisión CEO #3) — LEER PRIMERO
