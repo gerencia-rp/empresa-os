@@ -161,22 +161,32 @@ let TOKEN = null;
 let INVITE = null;
 let PLAN_DATA = null;   // edu_student_plans.perfil — jsonb enriquecido
 let TASKS = [];          // edu_student_plan_tasks
+let STUDENT_NAME = '';
 // Mapa task_id → contiene plan_id, etc.
+
+async function readStudentPlan() {
+  const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-student-plan-read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+    body: JSON.stringify({ token: TOKEN })
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(result.error || 'No se pudo cargar tu plan.');
+  return result;
+}
 
 async function init() {
   const sp = new URLSearchParams(window.location.search);
   TOKEN = sp.get('t');
   if (!TOKEN) return showInvalid('Falta el token en el link.');
 
-  const { data: invite, error: invErr } = await sb
-    .from('edu_diagnostic_invites')
-    .select('*')
-    .eq('token', TOKEN)
-    .maybeSingle();
-
-  if (invErr || !invite) {
-    return showInvalid(`No encontré tu invitación.\n\nToken: ${TOKEN}`);
+  let payload;
+  try {
+    payload = await readStudentPlan();
+  } catch (error) {
+    return showInvalid(error.message || 'No encontré tu invitación.');
   }
+  const invite = payload.invite;
 
   if (!invite.result_plan_id) {
     if (!invite.completed_at) {
@@ -188,15 +198,12 @@ async function init() {
 
   INVITE = invite;
 
-  // Cargar plan (con TODA la data enriquecida en .perfil)
-  const { data: plan, error: pErr } = await sb
-    .from('edu_student_plans')
-    .select('*')
-    .eq('id', invite.result_plan_id)
-    .maybeSingle();
-  if (pErr || !plan) return showInvalid('No pude cargar tu plan: ' + (pErr?.message || 'no encontrado'));
+  const plan = payload.plan;
+  if (!plan) return showInvalid('No pude cargar tu plan.');
 
   PLAN_DATA = plan.perfil || {};
+  TASKS = payload.tasks || [];
+  STUDENT_NAME = payload.student_name || '';
   // Fallback: si el plan es viejo y no tiene la data enriquecida, construir un mínimo viable
   if (!PLAN_DATA.bloques && !PLAN_DATA.objetivo_operativo && !PLAN_DATA.perfil) {
     console.log('[mi-plan] plan viejo sin data enriquecida, usando fallback');
@@ -206,27 +213,11 @@ async function init() {
       ...PLAN_DATA
     };
   }
-  await loadTasks(plan.id);
-
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('portal').classList.remove('hidden');
 
   await renderPlan();
   restoreScroll();
-}
-
-async function loadTasks(planId) {
-  const { data, error } = await sb
-    .from('edu_student_plan_tasks')
-    .select('*')
-    .eq('plan_id', planId)
-    .order('bloque_orden')
-    .order('paso_index');
-  if (error) {
-    console.error('[loadTasks]', error);
-    return;
-  }
-  TASKS = data || [];
 }
 
 async function renderPlan() {
@@ -237,13 +228,7 @@ async function renderPlan() {
   document.getElementById('plan-title').textContent = `${emoji} Plan de Trabajo · ${nombre}`;
 
   // Cargar info del estudiante
-  let studentFullName = '';
-  if (INVITE.student_id) {
-    try {
-      const { data: stu } = await sb.from('edu_students').select('full_name').eq('id', INVITE.student_id).maybeSingle();
-      if (stu?.full_name) studentFullName = stu.full_name;
-    } catch {}
-  }
+  const studentFullName = STUDENT_NAME;
 
   const etapa = PLAN_DATA.etapa || p.etapa || (INVITE.answers?.etapa_actual) || '';
   const cronograma = PLAN_DATA.cronograma || p.cronograma || '';
@@ -710,8 +695,8 @@ function waitForPlan() {
     if (el) el.textContent = `Esperando ${elapsed}s...`;
 
     try {
-      const { data: inv } = await sb.from('edu_diagnostic_invites').select('result_plan_id').eq('token', TOKEN).maybeSingle();
-      if (inv?.result_plan_id) {
+      const current = await readStudentPlan();
+      if (current.invite?.result_plan_id) {
         clearInterval(interval);
         window.location.reload();
         return;
