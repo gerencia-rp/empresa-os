@@ -80,7 +80,7 @@ function ffIngCalc(inp, ctx) {
     const pmFee = Math.round(bruta * UWc('pm_fee_pct', 8) / 100);
     const vacancy = Math.round(bruta * vacPct / 100);
     const mant = Math.round(bruta * UWc('mantenimiento_pct', 5) / 100);
-    const flujo = Math.round(bruta - ctx.pagoDscr - ctx.impuestos - ctx.seguro - pmFee - vacancy - mant);
+    const flujo = Math.round(bruta - ctx.pagoDscr - ctx.impuestos - ctx.seguro - ctx.hoa - pmFee - vacancy - mant);
     out[m] = { bruta: Math.round(bruta), vacPct, pmFee, vacancy, mant, flujo, coc: ctx.cashLeft > 0 ? Math.round(1000 * flujo * 12 / ctx.cashLeft) / 10 : null };
   });
   return { modelos: out, habN, estN, aptoN, rcRent, mixReal: mx, mejor: Object.entries(out).sort((a, b) => b[1].bruta - a[1].bruta)[0][0] };
@@ -120,7 +120,7 @@ function ffIngresoView() {
   const inp = UW.a.inputs;
   const st = igState();
   const o = ffUwComputeAll();
-  const ctx = { pagoDscr: o.intereses.pagoDscr || 0, pagoHml: o.intereses.intMensualHarmony || 0, impuestos: o.ingreso.impuestos || 0, seguro: UWc('seguro_mensual', 120), cashLeft: inp._cashLeftIn != null ? inp._cashLeftIn : 0 };
+  const ctx = { pagoDscr: o.intereses.pagoDscr || 0, pagoHml: o.intereses.intMensualHarmony || 0, impuestos: o.ingreso.impuestos || 0, seguro: UWc('seguro_mensual', 120), hoa: Math.round(+inp.hoa_mes || 0), cashLeft: inp._cashLeftIn != null ? inp._cashLeftIn : 0 };
   const r = ffIngCalc(inp, ctx);
   const zona = igZona();
   const modeloSel = st.modelo || r.mejor;
@@ -179,6 +179,7 @@ function ffIngresoView() {
     + fila('− Pago DSCR (Calc 4)', '−' + IG_M(ctx.pagoDscr), 'ap-neg')
     + fila('− Impuestos (' + UWc('impuestos_pct_arv', 2.2) + '% ARV/año)', '−' + IG_M(ctx.impuestos), 'ap-neg')
     + fila('− Seguro', '−' + IG_M(ctx.seguro), 'ap-neg')
+    + (ctx.hoa > 0 ? fila('− HOA', '−' + IG_M(ctx.hoa), 'ap-neg') : '')
     + fila('− Property mgmt (' + UWc('pm_fee_pct', 8) + '%)', '−' + IG_M(x.pmFee), 'ap-neg')
     + fila('− Vacancy (' + x.vacPct + '% · modelo ' + lblM[modeloSel] + ')', '−' + IG_M(x.vacancy), 'ap-neg')
     + fila('− Mantenimiento (' + UWc('mantenimiento_pct', 5) + '%)', '−' + IG_M(x.mant), 'ap-neg')
@@ -196,6 +197,7 @@ function ffIngresoView() {
     + igIn('Vacancy % Unidades', igVac('unidades'), "apCfgSet('ing_vac_unidades',this.value)", '100%') + igIn('Vacancy % Mixta', igVac('mixta'), "apCfgSet('ing_vac_mixta',this.value)", '100%')
     + igIn('PM fee %', UWc('pm_fee_pct', 8), "apCfgSet('pm_fee_pct',this.value)", '100%') + igIn('Mantenimiento %', UWc('mantenimiento_pct', 5), "apCfgSet('mantenimiento_pct',this.value)", '100%')
     + igIn('Impuestos % ARV/año', UWc('impuestos_pct_arv', 2.2), "apCfgSet('impuestos_pct_arv',this.value)", '100%') + igIn('Seguro $/mes', UWc('seguro_mensual', 120), "apCfgSet('seguro_mensual',this.value)", '100%')
+    + igIn('HOA $/mes', inp.hoa_mes || 0, "ffUwSet('hoa_mes',this.value)", '100%')
     + '</div><div style="font-size:10px;color:var(--mut,#8b93a1);margin-top:6px">La tarifa se guarda para la zona elegida (ing_&lt;tipo&gt;_' + zona + '); si no existe, cae a la base Austin. Calibración real: hab $780–880 · estudio $1,000–1,150 · apto $1,600–2,200 · casa $2,600–3,700 (Marlin $1,000–1,400).</div></details>';
 
   const nota = inp.renta_mensual ? '<div style="font-size:11px;color:var(--mut,#8b93a1);margin-top:10px">Renta del análisis (alimenta la Vista Unificada): <b style="color:var(--ink,#eaf0ff)">' + IG_M(inp.renta_mensual) + '/mes</b>' + (st.modelo ? ' · modelo ' + lblM[st.modelo] : ' · del deal real (Airtable)') + '</div>' : '';

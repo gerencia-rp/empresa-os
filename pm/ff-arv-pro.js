@@ -5,7 +5,8 @@
 // ponderada por MENOR gross adj % → ARV + rango + confianza → desviación vs appraisal real
 // (aprendizaje: sesgo sugerido, lo aplica un humano). NUNCA $/sqft promedio × sqft.
 // Cero hardcode: factores/filtros en ff_uw_config (editables acá mismo). Fuente de verdad
-// guardada sigue siendo el ARV de Airtable; esto produce el "ARV estimado profesional".
+// Airtable es el ancla histórica. Cuando el usuario confirma el ARV profesional, ese valor pasa a
+// ser la fuente oficial de ESTE análisis y alimenta MAO, salida, cash-out, escenarios y veredicto.
 // Estado por análisis en UW.a.inputs.arvpro (persiste con ff_underwriting_analyses).
 // UI: mockup PropStream del CEO (12-jul) — ficha subject completa (APN/dueño/assessed/última
 // venta), mapa Leaflet con pins de precio, criterio visible, resumen bajo/prom/alto,
@@ -197,7 +198,7 @@ function apVistaSenales(rec, inp) {
     { nombre: 'AVM RentCast', valor: avm, sub: 'modelo automático' },
     (fi.assessed && facA > 0) ? { nombre: 'Assessed × ' + facA, valor: Math.round(fi.assessed.total * facA), sub: 'condado ' + fi.assessed.anio + ' (factor calibrado con tus tasaciones)' } : null,
     (+inp.appraisal > 0) ? { nombre: 'Tasación previa', valor: +inp.appraisal, sub: 'Valuación por el Appraisal (Airtable)' } : null,
-    (+inp.arv_airtable > 0) ? { nombre: 'ARV Airtable', valor: +inp.arv_airtable, sub: 'fuente de verdad del análisis' } : null,
+    (+inp.arv_airtable > 0) ? { nombre: 'ARV original', valor: +inp.arv_airtable, sub: 'ancla histórica del deal' } : null,
   ].filter(Boolean);
   const tri = ArvEngine.triangular(senales, UW.cfg, rec.conflictos);
   const filas = tri.senales.map(x => {
@@ -830,7 +831,7 @@ function ffArvProView() {
 
   // foot + calibración/factores (misma lógica de siempre)
   const foot = rec && rec.arv ? '<div style="display:flex;gap:12px;align-items:center;margin:14px 0;flex-wrap:wrap"><button class="ap-btn" onclick="apUsarArv(' + rec.arv + ')">→ Usar ' + AP_M(rec.arv) + ' como ARV del análisis</button>'
-    + '<span style="font-size:11.5px;color:var(--mut,#8b93a1)">' + (rec.usables[0] ? 'El más parecido: ' + AP_E(rec.usables[0].c.dir.split(',')[0]) + ' (gross ' + rec.usables[0].adj.grossPct.toFixed(1) + '% → peso ' + rec.usables[0].pesoPct + '%).' : '') + ' El ARV de Airtable sigue siendo la fuente de verdad guardada.</span></div>' : '';
+    + '<span style="font-size:11.5px;color:var(--mut,#8b93a1)">' + (rec.usables[0] ? 'El más parecido: ' + AP_E(rec.usables[0].c.dir.split(',')[0]) + ' (gross ' + rec.usables[0].adj.grossPct.toFixed(1) + '% → peso ' + rec.usables[0].pesoPct + '%).' : '') + ' Al confirmarlo, este valor se vuelve el ARV oficial del análisis y alimenta todos los cálculos.</span></div>' : '';
 
   const fEd = (k, l, def) => '<div style="margin-bottom:8px"><div style="font-size:10.5px;color:var(--mut,#c7cdd8);font-weight:600;margin-bottom:2px">' + l + '</div><input value="' + apCfg(k, def) + '" onchange="apCfgSet(\'' + k + '\',this.value)" style="width:100%;background:var(--glass,rgba(255,255,255,.05));border:1px solid var(--line,rgba(255,255,255,.12));border-radius:8px;padding:6px 9px;color:inherit;font-size:12.5px;font-weight:600;outline:none"></div>';
   const factores = '<details class="ap-card" style="padding:14px;margin-bottom:14px"><summary style="cursor:pointer" class="ap-lab">' + osIcon('settings') + ' Factores de ajuste (calibrados, editables — ff_uw_config)</summary>'

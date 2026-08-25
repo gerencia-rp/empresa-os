@@ -1,5 +1,5 @@
 // ═══ SUITE DE UNDERWRITING · Fix & Flip ═══
-// 6 calculadoras calibradas con el histórico (Airtable → ff_*), memoria (ff_underwriting_analyses),
+// Suite calibrada con el histórico (Airtable → ff_*), memoria (ff_underwriting_analyses),
 // cargar casa real o hipotética. Sub-nav limpio. Soft-delete. Cero hardcode: todo de ff_uw_config + ff_deals.
 const UW = {
   cfg: {},            // ff_uw_config (calibración)
@@ -7,7 +7,8 @@ const UW = {
   hml: {},            // ff_hml_loans por address_norm
   analyses: [],       // ff_underwriting_analyses (memoria)
   a: null,            // análisis activo { nombre, inputs, outputs, ... }
-  sub: 'negocio',     // sub-vista activa
+  sub: 'arv',         // sub-vista activa · ARV primero (misma secuencia profesional de Bóveda)
+  escenario: { arv_pct: -8, rehab_pct: 15, tasa_delta: 1 }, // stress-test aditivo; nunca pisa el Base
   visibles: null,     // set de vistas en modo multi (null = una sola)
 };
 const UW_M = n => (n == null || isNaN(n)) ? '—' : (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
@@ -17,19 +18,21 @@ function UWct(k, def) { const v = (UW.cfgTxt || {})[k]; return v != null && v !=
 window.UWct = UWct;
 
 const UW_NAV = [
-  ['negocio', osIcon('banknote'), 'Del Negocio', 'Draw + Cash to Close'],
   ['arv', osIcon('clipboard'), 'ARV', 'comparables + appraisals'],
+  ['negocio', osIcon('banknote'), 'Del Negocio', 'Draw + Cash to Close'],
   ['cashout', osIcon('dollar'), 'Cash-Out', 'refi capital recuperado'],
   ['intereses', osIcon('trending-down'), 'Intereses', 'Harmony + DSCR'],
   ['ingreso', osIcon('house'), 'Ingreso Mensual', 'renta por modelo de negocio'],
+  ['escenarios', osIcon('target'), 'Escenarios', 'Base vs stress-test'],
   ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
 // MODO VENTA (flip): el ARV es el precio de salida, no hay refi/renta → nav distinto
 const UW_NAV_VENTA = [
-  ['negocio', osIcon('banknote'), 'Del Negocio', 'Compra + obra'],
   ['arv', osIcon('clipboard'), 'ARV', 'precio de venta'],
+  ['negocio', osIcon('banknote'), 'Del Negocio', 'Compra + obra'],
   ['venta', osIcon('landmark'), 'Venta', 'Net Wire + utilidad + ROI'],
   ['intereses', osIcon('trending-down'), 'Intereses', 'HML durante la obra'],
+  ['escenarios', osIcon('target'), 'Escenarios', 'Base vs stress-test'],
   ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
 ];
 function ffUwEstrategia() { return (UW.a && UW.a.inputs && UW.a.inputs.estrategia === 'venta') ? 'venta' : 'hold'; }
@@ -38,7 +41,7 @@ function ffUwNav() { return ffUwEstrategia() === 'venta' ? UW_NAV_VENTA : UW_NAV
 function ffUwSetEstrategia(estr) {
   if (!UW.a) return;
   UW.a.inputs.estrategia = (estr === 'venta') ? 'venta' : 'hold';
-  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'negocio';
+  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'arv';
   ffUwRender();
 }
 window.ffUwSetEstrategia = ffUwSetEstrategia;
@@ -100,7 +103,7 @@ function ffUwNuevo(hipotetica, estrategia) {
   if (estrategia === 'venta' || estrategia === 'hold') inputs.estrategia = estrategia;
   UW.a = { id: null, nombre: hipotetica ? 'Casa hipotética' : 'Nuevo análisis', property_id: null, ff_deal_id: null, es_hipotetica: !!hipotetica, direccion: '', ciudad: 'Austin',
     inputs, outputs: {}, veredicto: null };
-  UW.sub = 'negocio'; ffUwRender();
+  UW.sub = 'arv'; ffUwRender();
 }
 // la estrategia por defecto sale del deal (flip → venta, hold/rentada → hold) — el usuario la puede cambiar
 function ffUwEstrategiaDeDeal(d) {
@@ -116,7 +119,7 @@ function ffUwDefaults() {
     meses_obra: (UW.calib && +UW.calib.obra_meses_prom) || UWc('default_meses_hold', 6),   // tiempo de REMODELACIÓN (calibrado, editable)
     meses_renta: (UW.calib && +UW.calib.holding_meses_prom > 0 && +UW.calib.obra_meses_prom > 0) ? Math.max(0, Math.round((UW.calib.holding_meses_prom - UW.calib.obra_meses_prom) * 10) / 10) : 0,  // rentando hasta el refi
     meses_hold: 0,                                               // DERIVADO = obra + hasta rentar/vender (no se edita suelto)
-    utilities_mes: 250, insurance_mes: UWc('uw_insurance_mes', 0), muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
+    utilities_mes: 250, insurance_mes: UWc('uw_insurance_mes', 0), hoa_mes: 0, muebles: 4000, appraisal_cost: 600, cashout_en_draw: 0,
     contingencia_fija: 0,                                        // valor fijo opcional de contingencia (pisa el %)
     hml_tasa_anual: 0, dscr_tasa_anual: 0, dscr_plazo_anos: 0,   // 0 = usar config; editable inline en Intereses
     hml_capitaliza: 0,                                           // interés/fees que el term sheet CAPITALIZA al payoff
@@ -200,7 +203,7 @@ function ffUwCargarCasa(dealId) {
     inp.meses_hold = 0;                                    // derivado
   }
   UW.a = { id: null, nombre: (d.address || '').split(',')[0], property_id: d.property_id, ff_deal_id: d.id, es_hipotetica: false, direccion: d.address, ciudad: d.city || 'Austin', inputs: inp, outputs: {}, veredicto: null };
-  UW.sub = 'negocio'; ffUwRender();
+  UW.sub = 'arv'; ffUwRender();
 }
 async function ffUwAbrir(id) {
   const a = UW.analyses.find(x => x.id === id); if (!a) return;
@@ -211,7 +214,7 @@ async function ffUwAbrir(id) {
   // legacy: guardados con hml_finance_pct único → no pisar con 90/100 (mismo % en compra y remo, como antes)
   if (+sIn.hml_finance_pct > 0 && !(+sIn.hml_pct_compra > 0)) { base.hml_pct_compra = 0; base.hml_pct_remo = 0; }
   UW.a = { id: a.id, nombre: a.nombre, property_id: a.property_id, ff_deal_id: a.ff_deal_id, es_hipotetica: a.es_hipotetica, direccion: a.direccion, ciudad: a.ciudad, inputs: Object.assign(base, sIn), outputs: a.outputs || {}, veredicto: a.veredicto };
-  UW.sub = 'negocio'; ffUwRender();
+  UW.sub = 'arv'; ffUwRender();
 }
 async function ffUwGuardar() {
   if (!UW.a) return;
@@ -434,9 +437,10 @@ function ffUwCalcIntereses(inp, cashout, negocio) {
   const taxPctI = +inp.refi_tax_pct > 0 ? +inp.refi_tax_pct : UWc('refi_tax_pct', 2.1);
   const taxMes = R2i(valorTasadoI * (taxPctI / 100) / 12);
   const seguroMes = R2i(((+inp.refi_seguro_anual > 0 ? +inp.refi_seguro_anual : UWc('refi_seguro_anual', 1900))) / 12);
-  const pitiTotal = pagoDscr > 0 ? R2i(pagoDscr + taxMes + seguroMes) : 0;
+  const hoaMes = R2i(+inp.hoa_mes || 0);
+  const pitiTotal = pagoDscr > 0 ? R2i(pagoDscr + taxMes + seguroMes + hoaMes) : 0;
   return { financia: prestamoBruto, prestamoBruto, intMensualHarmony, interesTotalObra, dscrPrincipal, pagoDscr,
-    taxMes, seguroMes, pitiTotal, taxPct: taxPctI, valorTasado: valorTasadoI,
+    taxMes, seguroMes, hoaMes, pitiTotal, taxPct: taxPctI, valorTasado: valorTasadoI,
     tasaHarmony: ffUwTasaHml(inp), tasaDscr: ffUwTasaDscr(inp), plazoDscr: ffUwPlazoDscr(inp),
     mesesObra, mesesRenta: negocio ? negocio.mesesRenta : ffUwMesesRenta(inp), mesesHold: negocio ? negocio.mesesHold : ffUwMesesHold(inp) };
 }
@@ -449,10 +453,11 @@ function ffUwCalcIngreso(inp, arv, intereses) {
   const pmFee = Math.round(renta * UWc('pm_fee_pct', 8) / 100);
   const vacancy = Math.round(renta * UWc('vacancy_pct', 5) / 100);
   const mantenimiento = Math.round(renta * UWc('mantenimiento_pct', 5) / 100);
-  const flujo = renta - pagoDscr - impuestos - seguro - pmFee - vacancy - mantenimiento;
+  const hoa = Math.round(+inp.hoa_mes || 0);
+  const flujo = renta - pagoDscr - impuestos - seguro - hoa - pmFee - vacancy - mantenimiento;
   const cashLeft = (inp._cashLeftIn != null ? inp._cashLeftIn : 0);
   const cashOnCash = cashLeft > 0 ? Math.round(100 * (flujo * 12) / cashLeft * 10) / 10 : null;
-  return { renta, pagoDscr, impuestos, seguro, pmFee, vacancy, mantenimiento, flujo, cashOnCash, cashLeft };
+  return { renta, pagoDscr, impuestos, seguro, hoa, pmFee, vacancy, mantenimiento, flujo, cashOnCash, cashLeft };
 }
 // ═══ CALCULADORA · VENTA (MODO A: fix & flip) — modelo de experto ═══
 // Salida = VENDER: el ARV es el PRECIO DE SALIDA (una sola ganancia). Cascada itemizada:
@@ -516,8 +521,7 @@ function ffUwCalcVenta(inp, arv, negocio, intereses) {
     maoPct, maoVenta, regla70, splitInvPct, parteInv, parteOp };
 }
 // ═══ CALCULADORA 6 · VISTA UNIFICADA ═══
-function ffUwComputeAll() {
-  const inp = UW.a.inputs;
+function ffUwComputeFor(inp) {
   const esVenta = inp.estrategia === 'venta';
   const negocio = ffUwCalcNegocio(inp);
   inp._remodCalc = negocio.remod; inp._ctcCalc = negocio.cashToClose;
@@ -556,6 +560,8 @@ function ffUwComputeAll() {
   const veredicto = go ? 'GO' : (gAllIn || gDeficit) ? 'revisar' : 'NO-GO';
   return { negocio, arv, cashout, intereses, ingreso, venta, unificada: { modo: 'hold', allIn, allInPct, allInMax, mao, cashToClose: negocio.cashToClose, cashOut: cashout.cashOut, recuperaPct: cashout.recuperaPct, cashLeftIn: inp._cashLeftIn, flujo: ingreso.flujo, roi, gAllIn, gDeficit, gFlujo, veredicto } };
 }
+function ffUwComputeAll() { return ffUwComputeFor(UW.a.inputs); }
+window.ffUwComputeFor = ffUwComputeFor;
 
 // ═══ SHELL + RENDER ═══
 function ffUwShell() {
@@ -578,8 +584,8 @@ function ffUwShell() {
 }
 function ffUwSubBody() {
   // guard: si la estrategia no incluye este tab (p.ej. venir de hold con sub='ingreso' a venta), volvé a Negocio
-  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'negocio';
-  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, venta: ffUwViewVenta, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewNegocio)();
+  if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'arv';
+  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, venta: ffUwViewVenta, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, escenarios: ffUwViewEscenarios, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewArv)();
 }
 // ─── helpers de diseño (premium, legible para no-expertos) ───
 const UW_DLR = '\u0024';
@@ -983,6 +989,62 @@ function ffUwViewVenta() {
     + hero + semaforo + inputs + cascada + metricas + '</div>';
 }
 window.ffUwViewVenta = ffUwViewVenta;
+
+// ─── ESCENARIOS · mismo motor, sin alterar ni guardar el análisis Base ───
+function ffUwEscSet(k, v) {
+  UW.escenario[k] = Number(v) || 0;
+  ffUwRender();
+}
+function ffUwEscPreset(tipo) {
+  UW.escenario = tipo === 'optimista'
+    ? { arv_pct: 6, rehab_pct: -5, tasa_delta: -0.5 }
+    : tipo === 'base'
+      ? { arv_pct: 0, rehab_pct: 0, tasa_delta: 0 }
+      : { arv_pct: -8, rehab_pct: 15, tasa_delta: 1 };
+  ffUwRender();
+}
+window.ffUwEscSet = ffUwEscSet; window.ffUwEscPreset = ffUwEscPreset;
+function ffUwEscenarioOutput() {
+  const base = ffUwComputeAll();
+  const s = UW.escenario || {};
+  const inp = JSON.parse(JSON.stringify(UW.a.inputs || {}));
+  inp.arv = Math.round((base.arv.probable || 0) * (1 + (+s.arv_pct || 0) / 100));
+  inp.arv_airtable = 0;
+  inp.appraisal = 0; // el escenario prueba el valor; una tasación real sigue intacta en el Base
+  inp.venta_precio = 0;
+  inp.remod_directo = Math.round((base.negocio.remod || 0) * (1 + (+s.rehab_pct || 0) / 100));
+  inp.usar_estimador = false;
+  inp.hml_tasa_anual = Math.max(0, ffUwTasaHml(inp) + (+s.tasa_delta || 0));
+  inp.dscr_tasa_anual = Math.max(0, ffUwTasaDscr(inp) + (+s.tasa_delta || 0));
+  return { base, escenario: ffUwComputeFor(inp), supuestos: { ...s }, inputs: inp };
+}
+window.ffUwEscenarioOutput = ffUwEscenarioOutput;
+function ffUwViewEscenarios() {
+  const r = ffUwEscenarioOutput(), b = r.base, e = r.escenario, sb = b.unificada, se = e.unificada;
+  const venta = ffUwEstrategia() === 'venta';
+  const delta = (x, y, money) => {
+    if (x == null || y == null) return '—';
+    const d = y - x; return (d > 0 ? '+' : '') + (money ? UW_M(d) : Math.round(d * 10) / 10 + '%');
+  };
+  const row = (l, bv, ev, d, good) => '<div style="display:grid;grid-template-columns:minmax(150px,1.4fr) 1fr 1fr .8fr;gap:10px;padding:10px 12px;border-top:1px solid var(--line,rgba(255,255,255,.1));align-items:center"><b style="font-size:12px">' + l + '</b><span>' + bv + '</span><span style="font-weight:800">' + ev + '</span><span style="font-size:11px;color:' + (good ? 'var(--pos,#4ade9e)' : 'var(--amber,#fbbf24)') + '">' + d + '</span></div>';
+  const metricas = venta
+    ? row('ARV / precio', UW_M(b.venta.precio), UW_M(e.venta.precio), delta(b.venta.precio, e.venta.precio, true), e.venta.precio >= b.venta.precio)
+      + row('Rehab', UW_M(b.negocio.remod), UW_M(e.negocio.remod), delta(b.negocio.remod, e.negocio.remod, true), e.negocio.remod <= b.negocio.remod)
+      + row('Utilidad neta', UW_M(b.venta.utilidad), UW_M(e.venta.utilidad), delta(b.venta.utilidad, e.venta.utilidad, true), e.venta.utilidad >= b.venta.utilidad)
+      + row('ROI', b.venta.roi != null ? b.venta.roi + '%' : '—', e.venta.roi != null ? e.venta.roi + '%' : '—', delta(b.venta.roi, e.venta.roi, false), (e.venta.roi || 0) >= (b.venta.roi || 0))
+    : row('ARV', UW_M(b.arv.probable), UW_M(e.arv.probable), delta(b.arv.probable, e.arv.probable, true), e.arv.probable >= b.arv.probable)
+      + row('Rehab', UW_M(b.negocio.remod), UW_M(e.negocio.remod), delta(b.negocio.remod, e.negocio.remod, true), e.negocio.remod <= b.negocio.remod)
+      + row('Cash-out', UW_M(b.cashout.cashOut), UW_M(e.cashout.cashOut), delta(b.cashout.cashOut, e.cashout.cashOut, true), e.cashout.cashOut >= b.cashout.cashOut)
+      + row('Flujo mensual', UW_M(b.ingreso.flujo), UW_M(e.ingreso.flujo), delta(b.ingreso.flujo, e.ingreso.flujo, true), e.ingreso.flujo >= b.ingreso.flujo)
+      + row('Cash-on-cash', b.ingreso.cashOnCash != null ? b.ingreso.cashOnCash + '%' : '—', e.ingreso.cashOnCash != null ? e.ingreso.cashOnCash + '%' : '—', delta(b.ingreso.cashOnCash, e.ingreso.cashOnCash, false), (e.ingreso.cashOnCash || 0) >= (b.ingreso.cashOnCash || 0));
+  const input = (k, l, suffix) => '<label style="display:block"><span style="font-size:10.5px;color:var(--txt3,#8b93a1);font-weight:700">' + l + '</span><div style="display:flex;align-items:center;gap:7px;margin-top:4px"><input type="range" min="' + (k === 'tasa_delta' ? -2 : -20) + '" max="' + (k === 'tasa_delta' ? 4 : 30) + '" step="' + (k === 'tasa_delta' ? .25 : 1) + '" value="' + (UW.escenario[k] || 0) + '" onchange="ffUwEscSet(\'' + k + '\',this.value)" style="width:100%"><b style="min-width:48px;text-align:right">' + (UW.escenario[k] > 0 ? '+' : '') + (UW.escenario[k] || 0) + suffix + '</b></div></label>';
+  return '<div style="max-width:920px;margin:0 auto"><div style="display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div><div style="font-size:19px;font-weight:800">Escenarios · ¿aguanta el deal?</div><div style="font-size:12.5px;color:var(--txt3,#8b93a1)">Mueve ARV, remodelación y tasa con el mismo motor. El análisis Base no se modifica.</div></div><div style="display:flex;gap:6px"><button class="repbtn ghost" onclick="ffUwEscPreset(\'optimista\')">Optimista</button><button class="repbtn ghost" onclick="ffUwEscPreset(\'base\')">Base</button><button class="repbtn" onclick="ffUwEscPreset(\'conservador\')">Conservador</button></div></div>'
+    + '<div class="card" style="padding:16px;margin-bottom:14px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px">' + input('arv_pct','Cambio en ARV','%') + input('rehab_pct','Cambio en rehab','%') + input('tasa_delta','Cambio en tasa',' pts') + '</div></div>'
+    + '<div class="card" style="overflow-x:auto"><div style="min-width:620px"><div style="display:grid;grid-template-columns:minmax(150px,1.4fr) 1fr 1fr .8fr;gap:10px;padding:11px 12px;background:var(--glass,rgba(255,255,255,.05));font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3,#8b93a1)"><b>Indicador</b><b>Base</b><b>Escenario</b><b>Cambio</b></div>' + metricas + '</div></div>'
+    + '<div style="margin-top:12px;padding:11px 14px;border-radius:10px;background:color-mix(in srgb,' + (se.veredicto === 'GO' ? 'var(--pos,#4ade9e)' : 'var(--amber,#fbbf24)') + ' 10%,transparent);font-size:12px"><b>Resultado:</b> Base <b>' + sb.veredicto + '</b> → Escenario <b>' + se.veredicto + '</b>. Es una proyección bajo supuestos, no una promesa ni un avalúo.</div></div>';
+}
+window.ffUwViewEscenarios = ffUwViewEscenarios;
+
 function ffUwViewUnificada() {
   // Calc 6 = VISTA UNIFICADA PRO (pm/ff-unificada-pro.js): resumen de un vistazo + one-pager inversionista.
   if (window.ffUnificadaView) return ffUnificadaView();

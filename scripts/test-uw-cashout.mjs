@@ -8,6 +8,7 @@ import path from 'node:path';
 
 const src = readFileSync(path.join(import.meta.dirname, '..', 'pm', 'ff-underwriting.js'), 'utf8');
 global.window = {};
+global.osIcon = () => ''; // el motor comparte archivo con la navegación visual
 // eslint-disable-next-line no-eval
 eval(src + '\n;globalThis.__uw = { ffUwCalcCashout, ffUwCalcIntereses, UW };');
 const { ffUwCalcCashout, ffUwCalcIntereses, UW } = globalThis.__uw;

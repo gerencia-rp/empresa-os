@@ -2,6 +2,13 @@
 
 Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code, Claude Desktop, Cowork). Léelo siempre al iniciar una sesión. Mantenelo actualizado con cada decisión técnica importante.
 
+## 🏷️ UNDERWRITING FIX & FLIP · PARIDAD BÓVEDA FASE 1 (24-ago-2026) — LOCAL, PENDIENTE DEPLOY
+
+- El flujo de análisis ahora empieza en **ARV** para Hold y Venta. El ARV profesional confirmado por el usuario es la fuente oficial del análisis; el valor importado de Airtable queda como **ancla histórica**, no como un valor que pise la decisión.
+- Nueva vista **Escenarios**: Optimista/Base/Conservador y controles para ARV, rehab y tasa. Calcula Base vs escenario con el mismo `ffUwComputeFor`; el escenario usa un clon y nunca modifica ni guarda el Base.
+- **HOA mensual** entra en PITI, flujo y comparación de modelos de renta. Default 0 preserva todos los análisis anteriores.
+- Goldens: `node scripts/test-uw-cashout.mjs` y `node scripts/test-uw-scenarios.mjs`. Los cuatro refis reales siguen exactos y el test prueba ARV-first, downside y no mutación.
+
 ## 🧠 CONTRATO DE CONOCIMIENTO DEL EQUIPO IA (25-ago-2026) — EN PRODUCCIÓN
 
 - Cada agente recibe **contexto común del holding** y **especialidad profunda en su área**. Cerebro y gerentes reciben además contexto transversal de todas las empresas.
