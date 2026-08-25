@@ -178,6 +178,8 @@ function osInjectCSS() {
   #os-root .osx-nav.on{background:linear-gradient(90deg,var(--accent-soft),transparent);color:var(--ink);font-weight:650;box-shadow:inset 2px 0 0 var(--accent)}
   #os-root .osx-nav .nd{margin-left:auto;width:7px;height:7px;border-radius:50%}
   #os-root .osx-main{flex:1;min-width:0;padding:24px 30px 60px;max-width:1340px}
+  #os-root .osx-body.jarvis-only{display:block;min-height:calc(100vh - 62px)}
+  #os-root .osx-body.jarvis-only .osx-main{max-width:none;width:100%;padding:18px 22px 32px}
   #os-root .eyebrow{font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:var(--a2);margin-bottom:6px;font-weight:700}
   #os-root .kpi .kn{font-size:11.5px;color:var(--mut);margin-top:5px;line-height:1.5}
   #os-root .kpi .kbig{font-size:29px;font-weight:780;letter-spacing:-.6px;font-variant-numeric:tabular-nums;margin-top:8px}
@@ -654,8 +656,8 @@ function osShell(inner) {
       <div class="osx-live"><span class="pulse"></span>En vivo</div>
       <div class="barr">${osRole() === 'admin' ? '<button class="ibtn" data-osnav="/jarvis" title="Mapa de Agentes · Command Center (avanzado)">' + osIcon('bot') + ' Agentes</button><button class="ibtn" data-osnav="/admin" title="Usuarios, roles y accesos">' + osIcon('shield') + '</button>' : ''}<button class="ibtn" onclick="osToggleTheme()" title="Tema claro/oscuro">◐</button></div>
     </header>
-    <div class="osx-body">
-      <nav class="osx-side">${osSidebar(r, OS._comp)}</nav>
+    <div class="osx-body${r.view === 'jarvis' ? ' jarvis-only' : ''}">
+      ${r.view === 'jarvis' ? '' : `<nav class="osx-side">${osSidebar(r, OS._comp)}</nav>`}
       <main class="osx-main">${inner}</main>
     </div>`;
 }
