@@ -78,11 +78,11 @@ function osInjectCSS() {
   const st = document.createElement('style'); st.id = 'os-styles';
   st.textContent = `
   #os-root{position:fixed;inset:0;z-index:900;overflow:auto;
-    --bg:#08090c;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:#131519;--glassb:rgba(255,255,255,.07);
+    --bg:#060812;--ink:#f1f3f7;--mut:#8b93a1;--mut2:#757d8b;--glass:#101521;--glassb:rgba(111,220,255,.11);
     --a1:#5c79f0;--a2:#3a5be0;--a3:#93b0e2;--pos:#4ade9e;--neg:#ff6b6b;--amber:#fbbf24;
     --accent:#3a5be0;--accent-ink:#ffffff;--accent-2:#5c79f0;--accent-soft:rgba(58,91,224,.18);--glow:rgba(58,91,224,.5);--grad:linear-gradient(120deg,#3a5be0,#5c79f0);
-    --card:#131519;--line:rgba(255,255,255,.07);--txt2:#c7cdd8;--txt3:#8b93a1;--surface-2:#191c22;--surface-solid:#161a20;--radius:20px;
-    --mesh1:rgba(58,91,224,.5);--mesh2:rgba(92,121,240,.16);--mesh3:rgba(58,91,224,.10);--bggrad:#08090c;
+    --card:#101521;--line:rgba(111,220,255,.11);--txt2:#c7cdd8;--txt3:#8b93a1;--surface-2:#151c2a;--surface-solid:#0e1420;--radius:20px;
+    --mesh1:rgba(58,91,224,.5);--mesh2:rgba(111,220,255,.12);--mesh3:rgba(139,124,255,.10);--bggrad:#060812;
     color:var(--ink);background:var(--bg);font-family:'Inter',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
   /* LIGHT canon royal — ESPEJO de ui/tokens.css (mantener sincronizado) */
   #os-root[data-theme="light"]{--bg:#eef1f6;--ink:#0e1420;--mut:#5a6270;--mut2:#6f7785;--glass:#ffffff;--glassb:rgba(14,20,32,.09);
@@ -92,7 +92,7 @@ function osInjectCSS() {
     --mesh1:rgba(43,68,198,.24);--mesh2:rgba(62,91,224,.08);--mesh3:rgba(43,68,198,.05);--bggrad:#eef1f6}
   #os-root *{box-sizing:border-box;margin:0;padding:0}
   #os-root .bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(1100px 560px at 78% -12%,var(--mesh1),transparent 62%),radial-gradient(760px 520px at 8% 2%,var(--mesh2),transparent 58%),radial-gradient(700px 620px at 20% 120%,var(--mesh3),transparent 60%),var(--bggrad)}
-  #os-root .bgfx::after{content:"";position:absolute;inset:0;opacity:.11;background-image:linear-gradient(var(--glassb) 1px,transparent 1px),linear-gradient(90deg,var(--glassb) 1px,transparent 1px);background-size:52px 52px;-webkit-mask-image:radial-gradient(circle at 60% 0%,#000,transparent 75%);mask-image:radial-gradient(circle at 60% 0%,#000,transparent 75%)}
+  #os-root .bgfx::after{content:"";position:absolute;inset:0;opacity:.38;background-image:radial-gradient(circle at 16% 18%,rgba(255,255,255,.72) 0 1px,transparent 1.4px),radial-gradient(circle at 68% 26%,rgba(111,220,255,.62) 0 1px,transparent 1.5px),radial-gradient(circle at 88% 72%,rgba(147,176,226,.56) 0 1px,transparent 1.4px);background-size:241px 223px,317px 281px,419px 367px;-webkit-mask-image:linear-gradient(#000,transparent 78%);mask-image:linear-gradient(#000,transparent 78%)}
   #os-root .wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:22px 30px 60px}
   #os-root .bar{display:flex;align-items:center;gap:14px;margin-bottom:24px}
   #os-root .logo{width:38px;height:38px;border-radius:11px;background:var(--grad);display:grid;place-items:center;color:var(--accent-ink);font-weight:900;font-size:15px;box-shadow:0 0 18px var(--glow)}
@@ -105,7 +105,7 @@ function osInjectCSS() {
   #os-root h1{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:640;letter-spacing:-.3px}#os-root h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   #os-root .sub{color:var(--mut);font-size:13px;margin:5px 0 20px}
   #os-root .grid{display:grid;gap:16px}#os-root .k4{grid-template-columns:repeat(4,minmax(0,1fr))}#os-root .k3{grid-template-columns:repeat(3,minmax(0,1fr))}#os-root .k2{grid-template-columns:repeat(2,minmax(0,1fr))}
-  #os-root .card{position:relative;background:var(--glass);border:1px solid var(--glassb);border-radius:var(--radius);padding:19px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 22px 44px -28px rgba(0,0,0,.85);transition:.2s;overflow:hidden}
+  #os-root .card{position:relative;background:linear-gradient(145deg,color-mix(in srgb,var(--glass) 96%,#1d2a46),var(--glass));border:1px solid var(--glassb);border-radius:var(--radius);padding:19px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 22px 44px -28px rgba(0,0,0,.85);transition:.2s;overflow:hidden}
   #os-root[data-theme="light"] .card{box-shadow:0 1px 2px rgba(16,20,28,.04),0 18px 40px -28px rgba(16,20,28,.4)}
   /* Barra de acento superior en KPIs (design-ref .kpi::after) */
   #os-root .grid.k4>.card::after,#os-root .card.kpi::after{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad);opacity:.45}

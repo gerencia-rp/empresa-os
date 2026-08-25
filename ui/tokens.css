@@ -23,11 +23,11 @@
 
   /* ── DARK (default del OS): royal · negro azabache + cobalto ──
      (design-ref.html · data-accent="cobalto") */
-  --bg: #08090c;
+  --bg: #060812;
   --ink: #f1f3f7;            /* text */
   --mut: #8b93a1;            /* muted */
   --mut2: #757d8b;           /* dim/caption — piso de contraste */
-  --glass: #131519;          /* surface (SÓLIDA, ya no translúcida) */
+  --glass: #101521;          /* panel de mando sólido */
   --glassb: rgba(255, 255, 255, .07);  /* border */
   --a1: #5c79f0;             /* accent-2 (azul claro) — hero-num/highlights */
   --a2: #3a5be0;             /* accent (cobalto) */
@@ -37,7 +37,7 @@
   --amber: #fbbf24;          /* warning */
   --bggrad: radial-gradient(1100px 520px at 78% -12%, var(--glow), transparent 62%), var(--bg);
   /* alias familia FF/UW */
-  --card: #131519;
+  --card: #101521;
   --line: rgba(255, 255, 255, .07);
   --txt2: #c7cdd8;
   --txt3: #8b93a1;
@@ -55,8 +55,8 @@
   --paper: var(--bg);
   /* alias design-ref (para que las clases del ref funcionen sin redefinir) */
   --surface: var(--glass);
-  --surface-2: #191c22;
-  --surface-solid: #161a20;
+  --surface-2: #151c2a;
+  --surface-solid: #0e1420;
   --border: var(--line);
   --dim: var(--mut2);
   --text: var(--ink);
@@ -110,11 +110,40 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; 
 .mono { font-family: var(--font-mono); }
 .tabnum { font-variant-numeric: tabular-nums; }
 
+/* ORBITAL COMMAND — la interfaz opera como tablero ejecutivo, no como decorado. */
+body {
+  background:
+    radial-gradient(ellipse 78% 46% at 78% -10%, rgba(58,91,224,.3), transparent 66%),
+    radial-gradient(ellipse 40% 34% at 4% 92%, rgba(111,220,255,.08), transparent 72%),
+    var(--bg);
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .34;
+  background-image:
+    radial-gradient(circle at 16% 18%, rgba(255,255,255,.72) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 68% 26%, rgba(111,220,255,.62) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 88% 72%, rgba(147,176,226,.56) 0 1px, transparent 1.4px);
+  background-size: 241px 223px, 317px 281px, 419px 367px;
+  -webkit-mask-image: linear-gradient(#000, transparent 78%);
+  mask-image: linear-gradient(#000, transparent 78%);
+}
+::selection { color:#fff; background:rgba(58,91,224,.78); }
+* { scrollbar-width:thin; scrollbar-color:rgba(111,220,255,.32) transparent; }
+:where(a,button,input,select,textarea,[tabindex]):focus-visible {
+  outline:2px solid #6fdcff;
+  outline-offset:3px;
+}
+
 /* ════════ COMPONENTES BASE (baja especificidad: los módulos pueden refinar) ════════ */
 
 .ui-card, .card {
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: linear-gradient(145deg, color-mix(in srgb,var(--card) 96%,#1d2a46), var(--card));
+  border: 1px solid color-mix(in srgb, #6fdcff 14%, var(--line));
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
@@ -132,7 +161,7 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; 
 
 /* Botones canónicos (.btn absorbe .cbtn; .btn-ghost absorbe .ibtn/.repbtn.ghost) */
 .btn {
-  background: var(--grad);
+  background: linear-gradient(110deg,#3453dd,#4d72ee 58%,#5aa9e8);
   border: none; color: var(--accent-ink); font-weight: 700;
   padding: 9px 16px; border-radius: 11px; cursor: pointer; font-size: 12.5px;
 }
@@ -141,6 +170,10 @@ h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 600; 
   font-weight: 600; padding: 9px 14px; border-radius: 11px; cursor: pointer; font-size: 12.5px;
 }
 .btn-ghost:hover { border-color: var(--a2); }
+
+@media (prefers-reduced-motion:no-preference) {
+  .ui-card:hover, .card:hover { box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 28px 72px -54px rgba(111,220,255,.75); }
+}
 /* .repbtn vivía indefinido en el shell (bug de la auditoría) — se define acá */
 .repbtn { background: var(--grad); border: none; color: var(--accent-ink); font-weight: 700; padding: 7px 13px; border-radius: 10px; cursor: pointer; font-size: 12px; }
 .repbtn.ghost { background: var(--card); border: 1px solid var(--line); color: var(--ink); font-weight: 600; }

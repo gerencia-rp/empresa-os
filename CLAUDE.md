@@ -2,6 +2,14 @@
 
 Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code, Claude Desktop, Cowork). Léelo siempre al iniciar una sesión. Mantenelo actualizado con cada decisión técnica importante.
 
+## ORBITAL COMMAND · SISTEMA VISUAL (25-ago-2026)
+
+- Empresa OS se expresa como **centro de mando ejecutivo**: fondo espacial profundo, paneles instrumentales, foco cian y luz cobalto para navegación y jerarquía.
+- No es una piel de videojuego. Las cifras reales, fuentes, evidencia, decisiones y estados operativos conservan el protagonismo.
+- `ui/tokens.css` es la fuente visual canónica y `os/os.js` mantiene su espejo dentro de `#os-root`.
+- Verde/ámbar/rojo siguen reservados para estados reales; el brillo no puede fingir actividad ni confianza.
+- Toda animación respeta `prefers-reduced-motion`; selección, foco y scrollbars forman parte del acabado.
+
 ## 🛡️ HARDENING INTEGRAL · FASE 1 (24-ago-2026) — DESPLEGADA
 
 - `api/_fetch.mjs` fija timeouts para las integraciones Vercel críticas (Supabase/Auth/REST, Claude, Voyage, cron, Storage, WhatsApp y Resend). Las lecturas idempotentes pueden reintentar con backoff; las escrituras no se reintentan automáticamente.
