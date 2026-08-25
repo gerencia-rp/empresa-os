@@ -5,6 +5,10 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/api/health",
+      "destination": "/api/brain-chat?resource=health"
+    },
+    {
       "source": "/((?!api/|assets/|viral|diag|mi-plan|inversionista$|diagnostico|.*\\.).*)",
       "destination": "/"
     }

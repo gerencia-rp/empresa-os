@@ -11,6 +11,7 @@
 //   GET  /api/cron/check-contracts
 //   POST /api/cron/check-contracts
 const DEFAULT_FUNCTIONS_URL = "https://nezbaljfhhyznhltpjnk.supabase.co/functions/v1";
+import { fetchWithTimeout } from "../_fetch.mjs";
 
 export async function runCheck(check, req, res) {
   // Si CRON_SECRET está configurado, exigirlo (Vercel Cron lo envía automáticamente).
@@ -29,11 +30,11 @@ export async function runCheck(check, req, res) {
   }
   const base = process.env.SUPABASE_FUNCTIONS_URL || DEFAULT_FUNCTIONS_URL;
   try {
-    const r = await fetch(`${base}/pm-alerts?check=${encodeURIComponent(check)}`, {
+    const r = await fetchWithTimeout(`${base}/pm-alerts?check=${encodeURIComponent(check)}`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ triggered_by: "vercel-cron", check }),
-    });
+    }, 50000);
     const text = await r.text();
     res.status(r.status).setHeader("content-type", "application/json").send(text);
   } catch (e) {

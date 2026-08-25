@@ -5,6 +5,7 @@
 // Configuración (una sola vez, en Vercel → Project Settings → Environment Variables):
 //   ANTHROPIC_API_KEY = sk-ant-...            (obligatorio)
 //   VIRAL_PASSWORD     = una-clave-tuya       (opcional, protege el endpoint)
+import { fetchWithTimeout } from './_fetch.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
   const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body,
-    });
+    }, 45000);
     const text = await r.text();
     res.status(r.status).setHeader('content-type', 'application/json');
     res.send(text);

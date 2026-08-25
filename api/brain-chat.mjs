@@ -9,6 +9,7 @@
 //   Fusionado acá por el límite de 12 Serverless Functions. Requiere JWT válido (verifyAuth).
 import { recallMemories, embed, sbREST, vecLiteral } from './_brain.mjs';
 import { verifyAuth } from './_pm-auth.mjs';
+import { fetchWithTimeout } from './_fetch.mjs';
 
 // ─── MEMORIA (pm_brain_memory) ───
 const MEM_TIPOS = ['hecho', 'decisión', 'aprendizaje', 'nota'];
@@ -62,6 +63,30 @@ const MAX_TOKENS = 1400;
 const MAX_HISTORY = 8; // últimos N turnos para acotar contexto/costo
 
 function jsonSafe(v, fallback) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return fallback; } }
+
+async function healthHandler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  const started = Date.now();
+  const checks = {};
+  try {
+    const supa = process.env.SUPABASE_URL || 'https://nezbaljfhhyznhltpjnk.supabase.co';
+    const r = await fetchWithTimeout(`${supa}/auth/v1/health`, { headers: { accept: 'application/json' } }, 4000, 1);
+    checks.supabase = { ok: r.ok, status: r.status, ms: Date.now() - started };
+  } catch (error) {
+    checks.supabase = { ok: false, error: error.message, ms: Date.now() - started };
+  }
+  checks.configuration = {
+    ok: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.ANTHROPIC_API_KEY),
+    supabase_service: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
+    cron_secret: Boolean(process.env.CRON_SECRET),
+  };
+  const ok = checks.supabase.ok && checks.configuration.ok;
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Empresa-OS-Health', ok ? 'ready' : 'degraded');
+  if (req.method === 'HEAD') { res.status(ok ? 200 : 503).end(); return; }
+  res.status(ok ? 200 : 503).json({ ok, status: ok ? 'ready' : 'degraded', version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local', region: process.env.VERCEL_REGION || 'local', duration_ms: Date.now() - started, checks, timestamp: new Date().toISOString() });
+}
 
 // Fase 3: acá se recuperará memoria relevante (pm_brain_memory + embeddings VoyageAI).
 // Por ahora acepta hechos que ya vengan del front (si los hubiera) y los formatea.
@@ -131,7 +156,7 @@ async function parseDocHandler(req, res) {
     ? 'Extraé del statement del préstamo HML un JSON con EXACTAMENTE esta forma: {"casa": "dirección si aparece o null", "fecha_statement": "YYYY-MM-DD|null", "pago_mensual": número, "interes": número|null, "escrow_impound": número|null, "fees": [{"concepto": "...", "monto": número}], "extension": {"monto": número, "meses": número, "fecha": "YYYY-MM-DD"} | null, "notas": "..."}. REGLAS: el pago mensual es el que efectivamente se paga — si el statement trae "trust account reserve impound" (escrow), va INCLUIDO en pago_mensual y desglosado en escrow_impound. Si hay cargo de extensión/prórroga (extension fee, loan extension), va en extension. NO inventes números: lo que no esté, null.'
     : 'Extraé de la factura/recibo un JSON con EXACTAMENTE esta forma: {"vendor": "...", "fecha": "YYYY-MM-DD|null", "total": número, "casa_sugerida": "dirección si aparece o null", "items": [{"descripcion": "...", "monto": número, "categoria": "material"|"mueble"|"herramienta"}], "mixta": true|false, "notas": "..."}. REGLAS: la categorización material/mueble/herramienta es OBLIGATORIA por ítem. Si la factura mezcla categorías (mixta=true), los ítems ya quedan partidos por categoría para cargarse como filas separadas con el mismo comprobante. NO inventes montos.';
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
@@ -139,7 +164,7 @@ async function parseDocHandler(req, res) {
         system: 'Sos un extractor de datos financieros. Respondés ÚNICAMENTE el JSON pedido, sin markdown ni texto extra. Números como number (sin $ ni comas). Lo que no está en el documento es null — jamás inventar.',
         messages: [{ role: 'user', content: [bloque, { type: 'text', text: instr }] }],
       }),
-    });
+    }, 45000);
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { res.status(r.status).json({ error: d?.error?.message || ('Claude HTTP ' + r.status) }); return; }
     const txt = (d.content || []).filter(x => x.type === 'text').map(x => x.text).join('').trim();
@@ -151,6 +176,7 @@ async function parseDocHandler(req, res) {
 
 export default async function handler(req, res) {
   // Routing: ?resource=memory → CRUD de memoria; ?resource=parse-doc → parser Capa 0; si no → chat.
+  if ((req.query && req.query.resource) === 'health') return healthHandler(req, res);
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
   if ((req.query && req.query.resource) === 'parse-doc') return parseDocHandler(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -193,11 +219,11 @@ export default async function handler(req, res) {
   };
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const r = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify(payload),
-    });
+    }, 30000);
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = data?.error?.message || `Error de la API de Claude (HTTP ${r.status}).`;

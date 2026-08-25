@@ -12,6 +12,7 @@
 //
 // Test manual:  GET/POST  /api/cron/sync-airtable
 const DEFAULT_FUNCTIONS_URL = "https://nezbaljfhhyznhltpjnk.supabase.co/functions/v1";
+import { fetchWithTimeout } from "../_fetch.mjs";
 
 export default async function handler(req, res) {
   const secret = process.env.CRON_SECRET;
@@ -29,31 +30,31 @@ export default async function handler(req, res) {
   }
   const base = process.env.SUPABASE_FUNCTIONS_URL || DEFAULT_FUNCTIONS_URL;
   try {
-    const r = await fetch(`${base}/pm-sync-airtable`, {
+    const r = await fetchWithTimeout(`${base}/pm-sync-airtable`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ dry_run: false, archive: false, triggered_by: "vercel-cron" }),
-    });
+    }, 50000);
     const text = await r.text();
     // Sync FF (deals/draws/investors/overhead/HML) + Remodelación en el mismo cron — best-effort, no rompen el PM sync.
     let ffText = null, rmText = null;
     try {
-      const rf = await fetch(`${base}/sync-ff-airtable`, {
+      const rf = await fetchWithTimeout(`${base}/sync-ff-airtable`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ triggered_by: "vercel-cron" }),
-      });
+      }, 50000);
       ffText = await rf.text();
     } catch (e) { ffText = "error: " + e.message; }
     try {
-      const rr = await fetch(`${base}/sync-remodel-airtable`, {
+      const rr = await fetchWithTimeout(`${base}/sync-remodel-airtable`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ triggered_by: "vercel-cron" }),
-      });
+      }, 50000);
       rmText = await rr.text();
     } catch (e) { rmText = "error: " + e.message; }
-    try { await fetch(`${base}/sync-clickup`, { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: "{}" }); } catch (e) { /* best effort */ }
+    try { await fetchWithTimeout(`${base}/sync-clickup`, { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: "{}" }, 50000); } catch (e) { /* best effort */ }
     res.status(r.status).setHeader("content-type", "application/json")
       .send(JSON.stringify({ pm: safeParse(text), ff: safeParse(ffText), remodel: safeParse(rmText) }));
   } catch (e) {

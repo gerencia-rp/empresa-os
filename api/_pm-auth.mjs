@@ -5,6 +5,7 @@
 //   3) CRON_SECRET (si está configurado).
 // Devuelve { ok, via, token } — token es el bearer a usar para leer datos.
 import { PUBLIC_ANON_KEY, supabaseUrl } from "./_pm-report-data.mjs";
+import { fetchWithTimeout } from "./_fetch.mjs";
 
 export async function verifyAuth(req) {
   const hdr = req.headers["authorization"] || req.headers["Authorization"] || "";
@@ -20,9 +21,9 @@ export async function verifyAuth(req) {
   // JWT de usuario → validar con Supabase Auth usando la anon key como apikey.
   const apikey = process.env.SUPABASE_ANON_KEY || PUBLIC_ANON_KEY;
   try {
-    const r = await fetch(`${supabaseUrl()}/auth/v1/user`, {
+    const r = await fetchWithTimeout(`${supabaseUrl()}/auth/v1/user`, {
       headers: { apikey, Authorization: `Bearer ${token}` },
-    });
+    }, 6000, 1);
     if (r.ok) {
       const u = await r.json();
       return { ok: true, via: "user", token, email: u?.email || null };

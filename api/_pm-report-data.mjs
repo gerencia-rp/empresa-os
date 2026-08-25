@@ -1,4 +1,6 @@
 // ════════════════════════════════════════════════════════════════
+
+import { fetchWithTimeout } from './_fetch.mjs';
 // Datos de los reportes PM (semanal · operación / mensual · finanzas).
 // Lee de Supabase (PostgREST) con la service key. Funciona en Node (Vercel
 // Functions) y en scripts locales (Node 18+ trae fetch global).
@@ -30,9 +32,9 @@ export function reportConfigUser(userJWT, env = process.env) {
 }
 
 async function rest(cfg, path) {
-  const r = await fetch(`${cfg.supabaseUrl}/rest/v1/${path}`, {
+  const r = await fetchWithTimeout(`${cfg.supabaseUrl}/rest/v1/${path}`, {
     headers: { apikey: cfg.apikey, Authorization: `Bearer ${cfg.bearer}` },
-  });
+  }, 10000, 1);
   if (!r.ok) throw new Error(`REST ${path} → ${r.status} ${await r.text()}`);
   return r.json();
 }

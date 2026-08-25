@@ -3,6 +3,7 @@
 //   1) VOYAGE_API_KEY en Vercel (directo)  2) edge function generate-embedding
 //   (usa Supabase Secrets)  3) null → memoria sin vector (fallback por recientes).
 import { PUBLIC_ANON_KEY, supabaseUrl } from './_pm-report-data.mjs';
+import { fetchWithTimeout } from './_fetch.mjs';
 
 export const ANON = process.env.SUPABASE_ANON_KEY || PUBLIC_ANON_KEY;
 export const SUPA = supabaseUrl();
@@ -16,19 +17,19 @@ export async function embed(text) {
   const vk = process.env.VOYAGE_API_KEY;
   if (vk) {
     try {
-      const r = await fetch('https://api.voyageai.com/v1/embeddings', {
+      const r = await fetchWithTimeout('https://api.voyageai.com/v1/embeddings', {
         method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + vk },
         body: JSON.stringify({ model: 'voyage-3-lite', input: t, output_dimension: 512 }),
-      });
+      }, 10000);
       if (r.ok) { const d = await r.json(); const v = d?.data?.[0]?.embedding; if (Array.isArray(v)) return v; }
     } catch { /* fallthrough */ }
   }
   // Fallback: edge function (tiene VOYAGE_API_KEY en Supabase Secrets si está seteada allá).
   try {
-    const r = await fetch(`${SUPA}/functions/v1/generate-embedding`, {
+    const r = await fetchWithTimeout(`${SUPA}/functions/v1/generate-embedding`, {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + ANON, apikey: ANON },
       body: JSON.stringify({ text: t }),
-    });
+    }, 12000);
     if (r.ok) { const d = await r.json(); if (Array.isArray(d?.embedding) && !d.skipped) return d.embedding; }
   } catch { /* fallthrough */ }
   return null;
@@ -39,7 +40,7 @@ export async function sbREST(path, { method = 'GET', body, bearer, prefer } = {}
   const headers = { apikey: ANON, Authorization: 'Bearer ' + (bearer || ANON) };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (prefer) headers['Prefer'] = prefer;
-  const r = await fetch(`${SUPA}/rest/v1/${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+  const r = await fetchWithTimeout(`${SUPA}/rest/v1/${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined }, 10000, method === 'GET' ? 1 : 0);
   const txt = await r.text();
   let data = null; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
   if (!r.ok) throw new Error(`REST ${path} → ${r.status} ${typeof data === 'string' ? data : JSON.stringify(data)}`);

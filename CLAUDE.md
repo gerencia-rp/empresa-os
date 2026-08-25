@@ -2,6 +2,14 @@
 
 Este archivo es la **memoria persistente** del proyecto para Claude (Claude Code, Claude Desktop, Cowork). Léelo siempre al iniciar una sesión. Mantenelo actualizado con cada decisión técnica importante.
 
+## 🛡️ HARDENING INTEGRAL · FASE 1 (24-ago-2026) — LOCAL, PENDIENTE DEPLOY
+
+- `api/_fetch.mjs` fija timeouts para las integraciones Vercel críticas (Supabase/Auth/REST, Claude, Voyage, cron, Storage, WhatsApp y Resend). Las lecturas idempotentes pueden reintentar con backoff; las escrituras no se reintentan automáticamente.
+- `/api/health` se reescribe internamente a `brain-chat?resource=health` para no superar el límite de funciones serverless. Reporta Supabase, configuración, versión, región y latencia sin revelar secretos.
+- `CRON_SECRET` quedó configurado como secreto Sensitive en Vercel Production+Preview; después del deploy, todos los cron deben devolver 401 sin Bearer correcto.
+- Puppeteer/Chromium actualizados juntos a versiones compatibles con Node 20 (`puppeteer-core@24.43.1`, `@sparticuz/chromium@147.0.0`). Se redujo la auditoría de 8 a 3 alertas altas; las 3 restantes son la misma cadena `extract-zip` de Puppeteer y solo se elimina con Puppeteer 25, que exige Node >=22.12 y contradice el runtime 20.x actual. Riesgo aceptado temporalmente hasta migrar runtime y validar PDFs.
+- Tracker integral: `docs/IMPROVE-APP-PLAN.md` y artefactos CUSTOMER/DESIGN/EXPERIMENTS/POSITIONING/PRODUCT.
+
 ## 🏷️ UNDERWRITING FIX & FLIP · PARIDAD BÓVEDA FASE 1 (24-ago-2026) — LOCAL, PENDIENTE DEPLOY
 
 - El flujo de análisis ahora empieza en **ARV** para Hold y Venta. El ARV profesional confirmado por el usuario es la fuente oficial del análisis; el valor importado de Airtable queda como **ancla histórica**, no como un valor que pise la decisión.

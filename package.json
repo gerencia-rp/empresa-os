@@ -16,7 +16,7 @@
     "esbuild": "^0.24.0"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^131.0.0",
-    "puppeteer-core": "^23.10.0"
+    "@sparticuz/chromium": "^147.0.0",
+    "puppeteer-core": "^24.43.1"
   }
 }
