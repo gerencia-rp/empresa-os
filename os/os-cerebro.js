@@ -15,6 +15,10 @@
 
   const CB = { open: false, busy: false, chat: [], mounted: false };
   const E = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  // `sb` se declara con `const` en app.js: existe en el scope global de scripts,
+  // pero no como propiedad `window.sb`. Usar este helper evita que el FAB quede
+  // sin montar aunque la sesión ya esté autenticada.
+  const client = () => { try { return typeof sb !== 'undefined' ? sb : null; } catch (_) { return null; } };
 
   function pantallaActual() {
     // Etiqueta amigable de dónde está parado el usuario (para dar contexto al Cerebro)
@@ -189,8 +193,8 @@
     // Solo para usuarios logueados (el Cerebro es interno). El portal del inversor
     // standalone no incluye este script.
     try {
-      if (!window.sb) return;
-      const s = await sb.auth.getSession();
+      const db = client(); if (!db) return;
+      const s = await db.auth.getSession();
       if (s && s.data && s.data.session) mount();
     } catch (e) {}
   }
@@ -199,7 +203,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
   try {
-    if (window.sb) sb.auth.onAuthStateChange((_ev, session) => {
+    const db = client(); if (db) db.auth.onAuthStateChange((_ev, session) => {
       if (session) mount();
       else { const f = document.getElementById('cerebro-fab'), p = document.getElementById('cerebro-panel'); if (f) f.remove(); if (p) p.remove(); CB.mounted = false; CB.open = false; }
     });

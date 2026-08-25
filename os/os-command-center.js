@@ -33,6 +33,47 @@ function jvEvid(p) {
   if (typeof e === 'object') return e.detalle || e.titulo || e.mensaje || e.texto || JSON.stringify(e);
   return String(e);
 }
+function jvEvidObj(p) {
+  const e = p && (p.evidencia != null ? p.evidencia : p.payload);
+  if (e && typeof e === 'object') return e;
+  if (typeof e === 'string') { try { return JSON.parse(e); } catch (_) { return { detalle: e }; } }
+  return {};
+}
+function jvIsLegacy(a) { return String((a && a.linea) || '').toLowerCase().indexOf('transversal') === 0; }
+function jvIsRecent(a, days) {
+  const ts = a && JV.lastRun[a.id];
+  return !!ts && (Date.now() - new Date(ts).getTime()) < (days || 8) * 86400000;
+}
+function jvOperational(a) { return !!a && !jvIsLegacy(a) && jvIsRecent(a, 8) && a.estado !== 'pausado'; }
+function jvHumanState(a) {
+  if (jvIsLegacy(a)) return { cls: 'b-idle', label: 'absorbido' };
+  if (jvOperational(a)) return { cls: a.estado === 'activo' || a.estado === 'live' ? 'b-work' : 'b-asis', label: a.estado === 'activo' || a.estado === 'live' ? 'funcionando' : 'funcionando · supervisado' };
+  if (a.estado === 'planificado') return { cls: 'b-idle', label: 'por construir' };
+  return { cls: 'b-wait', label: 'falta conectar' };
+}
+function jvAgentHumanBadge(a) { const s = jvHumanState(a); return '<span class="jv-badge ' + s.cls + '">' + s.label + '</span>'; }
+function jvScheduleText(a) {
+  const d = (a && a.disparadores && typeof a.disparadores === 'object') ? a.disparadores : {};
+  const vals = Object.keys(d).map(k => String(d[k] || '')).filter(Boolean);
+  return vals.length ? vals.join(' · ') : 'Sin horario automático';
+}
+function jvProposalInfo(p) {
+  const e = jvEvidObj(p), type = String((p && p.tipo_accion) || '').toLowerCase();
+  const first = (...xs) => xs.find(x => x !== undefined && x !== null && x !== '');
+  let title = first(e.titulo, e.hallazgo, e.mensaje, 'Revisión del agente');
+  let summary = first(e.detalle, e.resumen, e.impacto, e.recomendacion, e.accion_recomendada, e.texto, 'Revisá la información y decidí si querés aplicarla.');
+  if (type.includes('cobranza')) { title = 'Resumen de cobranza'; summary = 'Hay ' + jvNum(first(e.pendientes, e.total_pendientes, e.cantidad, 0)) + ' cobros para revisar' + (first(e.monto, e.total, e.monto_pendiente) != null ? ', por ' + jvMoney(first(e.monto, e.total, e.monto_pendiente)) : '') + '.'; }
+  else if (type.includes('ocupacion')) { title = 'Plan para mejorar ocupación'; summary = first(e.plan, e.recomendacion, e.detalle, summary); }
+  else if (type.includes('cuello')) { title = 'Cuello de botella detectado'; summary = first(e.hallazgo, e.impacto, e.detalle, summary); }
+  else if (type.includes('underwriting')) { title = 'Revisión del negocio'; summary = first(e.veredicto, e.resumen, e.detalle, summary); }
+  else if (type.includes('descuadre')) { title = 'Diferencia en materiales'; summary = first(e.hallazgo, e.detalle, summary); }
+  else if (type.includes('higiene')) { title = 'Datos que necesitan limpieza'; summary = first(e.hallazgo, e.detalle, summary); }
+  else if (type.includes('anomalia')) { title = 'Datos fuera de lo esperado'; summary = first(e.hallazgo, e.detalle, summary); }
+  else if (type.includes('pulso') || type.includes('ejecucion')) { title = 'Seguimiento operativo'; summary = first(e.resumen, e.hallazgo, e.detalle, summary); }
+  if (typeof title === 'object') title = 'Revisión del agente';
+  if (typeof summary === 'object') summary = first(summary.detalle, summary.mensaje, summary.resumen, 'Información disponible para revisión.');
+  return { title: String(title), summary: String(summary), source: first(e.fuente, e.source, ''), cut: first(e.corte, e.fecha, '') };
+}
 function jvFmtTs(ts) {
   if (!ts) return 'sin corridas';
   const d = new Date(ts); const min = Math.floor((Date.now() - d.getTime()) / 60000);
@@ -109,12 +150,12 @@ const JV_CAPAS = [
 ];
 const JV_NAV = [
   { k: 'network', ic: 'network', t: 'Mapa de Agentes' },
-  { k: 'command', ic: 'layout', t: 'Command Center' },
+  { k: 'command', ic: 'layout', t: 'Sala de Dirección' },
   { k: 'brief', ic: 'sun', t: 'Brief del CEO' },
-  { k: 'propuestas', ic: 'inbox', t: 'Propuestas' },
+  { k: 'propuestas', ic: 'inbox', t: 'Decisiones' },
   { k: 'empresas', ic: 'building', t: 'Empresas' },
   { k: 'horarios', ic: 'clock', t: 'Horarios' },
-  { k: 'vault', ic: 'library', t: 'Knowledge Vault' },
+  { k: 'vault', ic: 'library', t: 'Memoria compartida' },
   { k: 'reportes', ic: 'chart', t: 'Reportes' },
 ];
 const JV_EMPRESAS = [
@@ -275,6 +316,15 @@ function jvCSS() {
     '#os-root .jv-appr button:disabled{opacity:.5}',
     '#os-root .jv-appr .ok{color:var(--jc-grn);border-color:rgba(52,211,153,.3)}#os-root .jv-appr .no{color:var(--jc-pink);border-color:rgba(244,114,182,.3)}',
     '#os-root .jv-empty{font-size:11px;color:var(--jc-mut);padding:6px 2px}',
+    '#os-root .jv-status-strip{display:flex;gap:8px;flex-wrap:wrap;margin:-10px 0 18px}',
+    '#os-root .jv-status-strip span{font-size:11px;padding:6px 10px;border:1px solid var(--jc-line);border-radius:10px;color:var(--jc-mut)}',
+    '#os-root .jv-decision{background:var(--jc-card);border:1px solid var(--jc-line);border-left:3px solid var(--jc-purple);border-radius:12px;padding:13px 14px;margin-bottom:10px}',
+    '#os-root .jv-decision.alert{border-left-color:var(--jc-pink)}',
+    '#os-root .jv-decision h4{font-size:13px;margin:0 0 5px}',
+    '#os-root .jv-decision p{font-size:12px;color:var(--jc-mut);line-height:1.5;margin:0}',
+    '#os-root .jv-simple-list{display:grid;gap:8px}',
+    '#os-root .jv-simple-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--jc-line);border-radius:10px;background:rgba(255,255,255,.015)}',
+    '#os-root .jv-simple-row .body{flex:1;min-width:0}#os-root .jv-simple-row .body b{display:block;font-size:12.5px}#os-root .jv-simple-row .body span{display:block;font-size:10.5px;color:var(--jc-mut);margin-top:2px}',
     // feed
     '#os-root .jv-feed{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:4px 4px;max-height:320px;overflow:auto}',
     '#os-root .jv-frow{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-bottom:1px solid var(--jc-line);font-size:11.5px}',
@@ -340,6 +390,15 @@ function jvCSS() {
     '#os-root .jv-linea-h .jv-chip{margin-left:auto}',
     '#os-root .jv-eqh{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--jc-mut);margin:12px 2px 8px}',
     '#os-root .jv-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}',
+    '#os-root .jv-network-stage{position:relative;padding-top:8px}',
+    '#os-root .jv-map-hub{width:min(560px,100%);margin:0 auto 42px;padding:18px 20px;border:1px solid rgba(167,139,250,.42);border-radius:16px;background:radial-gradient(circle at 20% 20%,rgba(167,139,250,.2),rgba(14,18,32,.96) 62%);display:flex;align-items:center;gap:14px;box-shadow:0 18px 60px rgba(56,189,248,.08),0 0 28px rgba(167,139,250,.12);position:relative}',
+    '#os-root .jv-map-hub::after{content:"";position:absolute;left:50%;top:100%;height:42px;border-left:2px dashed rgba(56,189,248,.55);animation:jvflow 1.2s linear infinite}',
+    '#os-root .jv-map-hub .orb{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:#d8ccff;background:linear-gradient(135deg,rgba(167,139,250,.48),rgba(56,189,248,.24));box-shadow:0 0 22px rgba(167,139,250,.38)}',
+    '#os-root .jv-map-hub .body{flex:1}#os-root .jv-map-hub .body b{display:block;font-size:17px}#os-root .jv-map-hub .body span{font-size:11px;color:var(--jc-mut)}',
+    '#os-root .jv-linea-h{position:relative}',
+    '#os-root .jv-linea-h::before{content:"";position:absolute;left:-14px;width:8px;height:8px;border-radius:50%;background:var(--lc);box-shadow:0 0 12px var(--lc);animation:jvpulse 1.8s infinite}',
+    '#os-root .jv-cards{position:relative;padding-left:14px;border-left:1px dashed rgba(120,140,180,.28)}',
+    '@keyframes jvflow{to{border-left-color:rgba(167,139,250,.25);transform:translateY(4px)}}',
     '#os-root .jv-card2{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;padding:14px;display:flex;flex-direction:column}',
     '#os-root .jv-card2.jv-editing{border-color:var(--jc-purple)}',
     '#os-root .jv-c2-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}',
@@ -451,14 +510,14 @@ window.jvView = jvView;
 
 function jvSidebar() {
   const nav = JV_NAV.map(n => '<a class="' + (JV.tab === n.k ? 'on' : '') + '" onclick="jvNav(\'' + n.k + '\')">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</a>').join('');
-  const todos = '<div class="jv-mini jv-mini-all' + (JV.filterLinea == null ? ' on' : '') + '" onclick="jvFilterClear()" style="cursor:pointer"><div class="ic">' + osIcon('list', { size: 13 }) + '</div>Todos<span class="stt idle" style="visibility:hidden"></span></div>';
-  const minis = JV_LINEAS.filter(L => JV.agents.some(a => a.linea === L.linea) || JV_LINEA_PLANNED.includes(L.linea)).map(L => {
+  const todos = '<div class="jv-mini jv-mini-all' + (JV.filterLinea == null ? ' on' : '') + '" onclick="jvFilterClear()" style="cursor:pointer"><div class="ic">' + osIcon('list', { size: 13 }) + '</div>Todo el equipo<span class="stt idle" style="visibility:hidden"></span></div>';
+  const minis = JV_LINEAS.filter(L => L.linea.indexOf('Transversal') !== 0 && (JV.agents.some(a => a.linea === L.linea && !jvIsLegacy(a)) || JV_LINEA_PLANNED.includes(L.linea))).map(L => {
     const st = jvLineaStatus(L.linea);
     return '<div class="jv-mini' + (JV.filterLinea === L.linea ? ' on' : '') + '" onclick="jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><div class="ic">' + osIcon(L.icon, { size: 13 }) + '</div>' + OS_E(L.linea) + '<span class="stt ' + st + '"></span></div>';
   }).join('');
   return '<aside class="jv-side"><div class="jv-logo"><div class="m"></div><b>Rental Profitss</b></div>'
     + '<nav class="jv-nav">' + nav + '</nav>'
-    + '<div class="jv-lbl">Escuadras</div>' + todos + minis + '</aside>';
+    + '<div class="jv-lbl">Áreas</div>' + todos + minis + '</aside>';
 }
 function jvTopBar() {
   const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
@@ -482,14 +541,20 @@ function jvTabBody() {
 // ════════════════════════════════════════════════════════════════
 function jvMapaView() {
   const canEdit = jvRole() === 'admin';
-  const activos = JV.agents.filter(a => ['activo', 'live'].includes(a.estado)).length;
+  const current = JV.agents.filter(a => !jvIsLegacy(a));
+  const activos = current.filter(jvOperational).length;
+  const pendientes = current.length - activos;
+  const legacy = JV.agents.length - current.length;
   const flt = JV.filterLinea;
-  const lineas = flt ? JV_LINEAS.filter(L => L.linea === flt) : JV_LINEAS;
+  const baseLineas = JV_LINEAS.filter(L => L.linea !== 'Comando' && L.linea.indexOf('Transversal') !== 0);
+  const lineas = flt ? baseLineas.filter(L => L.linea === flt) : baseLineas;
   let html = '<div class="jv-eyebrow">Mapa de Agentes</div>'
-    + '<div class="jv-lead">La empresa de trabajadores digitales — holding → líneas → escuadras → agentes. ' + JV.agents.length + ' agentes · ' + activos + ' activos. Tarjetas editables' + (canEdit ? '' : ' (solo admin)') + '.</div>'
+    + '<div class="jv-lead">Tu equipo digital organizado por área. “Supervisado” significa que trabaja y deja la decisión final en manos de una persona.</div>'
+    + '<div class="jv-status-strip"><span><b style="color:var(--jc-grn)">' + activos + '</b> funcionando</span><span><b style="color:var(--jc-amber)">' + pendientes + '</b> por conectar o completar</span>' + (legacy ? '<span>' + legacy + ' agentes antiguos ocultos porque ya fueron absorbidos</span>' : '') + '</div>'
+    + '<div class="jv-network-stage"><div class="jv-map-hub"><div class="orb">' + osIcon('brain', { size: 22 }) + '</div><div class="body"><b>Cerebro Ejecutivo</b><span>Coordina el equipo, comparte contexto, reúne perspectivas y te entrega la decisión final.</span></div><span class="jv-badge b-work">orquestando</span></div>'
     + (flt ? '<div class="jv-filter-bar">' + osIcon('filter', { size: 13 }) + ' Filtrando: <b>' + OS_E(flt) + '</b> <button class="jv-filter-x" onclick="jvFilterClear()">' + osIcon('x', { size: 12 }) + ' Todos</button></div>' : '');
   lineas.forEach(L => {
-    const ags = JV.agents.filter(a => a.linea === L.linea).sort((a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden));
+    const ags = current.filter(a => a.linea === L.linea).sort((a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden));
     if (!ags.length) {
       if (JV_LINEA_PLANNED.includes(L.linea)) html += jvLineaHeader(L, 0, true);
       return;
@@ -502,7 +567,7 @@ function jvMapaView() {
         + '<div class="jv-cards">' + eqAgs.map((a, i) => jvAgentCard(a, canEdit, i > 0, i < eqAgs.length - 1)).join('') + '</div>';
     });
   });
-  return html;
+  return html + '</div>';
 }
 function jvLineaHeader(L, count, planned) {
   return '<div class="jv-linea-h" style="--lc:' + L.color + '"><div class="ic">' + osIcon(L.icon, { size: 16 }) + '</div><b>' + OS_E(L.linea) + '</b>'
@@ -519,22 +584,19 @@ function jvFmtTarea(t) {
 }
 function jvAgentCard(a, canEdit, canUp, canDown) {
   if (JV.mapEdit === a.id) return jvAgentEditForm(a);
-  const skills = Array.isArray(a.skills) ? a.skills : [];
   const tareas = Array.isArray(a.tareas) ? a.tareas : [];
-  const disp = (a.disparadores && typeof a.disparadores === 'object') ? a.disparadores : {};
-  const dispStr = Object.keys(disp).map(k => k + ': ' + disp[k]).join(' · ');
-  const evalStr = a.eval_score != null ? ('eval ' + a.eval_score + '%' + (a.eval_fecha ? ' · ' + a.eval_fecha : '')) : '';
+  const skills = Array.isArray(a.skills) ? a.skills : [];
+  const pend = JV.props.filter(p => p.agent_id === a.id && p.estado === 'propuesta').length;
   return '<div class="jv-card2">'
     + '<div class="jv-c2-top"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 15 }) + '</div>'
     + '<div class="jv-c2-nm"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E((a.capa || '') + ' · ' + jvFmtTs(JV.lastRun[a.id])) + '</span></div>'
-    + jvEstadoBadge(a.estado) + '</div>'
+    + jvAgentHumanBadge(a) + '</div>'
     + '<p class="jv-c2-resp">' + OS_E(a.responsabilidad || a.proceso || '') + '</p>'
-    + (skills.length ? '<div class="jv-c2-chips">' + skills.slice(0, 6).map(s => '<span class="jv-chip">' + OS_E(String(s)) + '</span>').join('') + '</div>' : '')
-    + (tareas.length ? '<div class="jv-c2-tareas">' + tareas.slice(0, 4).map(jvFmtTarea).join('') + '</div>' : '')
-    + '<div class="jv-c2-meta"><span class="jv-chip">' + OS_E(a.nivel_riesgo || '—') + '</span>'
-    + (evalStr ? '<span class="jv-chip">' + OS_E(evalStr) + '</span>' : '')
-    + (a.dueno_humano ? '<span class="jv-chip">' + osIcon('user', { size: 11 }) + ' ' + OS_E(a.dueno_humano) + '</span>' : '')
-    + (dispStr ? '<span class="jv-chip">' + osIcon('clock', { size: 11 }) + ' ' + OS_E(dispStr) + '</span>' : '') + '</div>'
+    + ((tareas.length || skills.length) ? '<details class="jv-c2-tareas"><summary>Abrir ficha del empleado</summary>'
+      + (skills.length ? '<div class="jv-st" style="margin-top:8px">Skills</div><div class="jv-c2-chips">' + skills.slice(0, 8).map(s => '<span class="jv-chip">' + OS_E(String(s)) + '</span>').join('') + '</div>' : '')
+      + (tareas.length ? '<div class="jv-st" style="margin-top:8px">Tareas</div>' + tareas.slice(0, 6).map(jvFmtTarea).join('') : '') + '</details>' : '')
+    + '<div class="jv-c2-meta"><span class="jv-chip">' + osIcon('clock', { size: 11 }) + ' ' + OS_E(jvScheduleText(a)) + '</span>'
+    + (pend ? '<span class="jv-chip">' + pend + ' decisiones pendientes</span>' : '<span class="jv-chip">Sin decisiones pendientes</span>') + '</div>'
     + (canEdit ? '<div class="jv-c2-act"><button onclick="jvMapaEdit(\'' + a.id + '\')">' + osIcon('pencil', { size: 12 }) + ' Editar</button>'
       + '<button onclick="jvMapaMove(\'' + a.id + '\',-1)"' + (canUp ? '' : ' disabled') + ' title="Subir">↑</button>'
       + '<button onclick="jvMapaMove(\'' + a.id + '\',1)"' + (canDown ? '' : ' disabled') + ' title="Bajar">↓</button></div>' : '')
@@ -602,8 +664,8 @@ window.jvMapaMove = jvMapaMove;
 function jvDashboard() {
   jvClockStart();
   return jvHudHeader() + jvCounters() + jvNorthStar() + jvDeck() + jvCore() + jvChatUI()
-    + '<div class="jv-2col"><div><div class="jv-st">Task lanes · propuestas en vivo</div>' + jvLanesHTML() + '</div>'
-    + '<div><div class="jv-st">Bitácora · agent_audit_log</div>' + jvFeedHTML() + '</div></div>';
+    + '<div class="jv-st">Decisiones del equipo</div>' + jvLanesHTML()
+    + '<div class="jv-st" style="margin-top:22px">Actividad reciente</div>' + jvFeedHTML();
 }
 
 // ─── métricas vivas del holding (para strip + North-Star) ───
@@ -781,23 +843,24 @@ function jvRenderChat() { const el = document.getElementById('jv-chat'); if (el)
 // VIEW · PROPUESTAS (task lanes)
 // ════════════════════════════════════════════════════════════════
 function jvPropuestasView() {
-  return '<div class="jv-eyebrow">Propuestas</div><div class="jv-lead">Todo lo propone un agente — vos aprobás o rechazás. Cada decisión queda en la bitácora.</div>' + jvLanesHTML();
+  return '<div class="jv-eyebrow">Decisiones</div><div class="jv-lead">Solo aparece lo que necesita tu atención. Cada tarjeta explica qué encontró el agente, por qué importa y de dónde salió.</div>' + jvLanesHTML();
 }
 function jvLanesHTML() {
   const lanes = { propuesta: [], aprobada: [], ejecutada: [], alerta: [] };
   JV.props.forEach(p => { const l = jvLaneOf(p); if (l) lanes[l].push(p); });
-  const card = (p, cls, actions) => {
-    const txt = jvEvid(p); const short = txt.length > 140 ? txt.slice(0, 138) + '…' : txt;
-    const who = OS_E(jvAgentName(p.agent_id)) + ' · ' + OS_E(p.tipo_accion || '') + (p.approved_by ? ' · ' + OS_E(p.approved_by) : '');
+  const card = (p, alert, actions) => {
+    const info = jvProposalInfo(p);
     const busy = JV.busyId === p.id;
-    return '<div class="jv-lc ' + cls + '">' + OS_E(short || '(sin evidencia)') + '<div class="who">' + who + '</div>'
-      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy ? ' disabled' : '') + '>' + (busy ? '…' : '✓ Aprobar') + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>✕</button></div>' : '') + '</div>';
+    const meta = [jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
+    return '<div class="jv-decision' + (alert ? ' alert' : '') + '"><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p><div class="who">' + OS_E(meta) + '</div>'
+      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : '✓ Aprobar') + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>No aplicar</button></div>' : '') + '</div>';
   };
-  const lane = (title, arr, cls, actions) => {
-    const body = arr.length ? arr.slice(0, 12).map(p => card(p, cls, actions)).join('') + (arr.length > 12 ? '<div class="jv-empty">+' + (arr.length - 12) + ' más</div>' : '') : '<div class="jv-empty">Sin ítems.</div>';
-    return '<div class="jv-lane"><h4>' + title + ' <b>' + arr.length + '</b></h4>' + body + '</div>';
-  };
-  return '<div class="jv-lanes">' + lane('PROPUESTA', lanes.propuesta, '', true) + lane('ALERTAS', lanes.alerta, 'red', true) + lane('APROBADA', lanes.aprobada, 'grn', false) + lane('EJECUTADA', lanes.ejecutada, 'grn', false) + '</div>';
+  const pending = lanes.alerta.concat(lanes.propuesta);
+  const history = lanes.aprobada.concat(lanes.ejecutada).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  return '<div class="jv-2col"><div><div class="jv-st">Necesitan decisión · ' + pending.length + '</div>'
+    + (pending.length ? pending.slice(0, 30).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes.</div></div>') + '</div>'
+    + '<div><div class="jv-st">Historial reciente · ' + history.length + '</div>'
+    + (history.length ? history.slice(0, 20).map(p => card(p, false, false)).join('') : '<div class="jv-empty">Todavía no hay historial.</div>') + '</div></div>';
 }
 function jvFeedHTML() {
   if (!JV.audit.length) return '<div class="jv-feed"><div class="jv-empty" style="padding:12px">Sin registros de bitácora.</div></div>';
@@ -830,35 +893,24 @@ function jvBriefView() {
 // ════════════════════════════════════════════════════════════════
 function jvEmpresasView() {
   const cards = JV_EMPRESAS.map(e => {
-    const verif = JV.agents.find(a => a.area === e.area && a.capa === 'Integrity');
-    const rep = JV.agents.find(a => a.area === e.area && a.capa === 'Report');
-    const areaAgentIds = JV.agents.filter(a => a.area === e.area).map(a => a.id);
+    const squad = JV.agents.filter(a => a.area === e.area && !jvIsLegacy(a));
+    const areaAgentIds = squad.map(a => a.id);
     const props = JV.props.filter(p => areaAgentIds.includes(p.agent_id));
     const pend = props.filter(p => p.estado === 'propuesta').length;
-    const line = (a, lbl) => a ? '<div class="jv-arow" style="margin-bottom:8px"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 14 }) + '</div><div class="nm"><b>' + OS_E(a.nombre) + '</b><span>' + lbl + ' · ' + jvFmtTs(JV.lastRun[a.id]) + '</span></div>' + jvBadge(jvAgentStatus(a.id)) + '</div>' : '<div class="jv-empty">' + lbl + ': sin agente</div>';
+    const line = a => '<div class="jv-simple-row"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 14 }) + '</div><div class="body"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(a.responsabilidad || a.proceso || '') + ' · ' + jvFmtTs(JV.lastRun[a.id]) + '</span></div>' + jvAgentHumanBadge(a) + '</div>';
     return '<div class="jv-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:12px"><div class="jv-av">' + osIcon(e.icon, { size: 15 }) + '</div><b style="font-size:14px">' + OS_E(e.name) + '</b><span class="jv-chip" style="margin-left:auto">' + pend + ' pendientes · ' + props.length + ' props</span></div>'
-      + line(verif, 'Verificador · Integrity') + line(rep, 'Reportero · Report') + '</div>';
+      + (squad.length ? '<div class="jv-simple-list">' + squad.map(line).join('') + '</div>' : '<div class="jv-empty">Todavía no hay agentes conectados a esta empresa.</div>') + '</div>';
   }).join('');
-  return '<div class="jv-eyebrow">Empresas</div><div class="jv-lead">Cada empresa tiene su Verificador (integridad) y su Reportero (briefing).</div><div class="jv-2col">' + cards + '</div>';
+  return '<div class="jv-eyebrow">Empresas</div><div class="jv-lead">Qué equipo trabaja en cada negocio, cuándo trabajó por última vez y qué necesita de vos.</div><div class="jv-2col">' + cards + '</div>';
 }
 
 // ════════════════════════════════════════════════════════════════
 // VIEW · HORARIOS (cadena diaria + crons live)
 // ════════════════════════════════════════════════════════════════
 function jvHorariosView() {
-  const chain = [
-    ['06:45', 'Verificadores ×4', 'chequeo profundo por empresa (Airtable↔OS↔QB↔ClickUp)', false],
-    ['07:00', 'Contable & Datos + Operación', 'auditan + proponen correcciones', false],
-    ['07:15', 'Reporteros ×4', 'briefing por empresa', false],
-    ['07:30', 'Cerebro Ejecutivo', 'consolida → foto ejecutiva', false],
-    ['07:45', '→ CEO (WhatsApp / Command Center)', 'matutino del Cerebro a tu teléfono', true],
-    ['12:30 / 17:30', 'Sabueso', 'pulso + cierre con Definition of Done', false],
-    ['c/15 min', 'Sabueso · watcher', 'alertas 🔴 nuevas al instante', true],
-  ];
-  const steps = chain.map(s => '<div class="jv-step"><div class="hh">' + s[0] + ' · ' + OS_E(s[1]) + (s[3] ? '<span class="jv-live">cron activo</span>' : '') + '</div><div class="dd">' + OS_E(s[2]) + '</div></div>').join('');
-  return '<div class="jv-eyebrow">Horarios</div><div class="jv-lead">La cadena de orquestación diaria. Todo propone → el CEO aprueba → se registra.</div>'
-    + '<div class="jv-card"><div class="jv-st">Cadena diaria</div><div class="jv-chain">' + steps + '</div>'
-    + '<div class="jv-empty" style="margin-top:12px">Crons de notificación en vivo: <b style="color:var(--jc-grn)">cerebro-matutino</b> (07:45 Austin) · <b style="color:var(--jc-grn)">cerebro-alertas</b> (cada 15 min). La cadena de agentes por empresa es el diseño de orquestación (EQUIPOS-Y-SKILLS).</div></div>';
+  const agents = JV.agents.filter(a => !jvIsLegacy(a));
+  const rows = agents.map(a => '<div class="jv-simple-row"><div class="jv-av">' + osIcon('clock', { size: 14 }) + '</div><div class="body"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(jvScheduleText(a)) + ' · última ejecución ' + jvFmtTs(JV.lastRun[a.id]) + '</span></div>' + jvAgentHumanBadge(a) + '</div>').join('');
+  return '<div class="jv-eyebrow">Horarios y automatizaciones</div><div class="jv-lead">Horarios declarados por cada agente y evidencia de su última ejecución. Ya no se muestran cadenas teóricas como si estuvieran activas.</div><div class="jv-card"><div class="jv-simple-list">' + rows + '</div></div>';
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -897,6 +949,14 @@ function jvVaultPick(id) {
 window.jvVaultPick = jvVaultPick;
 
 function jvVaultView() {
+  const sources = JV_FUENTES.map(f => '<div class="jv-simple-row"><div class="jv-av">' + osIcon(f.icon, { size: 14 }) + '</div><div class="body"><b>' + OS_E(f.label) + '</b><span>' + OS_E(f.desc) + '</span></div><span class="jv-badge b-work">fuente conectada</span></div>').join('');
+  return '<div class="jv-eyebrow">Memoria compartida</div><div class="jv-lead">La información que todos los agentes consultan para trabajar con el mismo contexto. El mapa de agentes vive en su propia sección para evitar duplicados.</div>'
+    + '<div class="jv-kpis"><div class="jv-kpi"><div class="n">' + jvNum(JV.memCount) + '</div><div class="l">recuerdos guardados</div><div class="s">Contexto reutilizable entre agentes</div></div><div class="jv-kpi"><div class="n">' + JV_FUENTES.length + '</div><div class="l">fuentes principales</div><div class="s">Datos operativos y financieros</div></div></div>'
+    + '<div class="jv-card"><div class="jv-st">Fuentes de verdad</div><div class="jv-simple-list">' + sources + '</div></div>'
+    + '<div class="jv-card" style="margin-top:12px"><div class="jv-st">Cómo funciona</div><div class="jv-simple-list"><div class="jv-simple-row"><div class="jv-av">1</div><div class="body"><b>El agente consulta</b><span>Lee solamente las fuentes que necesita para su función.</span></div></div><div class="jv-simple-row"><div class="jv-av">2</div><div class="body"><b>Guarda un resultado entendible</b><span>Hallazgos, decisiones y contexto quedan disponibles para el resto del equipo.</span></div></div><div class="jv-simple-row"><div class="jv-av">3</div><div class="body"><b>El Cerebro coordina</b><span>Reúne las perspectivas y te presenta una recomendación final sin ocultar desacuerdos.</span></div></div></div></div>';
+}
+
+function jvVaultGraphView() {
   const cx = 600, cy = 400;
   const nodes = {}, lines = [];
   const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
@@ -963,9 +1023,12 @@ function jvVaultView() {
 // VIEW · REPORTES (informes de los agentes)
 // ════════════════════════════════════════════════════════════════
 function jvReportesView() {
-  const informes = JV.props.filter(p => p.tipo_accion === 'informe');
-  const rows = informes.length ? informes.slice(0, 40).map(p => '<div class="jv-card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:10px"><b style="font-size:12.5px;color:var(--jc-cyan)">' + OS_E(jvAgentName(p.agent_id)) + '</b><span class="jv-chip">' + (p.created_at ? new Date(p.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : '') + '</span></div><div style="font-size:12.5px;color:var(--jc-mut);margin-top:6px;line-height:1.5">' + OS_E(jvEvid(p)) + '</div></div>').join('') : '<div class="jv-empty">Todavía no hay informes de agentes.</div>';
-  return '<div class="jv-eyebrow">Reportes</div><div class="jv-lead">Los briefings e informes que generan los agentes (tipo informe).</div>' + rows;
+  const informes = JV.props.filter(p => p.tipo_accion === 'informe' || p.estado === 'ejecutada');
+  const rows = informes.length ? informes.slice(0, 40).map(p => {
+    const info = jvProposalInfo(p);
+    return '<div class="jv-decision"><div style="display:flex;justify-content:space-between;gap:10px"><h4>' + OS_E(info.title) + '</h4><span class="jv-chip">' + (p.created_at ? new Date(p.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) : '') + '</span></div><p>' + OS_E(info.summary) + '</p><div class="who">' + OS_E([jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ')) + '</div></div>';
+  }).join('') : '<div class="jv-empty">Todavía no hay informes de agentes.</div>';
+  return '<div class="jv-eyebrow">Reportes claros</div><div class="jv-lead">Resultados explicados en lenguaje de negocio. Los detalles técnicos quedan fuera de la vista principal.</div>' + rows;
 }
 
 // ════════════════════════════════════════════════════════════════

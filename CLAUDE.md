@@ -839,6 +839,15 @@ En la raíz del repo:
 
 ## 🤖 Instrucciones para Claude
 
+## 🎨 Decisión de producto — Sistema Operativo de IA (24 Ago 2026)
+
+- `/jarvis` se presenta como una **empresa digital viva**: Cerebro Ejecutivo → negocios/áreas → gerentes, managers y operadores.
+- El estado visible se deriva de evidencia real de ejecución. `asistido` con corridas recientes se muestra como **“funcionando · supervisado”**; no se presenta como roto. Los agentes legacy `Transversal*` quedan fuera de la vista principal porque ya fueron absorbidos.
+- El mapa debe ser entendible en segundos y suficientemente visual para demos y contenido: jerarquía clara, conexiones animadas y fichas expandibles con responsabilidad, skills, tareas, horario, última ejecución y decisiones pendientes.
+- “Propuestas” se presenta como **Decisiones** en lenguaje de negocio. Nunca mostrar JSON crudo ni nombres internos como experiencia principal.
+- Empresas muestra el equipo real completo de cada negocio; Horarios muestra el calendario declarado y la última ejecución real; Memoria compartida explica fuentes/contexto sin duplicar el mapa de agentes; Reportes traduce resultados técnicos a resúmenes humanos.
+- El Cerebro puede reunir perspectivas de CEO, CFO, CTO, CMO, COO, Legal y Data, pero cualquier acción de publicación, gasto, contrato o cambio sensible conserva aprobación humana.
+
 Cuando arranques una sesión en este repo:
 
 1. **Leé este archivo completo primero.** Es la fuente de verdad para decisiones técnicas.  
@@ -851,4 +860,4 @@ Cuando arranques una sesión en este repo:
 
 ---
 
-*Última actualización: 29 Jun 2026 — Cutover a base Airtable nueva `apptTKRYbx6gu701i` (linked records, sin fuzzy)*  
+*Última actualización: 24 Ago 2026 — dirección de producto del Sistema Operativo de IA y estados basados en evidencia*
