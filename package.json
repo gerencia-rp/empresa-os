@@ -13,10 +13,10 @@
     "lineage:register": "node scripts/lineage-coverage.mjs --register"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.28.2"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^147.0.0",
-    "puppeteer-core": "^24.43.1"
+    "@sparticuz/chromium": "^149.0.0",
+    "puppeteer-core": "^25.9.0"
   }
 }

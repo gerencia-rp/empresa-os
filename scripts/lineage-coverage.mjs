@@ -9,9 +9,7 @@
 //   .uppercase.font-bold + valor bold hermano. Filtra filas-registro (direcciones) — las
 //   tablas de registros no son métricas: su linaje es el de sus columnas, ya trazado.
 // Uso: SERVICE_KEY=sb_secret_... QA_BASE=http://localhost:5173/index.html node scripts/lineage-coverage.mjs --register
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const puppeteer = require('/Users/nicolaslara/Desktop/CLAUDE CODE/empresa-os-admin/node_modules/puppeteer-core');
+import puppeteer from 'puppeteer-core';
 
 const BASE = process.env.QA_BASE || 'http://localhost:5173/index.html';
 const SB_URL = 'https://nezbaljfhhyznhltpjnk.supabase.co';
