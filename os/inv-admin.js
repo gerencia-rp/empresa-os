@@ -12,6 +12,14 @@ function iaMoney(v) { return '$' + Math.round(+v || 0).toLocaleString('en-US'); 
 // label chico arriba de un control (solo presentación — no toca ids ni handlers)
 function iaLbl(txt, inner) { return '<div><div style="font-size:11px;color:var(--mut2);font-weight:600;margin-bottom:3px">' + txt + '</div>' + inner + '</div>'; }
 
+function iaRequire(result, label) {
+  if (result && result.error) {
+    const detail = result.error.message || String(result.error);
+    throw new Error(label + ': ' + detail);
+  }
+  return (result && result.data) || [];
+}
+
 async function iaLoad(force) {
   if (IA.loading || (IA.loaded && !force)) return;
   IA.loading = true; IA.err = null;
@@ -22,7 +30,10 @@ async function iaLoad(force) {
       sb.from('ff_investors').select('airtable_id,name,email,label,capital_aportado').eq('active', true),
       sb.from('ff_deals').select('airtable_id,address,address_norm,property_id,stage,capital_inversionista,investor_rec_ids').eq('active', true),
     ]);
-    IA.access = acc.data || []; IA.holdings = hold.data || []; IA.investors = inv.data || []; IA.deals = deals.data || [];
+    IA.access = iaRequire(acc, 'Accesos de inversionistas');
+    IA.holdings = iaRequire(hold, 'Casas y reparto');
+    IA.investors = iaRequire(inv, 'Inversionistas');
+    IA.deals = iaRequire(deals, 'Casas de Fix & Flip');
     if (!IA.email) { try { const u = await sb.auth.getUser(); IA.email = (u.data && u.data.user && u.data.user.email) || ''; } catch (e) { IA.email = ''; } }
     IA.casa = IA.casa || (IA.holdings[0] && IA.holdings[0].property_id) || null;
     if (IA.casa) await iaLoadCasa(IA.casa);
@@ -38,7 +49,8 @@ async function iaLoadCasa(pid) {
     sb.from('inv_cashflow_real').select('*').eq('property_id', pid).eq('active', true).order('fecha', { ascending: false }).limit(200),
     sb.from('inv_param_overrides').select('*').eq('property_id', pid).eq('active', true).then(r => r.data || []).catch(() => []),
   ]);
-  IA.params = prm.data || []; IA.cashflow = cf.data || [];
+  IA.params = iaRequire(prm, 'Parámetros de la casa');
+  IA.cashflow = iaRequire(cf, 'Movimientos de la casa');
   // overrides: el valor EFECTIVO es el override; el de la fuente queda en _base (reversible ↩)
   IA.ovr = {}; (ov || []).forEach(o => { IA.ovr[o.key] = o; });
   IA.params.forEach(p => { const o = IA.ovr[p.key]; if (o) { p._base = p.value; p._ov = o; p.value = o.valor; } });
