@@ -18,6 +18,8 @@
     .no-print { display: none !important; }
     body { background: white !important; }
     .page-break { page-break-before: always; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    #portal { display: block !important; }
   }
 </style>
 </head>
@@ -53,7 +55,7 @@
           <p id="plan-subtitle" class="text-sm text-slate-300"></p>
         </div>
         <div class="flex gap-2 no-print">
-          <button onclick="window.print()" class="px-3 md:px-4 py-2 bg-white text-slate-900 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-100">🖨️ Imprimir / PDF</button>
+          <button onclick="downloadPlanPdf()" class="px-3 md:px-4 py-2 bg-white text-slate-900 rounded-lg text-xs md:text-sm font-medium hover:bg-slate-100">⬇️ Descargar PDF</button>
         </div>
       </div>
 
@@ -691,7 +693,7 @@ function waitForPlan() {
     <div class="text-center max-w-md p-6">
       <div class="text-6xl mb-3 animate-pulse">🤖</div>
       <h2 class="text-xl font-bold text-slate-900">Armando tu plan...</h2>
-      <p class="text-sm text-slate-600 mt-2">Tu mentor está procesando tus respuestas. Esto suele tardar menos de 1 minuto.</p>
+      <p class="text-sm text-slate-600 mt-2">Estamos guardando tu plan personalizado. No necesitás repetir el diagnóstico.</p>
       <div class="h-2 bg-slate-200 rounded-full overflow-hidden mt-4">
         <div class="h-full bg-amber-500 animate-pulse" style="width: 60%"></div>
       </div>
@@ -701,6 +703,7 @@ function waitForPlan() {
   `;
   let elapsed = 0;
   const startTime = Date.now();
+  triggerPlanGeneration();
   const interval = setInterval(async () => {
     elapsed = Math.round((Date.now() - startTime) / 1000);
     const el = document.getElementById('wait-elapsed');
@@ -726,11 +729,35 @@ function waitForPlan() {
         <div class="text-center max-w-md p-6">
           <div class="text-5xl mb-3">⏳</div>
           <h2 class="text-xl font-bold">Tu plan se está demorando</h2>
-          <p class="text-sm text-slate-600 mt-2">Tu mentor lo va a generar manualmente. Te avisará cuando esté listo.</p>
-          <button onclick="window.location.reload()" class="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg">🔄 Reintentar</button>
+          <p class="text-sm text-slate-600 mt-2">Tu diagnóstico está guardado. Podés reintentar la generación sin volver a responderlo.</p>
+          <button onclick="triggerPlanGeneration()" class="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg">🔄 Reintentar generación</button>
         </div>`;
     }
   }, 5000);
+}
+
+async function triggerPlanGeneration() {
+  try {
+    const res = await fetch(`${window.SUPABASE_URL}/functions/v1/edu-generate-plan-from-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ token: TOKEN })
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(result.error || 'No se pudo generar el plan.');
+    if (result.plan_id) window.location.reload();
+  } catch (error) {
+    const el = document.getElementById('wait-elapsed');
+    if (el) el.textContent = 'No se perdió tu diagnóstico. Reintentaremos: ' + error.message;
+  }
+}
+
+function downloadPlanPdf() {
+  const originalTitle = document.title;
+  const student = (document.getElementById('plan-subtitle')?.textContent || 'Estudiante').split(' · ')[0].replace(/^Para\s+/, '');
+  document.title = `Plan de trabajo - ${student}`;
+  window.print();
+  setTimeout(() => { document.title = originalTitle; }, 1000);
 }
 
 function restoreScroll() {

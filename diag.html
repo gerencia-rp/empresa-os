@@ -682,10 +682,10 @@ async function finish() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window.SUPABASE_ANON_KEY}` },
       body: JSON.stringify({ token: new URLSearchParams(window.location.search).get('t') })
     });
-    // Si falla la edge function igual continuamos — el auto-procesamiento lo levanta después
-    if (!res.ok) console.warn('[gen-plan] no ok, fallback al auto-process');
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || !result.plan_id) throw new Error(result.error || 'No se pudo guardar el plan.');
   } catch (e) {
-    console.warn('[gen-plan]', e);
+    alert('Tus respuestas quedaron guardadas, pero el plan todavía no se pudo crear.\n\n' + e.message + '\n\nPodés reintentar sin repetir el diagnóstico.');
   }
 
   // 3) Redirigir al portal — si el plan no está listo, mi-plan.html muestra "esperando..."
