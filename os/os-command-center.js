@@ -114,9 +114,10 @@ function jvAgentIssue(a) {
 }
 function jvAgentHumanBadge(a) { const s = jvHumanState(a); return '<span class="jv-badge ' + s.cls + '">' + s.label + '</span>'; }
 function jvScheduleText(a) {
+  const automation = jvAutomation(a);
+  if (automation && automation.blocked) return 'Sin horario operativo';
   const d = (a && a.disparadores && typeof a.disparadores === 'object') ? a.disparadores : {};
   const vals = Object.keys(d).map(k => String(d[k] || '')).filter(Boolean);
-  const automation = jvAutomation(a);
   return vals.length ? vals.join(' · ') : (automation && automation.schedule) || 'Sin horario automático';
 }
 function jvIsOperationalAudit(row) {
@@ -726,6 +727,7 @@ function jvAgentInspector() {
   return '<aside class="jv-agent-inspector" aria-label="Ficha operativa de ' + OS_E(a.nombre) + '">'
     + '<div class="jv-ai-top"><div class="jv-ai-avatar">' + osIcon(jvAgentIcon(a), { size: 20 }) + '</div><div class="jv-ai-title"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(jvLineaLabel(a.linea || a.area || 'Equipo')) + ' · ' + OS_E(state.label) + '</span></div><button type="button" class="jv-ai-close" onclick="jvInspectAgent(null)" aria-label="Cerrar ficha">×</button></div>'
     + '<div class="jv-ai-body"><div class="jv-ai-section"><div class="jv-ai-label">Responsabilidad</div><div class="jv-ai-copy">' + OS_E(a.responsabilidad || a.proceso || 'Responsabilidad todavía no documentada.') + '</div></div>'
+    + (jvAgentIssue(a) ? '<div class="jv-needs-info">' + OS_E(jvAgentIssue(a)) + '</div>' : '')
     + '<div class="jv-ai-section"><div class="jv-ai-label">Qué hizo recientemente</div><div class="jv-ai-now"><b>' + OS_E(audit.title) + '</b><span>' + OS_E(audit.detail) + ' · ' + OS_E(jvFmtTs(jvAgentLastRun(a))) + '</span></div></div>'
     + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Automatización</span><b>' + OS_E(automation && automation.executor ? automation.executor : 'Sin ejecutor') + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
