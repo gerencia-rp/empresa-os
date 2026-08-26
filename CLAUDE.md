@@ -902,6 +902,8 @@ En la raíz del repo:
 - Deploy fase 2: commit `666e11a`, Vercel `dpl_B6QWwdiUiEGdTgKE1vgh9TPhYiTf`, alias `empresa-os.vercel.app`. El bundle productivo contiene `jvWorkView` y la cola de trabajo.
 - Auditoría operativa de solo lectura: Supabase reporta `ACTIVE` los ejecutores de Cerebro, Rentas, Remodelación y Fix & Flip. Esto confirma despliegue, no una corrida exitosa reciente; el estado visible sigue dependiendo de `agent_audit_log` y del horario declarado.
 - QA autenticado de producción detectó una brecha de representación: el total incluía a `Cerebro Matutino`, pero el mapa no lo dibujaba. Fase 3 lo incorpora como nodo de Comando inspeccionable bajo el Cerebro Ejecutivo para que cada agente contado exista también en el organigrama.
+- La disponibilidad operativa de fase 3 exige tres pruebas simultáneas: ejecutor versionado, estado promovido (`activo`/`live`/`asistido`) y evidencia reciente de negocio. Evals, promociones, registros y ediciones de ficha no cuentan como trabajo. Si `disparadores` está vacío, Jarvis muestra el horario del cron versionado.
+- `Optimización Fix & Flip` permanece correctamente bloqueado: no existe `ff-optimizacion` ni histórico confiable de transiciones por etapa. La interfaz debe mostrar esa brecha y nunca convertir su eval de prueba en estado “funcionando”.
 
 Cuando arranques una sesión en este repo:
 

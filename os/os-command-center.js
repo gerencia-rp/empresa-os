@@ -13,7 +13,7 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], lastRun: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], lastRun: {}, lastEvidence: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
@@ -41,6 +41,35 @@ function jvEvidObj(p) {
   return {};
 }
 function jvIsLegacy(a) { return String((a && a.linea) || '').toLowerCase().indexOf('transversal') === 0; }
+function jvKey(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+// Ejecutores y horarios que existen en las migraciones versionadas. Una ficha o
+// una evaluación nunca convierten por sí solas un puesto en automatización real.
+const JV_AUTOMATIONS = {
+  'cerebro ejecutivo': { executor: 'cerebro', schedule: 'Directivas 07:45 y 08:45 · alertas cada 15 min' },
+  'cerebro matutino': { executor: 'cerebro-reunion', schedule: 'Diario 07:35' },
+  'arquitecto de agentes': { executor: 'run_agent_governance(architecture)', schedule: 'Lunes 08:35' },
+  'auditor de agentes': { executor: 'run_agent_governance(audit)', schedule: 'Lunes 08:20' },
+  'gerente de rentas': { executor: 'rentas-gerente', schedule: 'Diario 07:30' },
+  'ejecucion rentas': { executor: 'rentas-ejecucion', schedule: 'Diario 07:00 · 12:30 · 17:30' },
+  'optimizacion rentas': { executor: 'rentas-optimizacion', schedule: 'Diario 08:15 · jueves 08:15 · día 1 09:00' },
+  'reportes rentas': { executor: 'rentas-reportes', schedule: 'Lunes, martes y miércoles 08:00' },
+  'financiero rentas': { executor: 'rentas-financiero', schedule: 'Diario 07:00 · días 5, 15 y 25 · cierre día 1 08:00' },
+  'gerente de remodelacion': { executor: 'remod-gerente', schedule: 'Diario 07:30' },
+  'ejecucion remodelacion': { executor: 'remod-ejecucion', schedule: 'Diario 07:00' },
+  'optimizacion remodelacion': { executor: 'remod-optimizacion', schedule: 'Jueves 08:00' },
+  'reportes remodelacion': { executor: 'remod-reportes', schedule: 'Miércoles 08:00' },
+  'financiero remodelacion': { executor: 'remod-financiero', schedule: 'Lunes 08:00 y 08:30 · días 1 y 16 09:00' },
+  'control de draws y hml (remodelacion)': { executor: 'run_remodel_control(draws)', schedule: 'Diario 08:15' },
+  'calidad de obra (remodelacion)': { executor: 'run_remodel_control(quality)', schedule: 'Viernes 08:45' },
+  'gerente de fix & flip': { executor: 'ff-gerente', schedule: 'Diario 07:30' },
+  'ejecucion fix & flip': { executor: 'ff-ejecucion', schedule: 'Diario 07:00 · 12:00 · 17:00' },
+  'optimizacion fix & flip': { executor: null, schedule: null, blocked: 'Falta el historial real de cambios de etapa por propiedad. No se calculan duraciones inventadas.' },
+  'reportes fix & flip': { executor: 'ff-reportes', schedule: 'Viernes 08:00' },
+  'financiero fix & flip': { executor: 'ff-financiero', schedule: 'Lunes 08:00 · día 1 09:00 y 09:30' },
+  'underwriting (fix & flip)': { executor: 'ff-underwriting', schedule: 'Lunes 08:15' },
+  'capital & inversionistas (fix & flip)': { executor: 'ff-capital', schedule: 'Día 1 10:00' },
+};
+function jvAutomation(a) { return JV_AUTOMATIONS[jvKey(a && a.nombre)] || null; }
 function jvAgentLastRun(a) {
   if (!a) return null;
   const own = JV.lastRun[a.id] || null;
@@ -62,7 +91,11 @@ function jvIsRecent(a, days) {
   const ts = jvAgentLastRun(a);
   return !!ts && (Date.now() - new Date(ts).getTime()) < (days || jvFreshnessDays(a)) * 86400000;
 }
-function jvOperational(a) { return !!a && !jvIsLegacy(a) && jvIsRecent(a) && a.estado !== 'pausado' && a.estado !== 'planificado'; }
+function jvOperational(a) {
+  const automation = jvAutomation(a);
+  return !!a && !jvIsLegacy(a) && !!automation && !!automation.executor
+    && ['activo', 'live', 'asistido'].includes(a.estado) && jvIsRecent(a);
+}
 function jvHumanState(a) {
   if (jvIsLegacy(a)) return { cls: 'b-idle', label: 'absorbido' };
   if (jvOperational(a)) return { cls: a.estado === 'activo' || a.estado === 'live' ? 'b-work' : 'b-asis', label: a.estado === 'activo' || a.estado === 'live' ? 'funcionando' : 'funcionando · supervisado' };
@@ -71,6 +104,10 @@ function jvHumanState(a) {
 }
 function jvAgentIssue(a) {
   if (jvOperational(a)) return '';
+  const automation = jvAutomation(a);
+  if (automation && automation.blocked) return automation.blocked;
+  if (!automation || !automation.executor) return 'La ficha existe, pero no hay un ejecutor operativo versionado para este puesto.';
+  if (a.estado === 'dry-run') return 'El agente sigue en prueba. Una evaluación aprobada no cuenta como trabajo operativo.';
   if (a.estado === 'planificado') return 'Este puesto está definido, pero todavía no tiene una automatización que ejecute sus tareas.';
   if (!jvAgentLastRun(a)) return 'No hay evidencia de una ejecución real. Debe conectarse a una fuente y realizar una corrida de prueba.';
   return 'Su última ejecución quedó fuera del horario esperado. Revisa la automatización y la evidencia antes de marcarlo activo.';
@@ -79,7 +116,14 @@ function jvAgentHumanBadge(a) { const s = jvHumanState(a); return '<span class="
 function jvScheduleText(a) {
   const d = (a && a.disparadores && typeof a.disparadores === 'object') ? a.disparadores : {};
   const vals = Object.keys(d).map(k => String(d[k] || '')).filter(Boolean);
-  return vals.length ? vals.join(' · ') : 'Sin horario automático';
+  const automation = jvAutomation(a);
+  return vals.length ? vals.join(' · ') : (automation && automation.schedule) || 'Sin horario automático';
+}
+function jvIsOperationalAudit(row) {
+  if (!row || String(row.resultado || '').toLowerCase() !== 'ok') return false;
+  const input = row.input && typeof row.input === 'object' ? row.input : {};
+  const marker = jvKey([input.accion, input.tipo, input.mode].filter(Boolean).join(' '));
+  return !/(eval|promocion|reconciliacion|editar ficha|reordenar|guardar ficha|registro|educacion fuera)/.test(marker);
 }
 function jvProposalInfo(p) {
   const e = jvEvidObj(p), type = String((p && p.tipo_accion) || '').toLowerCase();
@@ -576,9 +620,11 @@ async function jvLoad(force) {
     JV.capital = (cap && cap.data) ? cap.data.reduce((s, r) => s + (+r.capital_desplegado || 0), 0) : null;
     JV.nsCfg = (ns && ns.data) ? ns.data : null;
     const rr = await Promise.all(JV.agents.map(a =>
-      sb.from('agent_audit_log').select('ts').eq('agent_id', a.id).order('ts', { ascending: false }).limit(1)
-        .then(r => ({ id: a.id, ts: (r.data && r.data[0] && r.data[0].ts) || null })).catch(() => ({ id: a.id, ts: null }))));
-    JV.lastRun = {}; rr.forEach(r => { JV.lastRun[r.id] = r.ts; });
+      sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').eq('agent_id', a.id).order('ts', { ascending: false }).limit(50)
+        .then(r => ({ id: a.id, row: (r.data || []).find(jvIsOperationalAudit) || null }))
+        .catch(() => ({ id: a.id, row: null }))));
+    JV.lastRun = {}; JV.lastEvidence = {};
+    rr.forEach(r => { JV.lastRun[r.id] = r.row ? r.row.ts : null; if (r.row) JV.lastEvidence[r.id] = r.row; });
     JV.loaded = true;
   } catch (e) { JV.err = e.message || String(e); }
   JV.loading = false;
@@ -660,7 +706,7 @@ function jvMapaOverview(current, activos, pendientes) {
 }
 
 function jvAuditSummary(a) {
-  const row = JV.audit.find(r => r.agent_id === a.id);
+  const row = JV.lastEvidence[a.id] || JV.audit.find(r => r.agent_id === a.id && jvIsOperationalAudit(r));
   if (!row) return { title: 'Sin actividad reciente registrada', detail: 'La ficha existe, pero todavía no hay una corrida reciente dentro de la bitácora visible.' };
   const out = row.output && typeof row.output === 'object' ? row.output : {};
   const title = out.accion || out.titulo || out.estado || row.resultado || 'Ejecución registrada';
@@ -675,12 +721,13 @@ function jvAgentInspector() {
   const tasks = Array.isArray(a.tareas) ? a.tareas : [];
   const pending = JV.props.filter(p => p.agent_id === a.id && p.estado === 'propuesta').length;
   const parent = a.parent_id ? jvAgent(a.parent_id) : null;
+  const automation = jvAutomation(a);
   const cleanTask = t => typeof t === 'object' ? (t.tarea || t.nombre || t.name || t.salida || '') : String(t || '');
   return '<aside class="jv-agent-inspector" aria-label="Ficha operativa de ' + OS_E(a.nombre) + '">'
     + '<div class="jv-ai-top"><div class="jv-ai-avatar">' + osIcon(jvAgentIcon(a), { size: 20 }) + '</div><div class="jv-ai-title"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(jvLineaLabel(a.linea || a.area || 'Equipo')) + ' · ' + OS_E(state.label) + '</span></div><button type="button" class="jv-ai-close" onclick="jvInspectAgent(null)" aria-label="Cerrar ficha">×</button></div>'
     + '<div class="jv-ai-body"><div class="jv-ai-section"><div class="jv-ai-label">Responsabilidad</div><div class="jv-ai-copy">' + OS_E(a.responsabilidad || a.proceso || 'Responsabilidad todavía no documentada.') + '</div></div>'
     + '<div class="jv-ai-section"><div class="jv-ai-label">Qué hizo recientemente</div><div class="jv-ai-now"><b>' + OS_E(audit.title) + '</b><span>' + OS_E(audit.detail) + ' · ' + OS_E(jvFmtTs(jvAgentLastRun(a))) + '</span></div></div>'
-    + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
+    + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Automatización</span><b>' + OS_E(automation && automation.executor ? automation.executor : 'Sin ejecutor') + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
     + (tasks.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Tareas asignadas</div><div class="jv-ai-copy">' + tasks.slice(0, 5).map(t => '• ' + OS_E(cleanTask(t))).join('<br>') + '</div></div>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="jv-ai-action" onclick="jvWorkAgent(\'' + a.id + '\')">Ver trabajo →</button><button type="button" class="jv-ai-action" onclick="jvInspectOpenArea(\'' + OS_E(a.linea || '').replace(/'/g, "\\'") + '\')">Ficha completa →</button></div></div></aside>';
