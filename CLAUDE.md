@@ -906,6 +906,8 @@ En la raíz del repo:
 - `Optimización Fix & Flip` permanece correctamente bloqueado: no existe `ff-optimizacion` ni histórico confiable de transiciones por etapa. La interfaz debe mostrar esa brecha y nunca convertir su eval de prueba en estado “funcionando”.
 - Memoria compartida lee las memorias activas reales de `pm_brain_memory` (tipo, fuente, fecha, texto y reafirmaciones); no sustituye memoria por actividad genérica de auditoría.
 - Reportes lee la bandeja canónica `pm_informes`, agrupa por Dirección/Rentas/Remodelación/Fix & Flip y traduce el payload a campos humanos sin mostrar JSON crudo. `agent_proposals` sigue siendo trabajo/decisiones, no la fuente principal de reportes.
+- `ff_deal_stage_history` captura únicamente cambios futuros observados en `ff_deals.stage`. Las 28 filas iniciales son baseline explícito y se excluyen de duraciones; al instalar: 28 baselines, 0 intervalos válidos, 0 etapas abiertas duplicadas y cron semanal activo.
+- `ff-optimizacion` está desplegado, pero conserva el agente en `dry-run`. Exige 3 intervalos completos, 2 propiedades y 2 etapas; mientras no haya cobertura responde `ready:false`/`skipped`. Cuando alcance cobertura solo crea una propuesta para revisión humana; nunca se autopromueve ni modifica el pipeline.
 
 Cuando arranques una sesión en este repo:
 

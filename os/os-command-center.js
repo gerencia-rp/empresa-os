@@ -63,7 +63,7 @@ const JV_AUTOMATIONS = {
   'calidad de obra (remodelacion)': { executor: 'run_remodel_control(quality)', schedule: 'Viernes 08:45' },
   'gerente de fix & flip': { executor: 'ff-gerente', schedule: 'Diario 07:30' },
   'ejecucion fix & flip': { executor: 'ff-ejecucion', schedule: 'Diario 07:00 · 12:00 · 17:00' },
-  'optimizacion fix & flip': { executor: null, schedule: null, blocked: 'Falta el historial real de cambios de etapa por propiedad. No se calculan duraciones inventadas.' },
+  'optimizacion fix & flip': { executor: 'ff-optimizacion', schedule: 'Jueves 08:30', readinessReason: 'Está capturando transiciones reales. Se habilita al completar 3 intervalos, en al menos 2 propiedades y 2 etapas.' },
   'reportes fix & flip': { executor: 'ff-reportes', schedule: 'Viernes 08:00' },
   'financiero fix & flip': { executor: 'ff-financiero', schedule: 'Lunes 08:00 · día 1 09:00 y 09:30' },
   'underwriting (fix & flip)': { executor: 'ff-underwriting', schedule: 'Lunes 08:15' },
@@ -107,7 +107,7 @@ function jvAgentIssue(a) {
   const automation = jvAutomation(a);
   if (automation && automation.blocked) return automation.blocked;
   if (!automation || !automation.executor) return 'La ficha existe, pero no hay un ejecutor operativo versionado para este puesto.';
-  if (a.estado === 'dry-run') return 'El agente sigue en prueba. Una evaluación aprobada no cuenta como trabajo operativo.';
+  if (a.estado === 'dry-run') return (automation && automation.readinessReason) || 'El agente sigue en prueba. Una evaluación aprobada no cuenta como trabajo operativo.';
   if (a.estado === 'planificado') return 'Este puesto está definido, pero todavía no tiene una automatización que ejecute sus tareas.';
   if (!jvAgentLastRun(a)) return 'No hay evidencia de una ejecución real. Debe conectarse a una fuente y realizar una corrida de prueba.';
   return 'Su última ejecución quedó fuera del horario esperado. Revisa la automatización y la evidencia antes de marcarlo activo.';
