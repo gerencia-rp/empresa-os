@@ -901,6 +901,7 @@ En la raíz del repo:
 - “Aprobada · en cola” no significa ejecución confirmada. Solo una fila real de auditoría puede mostrarse como completada.
 - Deploy fase 2: commit `666e11a`, Vercel `dpl_B6QWwdiUiEGdTgKE1vgh9TPhYiTf`, alias `empresa-os.vercel.app`. El bundle productivo contiene `jvWorkView` y la cola de trabajo.
 - Auditoría operativa de solo lectura: Supabase reporta `ACTIVE` los ejecutores de Cerebro, Rentas, Remodelación y Fix & Flip. Esto confirma despliegue, no una corrida exitosa reciente; el estado visible sigue dependiendo de `agent_audit_log` y del horario declarado.
+- QA autenticado de producción detectó una brecha de representación: el total incluía a `Cerebro Matutino`, pero el mapa no lo dibujaba. Fase 3 lo incorpora como nodo de Comando inspeccionable bajo el Cerebro Ejecutivo para que cada agente contado exista también en el organigrama.
 
 Cuando arranques una sesión en este repo:
 
