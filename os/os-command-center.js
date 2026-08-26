@@ -15,7 +15,7 @@ const JV = {
   tab: 'network',
   agents: [], props: [], audit: [], lastRun: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
-  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null,
+  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
 };
 window.JV = JV;
@@ -471,9 +471,22 @@ function jvCSS() {
     '#os-root .jv-ha-title{flex:1}.jv-ha-title b{display:block;font-size:14px}.jv-ha-title span{display:block;font-size:9px;color:#7186a2;margin-top:2px;text-transform:uppercase;letter-spacing:.12em}',
     '#os-root .jv-ha-count{font-size:10px;color:var(--ac)}',
     '#os-root .jv-ha-agents{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.jv-ha-agent{display:flex;align-items:center;gap:5px;max-width:100%;font-size:9.5px;color:#a7b6ca;padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.055)}.jv-ha-agent i{width:5px;height:5px;border-radius:50%;background:#53e3b2;box-shadow:0 0 6px #53e3b2}.jv-ha-agent i.wait{background:#f4bb43;box-shadow:0 0 6px #f4bb43}',
+    '#os-root button.jv-ha-agent{font:inherit;cursor:pointer;transition:transform .2s ease,border-color .2s ease,background .2s ease}#os-root button.jv-ha-agent:hover,#os-root button.jv-ha-agent:focus-visible{color:#effaff;background:rgba(94,217,255,.09);border-color:rgba(94,217,255,.38);transform:translateY(-1px);outline:none}#os-root button.jv-ha-agent[aria-pressed="true"]{color:#fff;border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--ac) 14%,transparent)}',
     '#os-root .jv-ha-foot{display:flex;justify-content:space-between;align-items:center;margin-top:13px;padding-top:10px;border-top:1px solid rgba(255,255,255,.055);font-size:9.5px;color:#6f849e}.jv-ha-foot strong{color:var(--ac);font-weight:600}',
+    '#os-root .jv-agent-inspector{position:absolute;z-index:8;right:18px;top:72px;width:min(360px,calc(100% - 36px));max-height:calc(100% - 92px);overflow:auto;border:1px solid rgba(94,217,255,.28);border-radius:18px;background:linear-gradient(155deg,rgba(13,25,43,.98),rgba(5,10,18,.98));box-shadow:-22px 26px 80px rgba(0,0,0,.54),inset 0 1px rgba(255,255,255,.05);animation:jvInspectorIn .24s ease-out}',
+    '@keyframes jvInspectorIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}',
+    '#os-root .jv-ai-top{display:flex;gap:12px;align-items:center;padding:18px;border-bottom:1px solid rgba(120,160,205,.14);position:sticky;top:0;background:rgba(8,16,29,.96);backdrop-filter:blur(18px);z-index:2}',
+    '#os-root .jv-ai-avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:#bdeeff;background:linear-gradient(135deg,rgba(94,217,255,.25),rgba(149,104,255,.22));box-shadow:0 0 22px rgba(94,217,255,.12)}',
+    '#os-root .jv-ai-title{flex:1;min-width:0}#os-root .jv-ai-title b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-ai-title span{display:block;margin-top:3px;color:#75dfff;font-size:9px;letter-spacing:.13em;text-transform:uppercase}',
+    '#os-root .jv-ai-close{width:30px;height:30px;border:1px solid rgba(120,160,205,.18);border-radius:9px;background:transparent;color:#8ca0bb;cursor:pointer}#os-root .jv-ai-close:hover,#os-root .jv-ai-close:focus-visible{color:#fff;border-color:#5ed9ff;outline:none}',
+    '#os-root .jv-ai-body{padding:16px 18px 20px}#os-root .jv-ai-section{padding:13px 0;border-bottom:1px solid rgba(120,160,205,.12)}#os-root .jv-ai-section:last-child{border-bottom:0}',
+    '#os-root .jv-ai-label{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#7088a6;margin-bottom:7px}#os-root .jv-ai-copy{font-size:11.5px;line-height:1.55;color:#c5d0df}',
+    '#os-root .jv-ai-now{padding:11px 12px;border-left:2px solid #5ed9ff;background:rgba(94,217,255,.055);border-radius:0 10px 10px 0}#os-root .jv-ai-now b{display:block;color:#e8f8ff;font-size:11.5px}#os-root .jv-ai-now span{display:block;color:#8095af;font-size:10px;margin-top:4px}',
+    '#os-root .jv-ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#os-root .jv-ai-metric{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.035)}#os-root .jv-ai-metric span{display:block;color:#7188a5;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em}#os-root .jv-ai-metric b{display:block;margin-top:4px;color:#e7f2ff;font-size:11px}',
+    '#os-root .jv-ai-tags{display:flex;flex-wrap:wrap;gap:5px}#os-root .jv-ai-tags span{padding:4px 7px;border:1px solid rgba(120,160,205,.15);border-radius:7px;color:#9cafc5;font-size:9.5px;background:rgba(255,255,255,.025)}',
+    '#os-root .jv-ai-action{width:100%;margin-top:12px;padding:9px 12px;border-radius:10px;border:1px solid rgba(94,217,255,.3);background:rgba(94,217,255,.08);color:#bdefff;cursor:pointer;font-size:10.5px;font-weight:650}#os-root .jv-ai-action:hover,#os-root .jv-ai-action:focus-visible{background:rgba(94,217,255,.14);outline:none}',
     '@media(max-width:1100px){#os-root .jv-holo-map{grid-template-columns:1fr 1fr;grid-template-rows:auto;gap:14px;padding:230px 18px 24px}#os-root .jv-holo-core{top:120px}#os-root .jv-holo-lines{display:none}#os-root .jv-holo-area:nth-of-type(n){grid-column:auto;grid-row:auto}}',
-    '@media(max-width:680px){#os-root .jv{display:block}#os-root .jv-side{width:100%;padding:7px 8px;border-right:0;border-bottom:1px solid var(--jc-line);overflow:hidden}#os-root .jv-logo,#os-root .jv-lbl,#os-root .jv-mini{display:none}#os-root .jv-nav{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none}#os-root .jv-nav::-webkit-scrollbar{display:none}#os-root .jv-nav a{flex:0 0 auto;white-space:nowrap;margin:0;padding:7px 9px}#os-root .jv-main{padding:14px 10px}#os-root .jv-top{margin-bottom:12px}#os-root .jv-holo-head{display:block;padding:18px 16px 0}#os-root .jv-holo-stats{justify-content:flex-start;margin-top:12px}#os-root .jv-holo-map{grid-template-columns:1fr;padding:270px 12px 18px}#os-root .jv-holo-core{top:135px}#os-root .jv-holo-area:nth-of-type(n){grid-column:1}}',
+    '@media(max-width:680px){#os-root .jv{display:block}#os-root .jv-side{width:100%;padding:7px 8px;border-right:0;border-bottom:1px solid var(--jc-line);overflow:hidden}#os-root .jv-logo,#os-root .jv-lbl,#os-root .jv-mini{display:none}#os-root .jv-nav{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none}#os-root .jv-nav::-webkit-scrollbar{display:none}#os-root .jv-nav a{flex:0 0 auto;white-space:nowrap;margin:0;padding:7px 9px}#os-root .jv-main{padding:14px 10px}#os-root .jv-top{margin-bottom:12px}#os-root .jv-holo-head{display:block;padding:18px 16px 0}#os-root .jv-holo-stats{justify-content:flex-start;margin-top:12px}#os-root .jv-holo-map{grid-template-columns:1fr;padding:270px 12px 18px}#os-root .jv-holo-core{top:135px}#os-root .jv-holo-area:nth-of-type(n){grid-column:1}#os-root .jv-agent-inspector{position:fixed;left:10px;right:10px;top:78px;width:auto;max-height:calc(100dvh - 92px)}}',
     '@media(prefers-reduced-motion:reduce){#os-root .jv-holo-lines path,#os-root .jv-core-ring,#os-root .jv-core-reactor{animation:none!important}}',
     '#os-root .jv-card2{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;padding:14px;display:flex;flex-direction:column}',
     '#os-root .jv-card2.jv-editing{border-color:var(--jc-purple)}',
@@ -621,7 +634,7 @@ function jvMapaOverview(current, activos, pendientes) {
     const agents = current.filter(a => a.linea === L.linea).sort((a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden));
     const working = agents.filter(jvOperational).length;
     const waiting = agents.length - working;
-    const chips = agents.map(a => '<span class="jv-ha-agent"><i class="' + (jvOperational(a) ? '' : 'wait') + '"></i>' + OS_E(a.nombre.replace(/\s*\([^)]*\)/g, '')) + '</span>').join('');
+    const chips = agents.map(a => '<button type="button" class="jv-ha-agent" aria-pressed="' + (JV.inspectAgentId === a.id ? 'true' : 'false') + '" onclick="event.stopPropagation();jvInspectAgent(\'' + a.id + '\')"><i class="' + (jvOperational(a) ? '' : 'wait') + '"></i>' + OS_E(a.nombre.replace(/\s*\([^)]*\)/g, '')) + '</button>').join('');
     const label = jvLineaLabel(L.linea);
     const descriptor = L.linea === 'Meta' ? 'Administra y verifica el equipo digital' : agents.length + ' empleados digitales';
     return '<section class="jv-holo-area" style="--ac:' + L.color + '" tabindex="0" role="button" onclick="jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')}" aria-label="Abrir organigrama de ' + OS_E(label) + '">'
@@ -632,8 +645,39 @@ function jvMapaOverview(current, activos, pendientes) {
     + '<div class="jv-holo-stats"><span class="jv-holo-stat"><b>' + activos + '</b> funcionando</span><span class="jv-holo-stat"><b>' + pendientes + '</b> requieren atención</span><span class="jv-holo-stat"><b>' + jvNum(JV.runsTotal) + '</b> ejecuciones registradas</span></div></div>'
     + '<div class="jv-holo-map"><svg class="jv-holo-lines" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="jv-holo-grad"><stop offset="0" stop-color="#9568ff"/><stop offset=".5" stop-color="#5ed9ff"/><stop offset="1" stop-color="#48e0b0"/></linearGradient></defs><path d="M500 300 C390 270 310 170 160 130"/><path d="M500 300 C610 270 690 170 840 130"/><path d="M500 300 C390 330 310 430 160 480"/><path d="M500 300 C610 330 690 430 840 480"/><circle cx="500" cy="300" r="4"/></svg>'
     + '<div class="jv-holo-core" role="button" tabindex="0" aria-label="Abrir Sala de Dirección" onclick="jvNav(\'command\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jvNav(\'command\')}" title="Abrir Sala de Dirección"><div class="jv-core-ring"></div><div class="jv-core-ring r2"></div><div class="jv-core-ring r3"></div><div class="jv-core-reactor">' + osIcon('brain', { size: 27 }) + '</div><div class="jv-core-label"><b>Cerebro Ejecutivo</b><span>orquestación en vivo</span></div></div>'
-    + areaHTML + '</div></div>';
+    + areaHTML + '</div>' + jvAgentInspector() + '</div>';
 }
+
+function jvAuditSummary(a) {
+  const row = JV.audit.find(r => r.agent_id === a.id);
+  if (!row) return { title: 'Sin actividad reciente registrada', detail: 'La ficha existe, pero todavía no hay una corrida reciente dentro de la bitácora visible.' };
+  const out = row.output && typeof row.output === 'object' ? row.output : {};
+  const title = out.accion || out.titulo || out.estado || row.resultado || 'Ejecución registrada';
+  const detail = out.nota || out.resumen || out.detalle || out.mensaje || 'La ejecución dejó evidencia en la bitácora del sistema.';
+  return { title: String(title), detail: String(detail) };
+}
+function jvAgentInspector() {
+  const a = jvAgent(JV.inspectAgentId);
+  if (!a || jvIsLegacy(a)) return '';
+  const state = jvHumanState(a), audit = jvAuditSummary(a);
+  const skills = Array.isArray(a.skills) ? a.skills : [];
+  const tasks = Array.isArray(a.tareas) ? a.tareas : [];
+  const pending = JV.props.filter(p => p.agent_id === a.id && p.estado === 'propuesta').length;
+  const parent = a.parent_id ? jvAgent(a.parent_id) : null;
+  const cleanTask = t => typeof t === 'object' ? (t.tarea || t.nombre || t.name || t.salida || '') : String(t || '');
+  return '<aside class="jv-agent-inspector" aria-label="Ficha operativa de ' + OS_E(a.nombre) + '">'
+    + '<div class="jv-ai-top"><div class="jv-ai-avatar">' + osIcon(jvAgentIcon(a), { size: 20 }) + '</div><div class="jv-ai-title"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(jvLineaLabel(a.linea || a.area || 'Equipo')) + ' · ' + OS_E(state.label) + '</span></div><button type="button" class="jv-ai-close" onclick="jvInspectAgent(null)" aria-label="Cerrar ficha">×</button></div>'
+    + '<div class="jv-ai-body"><div class="jv-ai-section"><div class="jv-ai-label">Responsabilidad</div><div class="jv-ai-copy">' + OS_E(a.responsabilidad || a.proceso || 'Responsabilidad todavía no documentada.') + '</div></div>'
+    + '<div class="jv-ai-section"><div class="jv-ai-label">Qué hizo recientemente</div><div class="jv-ai-now"><b>' + OS_E(audit.title) + '</b><span>' + OS_E(audit.detail) + ' · ' + OS_E(jvFmtTs(jvAgentLastRun(a))) + '</span></div></div>'
+    + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
+    + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
+    + (tasks.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Tareas asignadas</div><div class="jv-ai-copy">' + tasks.slice(0, 5).map(t => '• ' + OS_E(cleanTask(t))).join('<br>') + '</div></div>' : '')
+    + '<button type="button" class="jv-ai-action" onclick="jvInspectOpenArea(\'' + OS_E(a.linea || '').replace(/'/g, "\\'") + '\')">Abrir equipo y ficha completa →</button></div></aside>';
+}
+function jvInspectAgent(id) { JV.inspectAgentId = id || null; if (window.osRender) osRender(); }
+function jvInspectOpenArea(linea) { JV.inspectAgentId = null; JV.filterLinea = linea || null; JV.tab = 'network'; if (window.osRender) osRender(); }
+window.jvInspectAgent = jvInspectAgent;
+window.jvInspectOpenArea = jvInspectOpenArea;
 
 function jvMapaView() {
   const canEdit = jvRole() === 'admin';

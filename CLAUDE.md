@@ -890,6 +890,13 @@ En la raíz del repo:
 - Empresas muestra el equipo real completo de cada negocio; Horarios muestra el calendario declarado y la última ejecución real; Memoria compartida explica fuentes/contexto sin duplicar el mapa de agentes; Reportes traduce resultados técnicos a resúmenes humanos.
 - El Cerebro puede reunir perspectivas de CEO, CFO, CTO, CMO, COO, Legal y Data, pero cualquier acción de publicación, gasto, contrato o cambio sensible conserva aprobación humana.
 
+## 🛰️ JARVIS · ficha operativa desde el organigrama (26 Ago 2026) — LOCAL, PENDIENTE VALIDACIÓN/DEPLOY
+
+- La vista completa de `/jarvis` conserva las cuatro áreas alrededor del Cerebro Ejecutivo, pero cada nombre de agente ahora funciona como nodo inspeccionable sin abandonar el organigrama.
+- La ficha lateral traduce datos reales ya disponibles: responsabilidad, estado humano derivado de evidencia, última actividad en `agent_audit_log`, horario declarado, jefe según `parent_id`, decisiones pendientes, riesgo, skills y tareas.
+- Si no hay corrida visible, la ficha lo declara; nunca inventa actividad. El botón final abre el área y la ficha ampliada existente para administración.
+- La interacción es accesible por teclado, responsive y respeta `prefers-reduced-motion`. No agrega tablas, migraciones ni nuevas fuentes de datos.
+
 Cuando arranques una sesión en este repo:
 
 1. **Leé este archivo completo primero.** Es la fuente de verdad para decisiones técnicas.  
@@ -902,4 +909,4 @@ Cuando arranques una sesión en este repo:
 
 ---
 
-*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio M5 en desarrollo local*
+*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio desplegado; ficha operativa JARVIS en validación local*
