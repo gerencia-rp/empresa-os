@@ -150,6 +150,21 @@ function jvProposalArea(p) {
   const a = jvAgent(p && p.agent_id);
   return a ? jvLineaLabel(a.linea || a.area || 'General') : 'General';
 }
+function jvDecisionGroupKey(p) {
+  const e = jvEvidObj(p);
+  const subject = (p && p.property_id) || e.property_id || e.propiedad || e.property_name || e.property || e.address || '';
+  return [p && p.agent_id, p && p.tipo_accion, jvKey(subject)].join('|');
+}
+function jvPendingDecisions() {
+  const grouped = new Map();
+  JV.props.filter(p => p.estado === 'propuesta').forEach(p => {
+    const key = jvDecisionGroupKey(p);
+    const current = grouped.get(key);
+    if (!current) grouped.set(key, Object.assign({}, p, { _groupIds: [p.id], _groupCount: 1 }));
+    else { current._groupIds.push(p.id); current._groupCount += 1; }
+  });
+  return Array.from(grouped.values());
+}
 function jvProposalDetails(p) {
   const e = jvEvidObj(p);
   const skip = /^(id|uuid|token|prompt|raw|debug|sql|query|stack|trace|source)$/i;
@@ -741,7 +756,7 @@ function jvAgentInspector() {
   const state = jvHumanState(a), audit = jvAuditSummary(a);
   const skills = Array.isArray(a.skills) ? a.skills : [];
   const tasks = Array.isArray(a.tareas) ? a.tareas : [];
-  const pending = JV.props.filter(p => p.agent_id === a.id && p.estado === 'propuesta').length;
+  const pending = jvPendingDecisions().filter(p => p.agent_id === a.id).length;
   const parent = a.parent_id ? jvAgent(a.parent_id) : null;
   const automation = jvAutomation(a);
   const cleanTask = t => typeof t === 'object' ? (t.tarea || t.nombre || t.name || t.salida || '') : String(t || '');
@@ -809,7 +824,7 @@ function jvAgentCard(a, canEdit, canUp, canDown) {
   if (JV.mapEdit === a.id) return jvAgentEditForm(a);
   const tareas = Array.isArray(a.tareas) ? a.tareas : [];
   const skills = Array.isArray(a.skills) ? a.skills : [];
-  const pend = JV.props.filter(p => p.agent_id === a.id && p.estado === 'propuesta').length;
+  const pend = jvPendingDecisions().filter(p => p.agent_id === a.id).length;
   return '<div class="jv-card2">'
     + '<div class="jv-c2-top"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 15 }) + '</div>'
     + '<div class="jv-c2-nm"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E((a.capa || '') + ' · ' + jvFmtTs(jvAgentLastRun(a))) + '</span></div>'
@@ -889,7 +904,7 @@ window.jvMapaMove = jvMapaMove;
 // ════════════════════════════════════════════════════════════════
 function jvDashboard() {
   jvClockStart();
-  const pending = JV.props.filter(p => p.estado === 'propuesta').length;
+  const pending = jvPendingDecisions().length;
   const decisionCallout = '<div class="jv-command-action"><div><b>' + (pending ? pending + ' decisiones necesitan revisión' : 'No hay decisiones pendientes') + '</b><span>' + (pending ? 'Están organizadas por área y cada una explica qué cambia antes de aprobar.' : 'El equipo puede seguir trabajando sin intervención.') + '</span></div>' + (pending ? '<button onclick="jvNav(\'propuestas\')">Revisar decisiones</button>' : '') + '</div>';
   return jvHudHeader() + jvCounters() + jvNorthStar() + decisionCallout + jvCore() + jvChatUI()
     + jvWorkPulse()
@@ -908,7 +923,8 @@ function jvAuditWorkInfo(r) {
   return { title: jvHumanize(title), detail: String(detail), state: failed ? 'failed' : 'done' };
 }
 function jvWorkItems() {
-  const proposalItems = JV.props.map(p => {
+  const visibleProposals = JV.props.filter(p => p.estado !== 'propuesta').concat(jvPendingDecisions());
+  const proposalItems = visibleProposals.map(p => {
     const info = jvProposalInfo(p);
     const state = p.estado === 'propuesta' ? 'waiting' : (p.estado === 'aprobada' ? 'running' : 'done');
     return { id: 'p-' + p.id, kind: 'Decisión', agentId: p.agent_id, area: jvProposalArea(p), title: info.title, detail: info.summary, state, ts: p.created_at, source: info.source || 'agent_proposals' };
@@ -950,7 +966,7 @@ window.jvWorkAgent = jvWorkAgent;
 function jvMetrics() {
   let occ = null, deuda = null;
   try { if (typeof osCompute === 'function') { const c = osCompute(); if (c) { occ = c.rentas ? c.rentas.occPct : null; deuda = c.cobranza ? c.cobranza.total : null; } } } catch (e) {}
-  const pend = JV.props.filter(p => p.estado === 'propuesta').length;
+  const pend = jvPendingDecisions().length;
   return { ocupacion: occ, deuda: deuda, pendientes: pend, criticas: JV.crit.length, capital: JV.capital };
 }
 function jvGreetName() {
@@ -1067,7 +1083,7 @@ const JV_DECK = [
   { k: 'cerebro', ic: 'brain', c: 'var(--jc-pink)', t: 'Hablar con el Cerebro', s: 'Preguntale lo que sea' },
 ];
 function jvDeck() {
-  const pend = JV.props.filter(p => p.estado === 'propuesta').length;
+  const pend = jvPendingDecisions().length;
   const cards = JV_DECK.map(d => {
     const sub = d.k === 'aprobar' ? (pend + ' esperando tu OK') : d.s;
     return '<div class="jv-cmd" style="--c:' + d.c + '" onclick="jvCmd(\'' + d.k + '\')"><div class="ic">' + osIcon(d.ic, { size: 16 }) + '</div><b>' + d.t + '</b><span>' + OS_E(sub) + '</span></div>';
@@ -1125,7 +1141,7 @@ function jvPropuestasView() {
 }
 function jvLanesHTML() {
   const lanes = { propuesta: [], aprobada: [], ejecutada: [], alerta: [] };
-  JV.props.forEach(p => { const l = jvLaneOf(p); if (l) lanes[l].push(p); });
+  JV.props.filter(p => p.estado !== 'propuesta').concat(jvPendingDecisions()).forEach(p => { const l = jvLaneOf(p); if (l) lanes[l].push(p); });
   const card = (p, alert, actions) => {
     const info = jvProposalInfo(p);
     const detail = jvProposalDetails(p);
@@ -1133,6 +1149,7 @@ function jvLanesHTML() {
     const meta = [jvProposalArea(p), jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
     return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span></div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
       + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
+      + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
       + '<div class="who">' + OS_E(meta) + '</div>'
       + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (detail.sufficient ? 'Aprobar propuesta' : 'Falta información')) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>No aplicar</button></div>' : '') + '</article>';
   };
@@ -1162,7 +1179,7 @@ function jvFeedHTML() {
 // ════════════════════════════════════════════════════════════════
 function jvBriefView() {
   let occ = null; try { if (typeof osCompute === 'function') { const c = osCompute(); occ = c && c.rentas ? c.rentas.occPct : null; } } catch (e) {}
-  const pend = JV.props.filter(p => p.estado === 'propuesta').length;
+  const pend = jvPendingDecisions().length;
   const informe = (like) => { const a = JV.agents.find(x => (x.nombre || '').indexOf(like) === 0); if (!a) return null; const p = JV.props.find(x => x.agent_id === a.id && x.tipo_accion === 'informe'); return p ? jvEvid(p) : null; };
   const plan = informe('Ops · Líder'); const cal = informe('Ops · Analista de Calidad');
   const topCrit = JV.crit.slice(0, 5).map(f => '<div class="jv-frow"><span class="rs">' + OS_E(f.titulo) + '</span><span class="tm" style="color:var(--jc-pink)">' + jvMoney(f.impacto_usd) + '</span></div>').join('');
@@ -1182,7 +1199,7 @@ function jvEmpresasView() {
     const squad = JV.agents.filter(a => a.area === e.area && !jvIsLegacy(a));
     const areaAgentIds = squad.map(a => a.id);
     const props = JV.props.filter(p => areaAgentIds.includes(p.agent_id));
-    const pend = props.filter(p => p.estado === 'propuesta').length;
+    const pend = jvPendingDecisions().filter(p => areaAgentIds.includes(p.agent_id)).length;
     const line = a => '<div class="jv-simple-row"><div class="jv-av">' + osIcon(jvAgentIcon(a), { size: 14 }) + '</div><div class="body"><b>' + OS_E(a.nombre) + '</b><span>' + OS_E(a.responsabilidad || a.proceso || '') + ' · ' + jvFmtTs(jvAgentLastRun(a)) + '</span></div>' + jvAgentHumanBadge(a) + '</div>';
     return '<div class="jv-card"><div style="display:flex;align-items:center;gap:9px;margin-bottom:12px"><div class="jv-av">' + osIcon(e.icon, { size: 15 }) + '</div><b style="font-size:14px">' + OS_E(e.name) + '</b><span class="jv-chip" style="margin-left:auto">' + pend + ' pendientes · ' + props.length + ' props</span></div>'
       + (squad.length ? '<div class="jv-simple-list">' + squad.map(line).join('') + '</div>' : '<div class="jv-empty">Todavía no hay agentes conectados a esta empresa.</div>') + '</div>';
@@ -1354,12 +1371,25 @@ window.jvReportArea = jvReportArea;
 async function jvDecide(id, estado) {
   const p = JV.props.find(x => x.id === id); if (!p || JV.busyId) return;
   const me = jvMe(); const verb = estado === 'aprobada' ? 'Aprobar' : 'Rechazar';
-  if (!confirm(verb + ' esta propuesta de "' + jvAgentName(p.agent_id) + '"?')) return;
+  const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
+  const groupedNote = groupIds.length > 1 ? ' También se cerrarán ' + (groupIds.length - 1) + ' actualizaciones anteriores del mismo control.' : '';
+  if (!confirm(verb + ' esta propuesta de "' + jvAgentName(p.agent_id) + '"?' + groupedNote)) return;
   JV.busyId = id; if (window.osRender) osRender();
   try {
-    const { error: e1 } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: new Date().toISOString() }).eq('id', id);
-    if (e1) throw e1;
-    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: id, input: { accion: estado, por: me, tipo: p.tipo_accion }, output: { estado: estado, por: me, accion: verb + ' desde Command Center' }, resultado: 'ok' });
+    const decidedAt = new Date().toISOString();
+    const olderIds = groupIds.filter(x => x !== id);
+    if (estado === 'rechazada') {
+      const { error: rejectError } = await sb.from('agent_proposals').update({ estado: 'rechazada', approved_by: me, approved_at: decidedAt }).in('id', groupIds);
+      if (rejectError) throw rejectError;
+    } else {
+      if (olderIds.length) {
+        const { error: supersedeError } = await sb.from('agent_proposals').update({ estado: 'rechazada', approved_by: me, approved_at: decidedAt }).in('id', olderIds);
+        if (supersedeError) throw supersedeError;
+      }
+      const { error: approveError } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: decidedAt }).eq('id', id);
+      if (approveError) throw approveError;
+    }
+    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: id, input: { accion: estado, por: me, tipo: p.tipo_accion, actualizaciones_agrupadas: groupIds.length }, output: { estado: estado, por: me, accion: verb + ' desde Command Center', actualizaciones_anteriores_cerradas: olderIds.length }, resultado: 'ok' });
     if (e2) console.warn('audit_log insert:', e2.message);
   } catch (e) { alert('No se pudo ' + verb.toLowerCase() + ': ' + (e.message || e)); }
   JV.busyId = null; await jvLoad(true);
@@ -1368,7 +1398,7 @@ window.jvDecide = jvDecide;
 
 function jvSnapshot() {
   const informes = JV.props.filter(p => p.tipo_accion === 'informe').slice(0, 6).map(p => jvEvid(p));
-  const pend = JV.props.filter(p => p.estado === 'propuesta');
+  const pend = jvPendingDecisions();
   const byTipo = {}; pend.forEach(p => { byTipo[p.tipo_accion || 'otro'] = (byTipo[p.tipo_accion || 'otro'] || 0) + 1; });
   let os = null; try { if (typeof osSnapshot === 'function' && typeof osCompute === 'function') os = osSnapshot(osCompute()); } catch (e) {}
   return {
