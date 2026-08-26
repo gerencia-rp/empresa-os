@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'port', myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [], viewOnly: false, ver: null, verNombre: '', verList: [] };
+const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'ruta', rutaEtapa: null, myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [], viewOnly: false, ver: null, verNombre: '', verList: [] };
 window.IP = IP;
 
 const $money = v => (v == null || isNaN(+v)) ? '—' : (+v < 0 ? '−$' : '$') + Math.abs(Math.round(+v)).toLocaleString('en-US');
@@ -422,7 +422,7 @@ function render() {
   // datos intactos (renderDocs/renderMsgs siguen y se renderizan si se navega directo). PARA REACTIVAR:
   // sacá el tab de IP_TABS_OCULTOS.
   const IP_TABS_OCULTOS = ['docs', 'msgs'];
-  const TABS = [['port', 'Mi Portafolio'], ['rend', 'Rendimiento'], ['casa', 'Mi Casa'], ['flujo', 'Flujo Mensual'], ['dist', 'Distribuciones'], ['docs', 'Mis Documentos'], ['glos', 'Aprende'], ['msgs', 'Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', 'Asistente']].filter(t => !IP_TABS_OCULTOS.includes(t[0]));
+  const TABS = [['ruta', 'Ruta de la inversión'], ['port', 'Mi Portafolio'], ['rend', 'Rendimiento'], ['casa', 'Mi Casa'], ['flujo', 'Flujo Mensual'], ['dist', 'Distribuciones'], ['docs', 'Mis Documentos'], ['glos', 'Aprende'], ['msgs', 'Mensajes' + (noLeidos ? ' (' + noLeidos + ')' : '')], ['ia', 'Asistente']].filter(t => !IP_TABS_OCULTOS.includes(t[0]));
   const head = ipVerBar()
     + '<div class="bar"><div class="logo">FR</div><div class="brandt"><b>Portal de Inversionistas</b><span>FLIPPING RENTALS</span></div>'
     + '<div class="barr">' + selector
@@ -431,7 +431,8 @@ function render() {
     + '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' + TABS.map(t => '<button class="ibtn tabb' + (IP.tab === t[0] ? ' on' : '') + '" onclick="IP.tab=\'' + t[0] + '\';render()">' + t[1] + '</button>').join('') + '</div>';
 
   let body = '';
-  if (IP.tab === 'rend') body = renderRendimiento();
+  if (IP.tab === 'ruta') body = renderRutaInversion(pid, P, holding, p, r, dir, docs);
+  else if (IP.tab === 'rend') body = renderRendimiento();
   else if (IP.tab === 'casa') body = renderCasaDash(pid, P, holding, p, r, dir);
   else if (IP.tab === 'flujo') body = renderFlujo(pid, p.repartoInv);
   else if (IP.tab === 'dist') body = renderDist(pid, p.repartoInv);
@@ -451,6 +452,55 @@ function render() {
     // debe decir "aún no aplica", nunca "sin dato" ni inventar un número.
     estado_operativo: r.indicadores.estadoOperativo,
     riqueza_hoy: met.riquezaHoy, coc_anual: met.cocAnualPct, equity_multiple: met.em, roi_anualizado: met.roiAnu, fases: r.indicadores.fases, distribuciones: met.distMias.map(d => ({ fecha: d.fecha, tipo: d.tipo, monto: +d.monto, estado: d.estado })) };
+}
+
+function ipRutaEtapa(key) { IP.rutaEtapa = key; render(); }
+window.ipRutaEtapa = ipRutaEtapa;
+
+// Mapa operacional: deriva su estado de la Ficha 360, modelo, ledger y documentos.
+// No mantiene un segundo estado de la propiedad que pueda divergir del resto del OS.
+function renderRutaInversion(pid, P, holding, p, r, dir, docs) {
+  const rc = (IP.resumen || []).find(x => x.property_id === pid) || {};
+  const led = Array.isArray(IP.ledger[pid]) ? IP.ledger[pid] : [];
+  if (IP.ledger[pid] === undefined) ipLoadLedger(pid, true);
+  const cierre = txt(P, 'fecha_cierre');
+  const etapaReal = String(rc.etapa || txt(P, 'estado_casa') || '').toLowerCase();
+  const obraPct = rc.avance_planner == null ? null : Math.max(0, Math.min(100, +rc.avance_planner));
+  const hmCompra = num(P, 'hm_compra', null), hmRehab = num(P, 'hm_rehab', null);
+  const aporte = +holding.inversion_aportada || 0;
+  const rentaReal = led.some(x => x.categoria === 'renta' && +x.monto > 0);
+  const refiReal = num(P, 'cashout_real', null) != null || /refinan/.test(etapaReal);
+  const vendida = /vendid|cerrad/.test(etapaReal);
+  const dist = (IP.dists || []).filter(x => x.property_id === pid);
+  const addM = (iso, m) => { if (!iso || m == null || m < 0) return null; const d = new Date(iso + 'T00:00:00'); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 10); };
+  const totalDraws = Object.values(p.draws || {}).reduce((s, v) => s + (+v || 0), 0);
+  const proxDist = dist.filter(x => x.estado !== 'pagada').sort((a,b) => String(a.fecha).localeCompare(String(b.fecha)))[0];
+  const stages = [
+    { key:'capital', title:'Capital y estructura', short:'Capital', done:aporte > 0, started:true, eta:cierre, desc:'Se define quién participa, cuánto aporta y cómo se reparte el negocio.', facts:[['Tu aporte', aporte ? $money(aporte) : 'Pendiente'], ['Tu participación', $pct(+holding.reparto_pct || 0)], ['Cierre previsto / real', cierre || 'Pendiente']] },
+    { key:'financiamiento', title:'Financiamiento', short:'Financiamiento', done:(hmCompra != null || p.compra > 0) && !!cierre, started:hmCompra != null || hmRehab != null, eta:cierre, desc:'Se estructura y confirma el dinero para compra y remodelación.', facts:[['HML para compra', hmCompra == null ? 'Pendiente' : $money(hmCompra)], ['HML para remodelación', hmRehab == null ? 'Pendiente' : $money(hmRehab)], ['Tasa HML', p.hmTasa ? $pct2(p.hmTasa) : 'Pendiente']] },
+    { key:'compra', title:'Compra y cierre', short:'Compra', done:!!cierre, started:!!cierre, eta:cierre, desc:'La propiedad se adquiere y comienza formalmente la operación.', facts:[['Precio de compra', p.compra ? $money(p.compra) : 'Pendiente'], ['Gastos de cierre', p.cierreCompra ? $money(p.cierreCompra) : 'Pendiente'], ['Fecha de cierre', cierre || 'Pendiente']] },
+    { key:'remodelacion', title:'Remodelación', short:'Remodelación', done:/rentad|estabil|refinan|vendid/.test(etapaReal) || obraPct >= 100, started:(obraPct != null && obraPct > 0) || /remodel|obra|rehab/.test(etapaReal), eta:addM(cierre, Math.max(1, Object.keys(p.draws || {}).length)), desc:'La obra transforma la casa hasta dejarla lista para operar o vender.', facts:[['Avance reportado', obraPct == null ? 'Pendiente de actualización' : Math.round(obraPct) + '%'], ['Presupuesto / draws', totalDraws ? $money(totalDraws) : 'Pendiente'], ['Responsable', rc.lider || 'Equipo de remodelación']] },
+    { key:'estabilizacion', title:'Ocupación y estabilización', short:'Estabilización', done:rentaReal || /rentad|estabil|refinan/.test(etapaReal), started:rentaReal || /rent|ocup|estabil/.test(etapaReal), eta:addM(cierre, (p.rampa || []).findIndex(x => x > 0)), desc:'Se prepara la operación, se ocupan las unidades y comienza el cobro de rentas.', facts:[['Primera renta real', rentaReal ? 'Registrada' : 'Pendiente'], ['Renta mensual objetivo', p.rentaMes ? $money(p.rentaMes) : 'Pendiente'], ['Estado operativo', etapaReal ? etapaReal.replace(/_/g,' ') : 'Pendiente']] },
+    { key:'refi', title:'Refinanciación o salida', short:'Refi / salida', done:refiReal || vendida, started:refiReal || vendida, eta:p.refiMes != null ? addM(cierre, p.refiMes) : null, desc:'Se reemplaza el Hard Money por deuda de largo plazo o se ejecuta la venta.', facts:[['Préstamo estimado', p.refiMonto ? $money(p.refiMonto) : 'Pendiente'], ['Cash-out real', num(P,'cashout_real',null) == null ? 'Pendiente' : $money(num(P,'cashout_real',0))], ['Plan de salida', txt(P,'plan_salida') || 'Pendiente de definir']] },
+    { key:'operacion', title:'Operación y retornos', short:'Retornos', done:dist.some(x => x.estado === 'pagada'), started:rentaReal || dist.length > 0, eta:proxDist ? proxDist.fecha : null, desc:'La propiedad produce, se reportan resultados y se realizan distribuciones.', facts:[['Distribuciones pagadas', $money(dist.filter(x => x.estado === 'pagada').reduce((s,x) => s + (+x.monto || 0),0))], ['Movimientos registrados', String(led.length)], ['Próxima distribución', proxDist ? proxDist.fecha : 'Sin fecha programada']] }
+  ];
+  let current = stages.findIndex(s => !s.done);
+  if (current < 0) current = stages.length - 1;
+  stages[current].started = true;
+  const chosen = stages.find(s => s.key === IP.rutaEtapa) || stages[current];
+  IP.rutaEtapa = chosen.key;
+  const completed = stages.filter(s => s.done).length;
+  const supports = docs.filter(d => (d.etapa || 'general') === chosen.key || (d.etapa || 'general') === 'general');
+  const missing = chosen.facts.filter(x => /Pendiente|Sin fecha/.test(String(x[1]))).map(x => x[0]);
+  const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? String(u) : '#';
+  const media = d => d.formato === 'imagen'
+    ? '<a href="' + esc(safeUrl(d.url)) + '" target="_blank" rel="noopener"><img class="deal-media" src="' + esc(safeUrl(d.url)) + '" alt="' + esc(d.nombre) + '"></a>'
+    : (d.formato === 'nota' ? '' : '<a href="#" onclick="ipVerDoc(\'' + d.id + '\',decodeURIComponent(\'' + encodeURIComponent(safeUrl(d.url)) + '\'));return false" style="color:var(--a2)">' + osIcon(d.formato === 'link' ? 'external-link' : 'paperclip') + ' Abrir soporte ↗</a>');
+  return '<h1>El mapa de <span>tu inversión</span></h1><div class="sub">' + esc(dir) + ' · seguí el negocio completo, qué pasó, dónde estamos y qué viene después.</div>'
+    + '<div class="card"><div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap"><div><div class="lab">Estado actual</div><div class="big" style="font-size:20px">' + esc(stages[current].title) + '</div><div class="meta">' + esc(stages[current].desc) + '</div></div><div style="min-width:210px"><div class="meta" style="display:flex;justify-content:space-between"><span>Progreso del proceso</span><b>' + completed + ' de ' + stages.length + ' etapas</b></div><div class="progress-track" style="margin-top:8px"><span style="width:' + Math.round(completed / stages.length * 100) + '%"></span></div></div></div>'
+    + '<div class="deal-route" style="margin-top:16px">' + stages.map((s,i) => '<button class="deal-step ' + (s.done ? 'done ' : '') + (i === current ? 'now ' : '') + '" onclick="ipRutaEtapa(\'' + s.key + '\')"><span class="deal-n">' + (s.done ? '✓' : i + 1) + '</span><b style="display:block;font-size:12px;line-height:1.25">' + esc(s.short) + '</b><span class="meta" style="display:block">' + (s.done ? 'Completada' : i === current ? 'Estamos aquí' : 'Próximamente') + '</span>' + (s.eta ? '<span class="meta" style="display:block">' + esc(s.eta) + '</span>' : '') + '</button>').join('') + '</div></div>'
+    + '<div class="deal-detail"><div class="card"><div class="chart-h"><div><div class="lab">Etapa seleccionada</div><div class="t" style="font-size:17px;margin-top:4px">' + esc(chosen.title) + '</div></div><span class="src' + (chosen.done ? '' : ' sup') + '">' + (chosen.done ? 'completada' : chosen.key === stages[current].key ? 'en curso' : 'próxima') + '</span></div><p style="font-size:12.5px;line-height:1.65;color:var(--mut);margin-bottom:10px">' + esc(chosen.desc) + '</p>' + chosen.facts.map(f => '<div class="kv"><span>' + esc(f[0]) + '</span><b>' + esc(f[1]) + '</b></div>').join('') + (missing.length ? '<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.25);font-size:11.5px"><b class="warn">Qué falta:</b> ' + esc(missing.join(' · ')) + '</div>' : '<div class="meta up" style="margin-top:10px">✓ La información principal de esta etapa está registrada.</div>') + (chosen.eta ? '<div class="meta" style="margin-top:10px">' + osIcon('clock') + ' Fecha real o estimada: <b>' + esc(chosen.eta) + '</b></div>' : '') + '</div>'
+    + '<div class="card"><div class="chart-h"><div class="t">Soportes y actualizaciones</div><div class="k">' + supports.length + ' disponibles</div></div>' + (supports.length ? supports.map(d => '<div class="deal-support"><div style="flex:1"><b style="font-size:12px">' + esc(d.nombre) + '</b>' + (d.descripcion ? '<div class="meta">' + esc(d.descripcion) + '</div>' : '') + '<div class="meta">' + esc(d.fecha_evento || String(d.created_at || '').slice(0,10)) + ' · ' + esc(d.formato || d.tipo || 'documento') + (d.duracion_estimada_dias != null ? ' · estimado ' + esc(d.duracion_estimada_dias) + ' días' : '') + '</div>' + media(d) + '</div></div>').join('') : '<div class="empty" style="padding:24px 8px">Todavía no hay soportes publicados para esta etapa. El equipo puede agregar una nota, imagen, documento o enlace desde administración.</div>') + '</div></div>';
 }
 
 // ─── 🏠 MI PORTAFOLIO ───

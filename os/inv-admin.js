@@ -494,8 +494,9 @@ async function iaLoadProducto() {
 // ─── 📄 documentos del inversionista (el portal los lista con buscador + audit) ───
 async function iaAddDoc() {
   const g = id => ((document.getElementById(id) || {}).value || '').trim();
-  const row = { property_id: g('ia-doc-casa'), investor_airtable_id: g('ia-doc-inv') || null, tipo: g('ia-doc-tipo') || 'otro', nombre: g('ia-doc-nombre'), url: g('ia-doc-url') };
-  if (!row.property_id || !row.nombre || !row.url) return alert('Casa, nombre y URL son obligatorios');
+  const row = { property_id: g('ia-doc-casa'), investor_airtable_id: g('ia-doc-inv') || null, tipo: g('ia-doc-tipo') || 'otro', nombre: g('ia-doc-nombre'), url: g('ia-doc-url') || 'https://empresa-os.vercel.app', etapa: g('ia-doc-etapa') || 'general', formato: g('ia-doc-formato') || 'documento', descripcion: g('ia-doc-desc') || null, fecha_evento: g('ia-doc-fecha') || null, duracion_estimada_dias: g('ia-doc-dias') ? +g('ia-doc-dias') : null };
+  if (!row.property_id || !row.nombre) return alert('Casa y título son obligatorios');
+  if (row.formato !== 'nota' && !g('ia-doc-url')) return alert('Agregá la URL del documento, imagen o enlace');
   const { error } = await sb.from('inv_documents').insert(row);
   if (error) return alert('Error: ' + error.message);
   if (window.toast) toast('✓ Documento cargado — ya lo ve el inversionista en su portal', 'success');
@@ -512,21 +513,26 @@ function iaTabDocs() {
   const invOpts = '<option value="">' + osIcon('house') + ' Todos los inversionistas de la casa</option>' + iaInvOptions();
   const casaOpts = [...new Set(IA.holdings.map(h => h.property_id))].map(c => '<option value="' + c + '">' + OS_E(iaCasaName(c)) + '</option>').join('');
   const docs = IA.docsAll || [];
-  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Subir documento al portal</div><div class="k">contrato · fiscal (K-1) · legal · otro — URL de Drive/Storage</div></div>'
+  return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Publicar soporte o actualización</div><div class="k">aparece dentro de la etapa correspondiente</div></div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
     + '<select id="ia-doc-casa" class="osa-in">' + casaOpts + '</select>'
     + '<select id="ia-doc-inv" class="osa-in">' + invOpts + '</select>'
-    + '<select id="ia-doc-tipo" class="osa-in"><option>contrato</option><option>fiscal</option><option>legal</option><option>otro</option></select>'
-    + '<input id="ia-doc-nombre" class="osa-in" placeholder="Nombre visible (ej: Operating Agreement 2025)">'
-    + '<input id="ia-doc-url" class="osa-in" placeholder="URL del documento" style="grid-column:span 2">'
-    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaAddDoc()">Subir al portal</button>'
+    + '<select id="ia-doc-etapa" class="osa-in"><option value="general">Todas las etapas</option><option value="capital">Capital y estructura</option><option value="financiamiento">Financiamiento</option><option value="compra">Compra y cierre</option><option value="remodelacion">Remodelación</option><option value="estabilizacion">Ocupación y estabilización</option><option value="refi">Refinanciación o salida</option><option value="operacion">Operación y retornos</option></select>'
+    + '<select id="ia-doc-formato" class="osa-in"><option value="documento">Documento</option><option value="imagen">Imagen</option><option value="link">Enlace</option><option value="nota">Solo actualización</option></select>'
+    + '<select id="ia-doc-tipo" class="osa-in"><option>contrato</option><option>fiscal</option><option>legal</option><option>avance</option><option>financiero</option><option>otro</option></select>'
+    + '<input id="ia-doc-nombre" class="osa-in" placeholder="Título visible (ej: Draw #2 aprobado)">'
+    + '<input id="ia-doc-fecha" class="osa-in" type="date" title="Fecha de la actualización">'
+    + '<input id="ia-doc-dias" class="osa-in" type="number" min="0" placeholder="Duración estimada (días)">'
+    + '<textarea id="ia-doc-desc" class="osa-in" rows="2" placeholder="Qué pasó, qué sigue y qué significa para el inversionista" style="grid-column:span 3"></textarea>'
+    + '<input id="ia-doc-url" class="osa-in" placeholder="URL de Drive, imagen o página (opcional para una nota)" style="grid-column:span 3">'
+    + '</div><button class="cbtn" style="margin-top:10px" onclick="iaAddDoc()">Publicar en la ruta</button>'
     + '<div class="meta" style="margin-top:6px">Sin inversionista = lo ven todos los holders de la casa. Cada vista del inversionista queda en el audit log del documento.</div></div>'
     + '<div class="card"><div class="chart-h"><div class="t">Documentos (' + docs.length + ')</div></div>'
-    + '<table class="ptable"><thead><tr><th>Documento</th><th>Casa</th><th>Para</th><th>Tipo</th><th>Vistas</th><th style="text-align:right"></th></tr></thead><tbody>'
-    + (docs.map(d => '<tr><td><a href="' + OS_E(d.url) + '" target="_blank" style="color:var(--a2)">' + OS_E(d.nombre) + ' ↗</a></td><td>' + OS_E(iaCasaName(d.property_id)) + '</td>'
-      + '<td>' + (d.investor_airtable_id ? OS_E(iaInvName(d.investor_airtable_id)) : 'todos') + '</td><td>' + OS_E(d.tipo || '—') + '</td>'
+    + '<table class="ptable"><thead><tr><th>Actualización</th><th>Casa</th><th>Etapa</th><th>Para</th><th>Tipo</th><th>Vistas</th><th style="text-align:right"></th></tr></thead><tbody>'
+    + (docs.map(d => '<tr><td><a href="' + OS_E(d.url) + '" target="_blank" style="color:var(--a2)">' + OS_E(d.nombre) + ' ↗</a></td><td>' + OS_E(iaCasaName(d.property_id)) + '</td><td>' + OS_E(d.etapa || 'general') + '</td>'
+      + '<td>' + (d.investor_airtable_id ? OS_E(iaInvName(d.investor_airtable_id)) : 'todos') + '</td><td>' + OS_E(d.formato || d.tipo || '—') + '</td>'
       + '<td>' + ((d.audit || []).length || 0) + '</td>'
-      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDoc(\'' + d.id + '\')">' + osIcon('pause') + '</button></td></tr>').join('') || '<tr><td colspan="6" class="empty">Sin documentos.</td></tr>')
+      + '<td style="text-align:right"><button class="ct-btn" style="color:var(--neg);padding:2px 7px" onclick="iaDelDoc(\'' + d.id + '\')">' + osIcon('pause') + '</button></td></tr>').join('') || '<tr><td colspan="7" class="empty">Sin documentos.</td></tr>')
     + '</tbody></table></div>';
 }
 async function iaCrearDist() {
@@ -1680,8 +1686,8 @@ function invAdminView() {
   // Auditoría Item 10 (20-ago): 'pipeline' (Calculadora de propuesta) OCULTO por pedido del CEO
   // ("quitemos esto"). Código y datos intactos; iaTabDocs/iaTabMsgs/iaTabPipeline siguen existiendo
   // y se renderizan si se navega directo. PARA REACTIVAR: sacá el tab de IA_TABS_OCULTOS.
-  const IA_TABS_OCULTOS = ['docs2', 'msgs', 'pipeline'];
-  const tabsAll = [['global', 'Global'], ['analizador', 'Analizador'], ['pipeline', 'Pipeline'], ['accesos', 'Accesos'], ['holdings', 'Casas & reparto'], ['modelo', 'Modelo & movimientos'], ['escenarios', 'Escenarios & simulador'], ['dist', 'Distribuciones'], ['docs2', 'Documentos'], ['msgs', 'Mensajes'], ['ledger', 'Ledger'], ['glosario', 'Glosario']];
+  const IA_TABS_OCULTOS = ['msgs', 'pipeline'];
+  const tabsAll = [['global', 'Global'], ['analizador', 'Analizador'], ['pipeline', 'Pipeline'], ['accesos', 'Accesos'], ['holdings', 'Casas & reparto'], ['modelo', 'Modelo & movimientos'], ['escenarios', 'Escenarios & simulador'], ['dist', 'Distribuciones'], ['docs2', 'Ruta y soportes'], ['msgs', 'Mensajes'], ['ledger', 'Ledger'], ['glosario', 'Glosario']];
   const tabs = tabsAll.filter(t => !IA_TABS_OCULTOS.includes(t[0]));
   const tabBtns = tabs.map(t => '<button class="ibtn" style="' + (IA.tab === t[0] ? 'border-color:var(--a2);color:var(--ink)' : '') + '" onclick="iaGoTab(\'' + t[0] + '\')">' + t[1] + '</button>').join(' ');
   let body = '';
