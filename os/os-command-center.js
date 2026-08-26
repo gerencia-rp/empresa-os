@@ -144,7 +144,7 @@ function jvProposalInfo(p) {
   return { title: String(title), summary: String(summary), source: first(e.fuente, e.source, ''), cut: first(e.corte, e.fecha, '') };
 }
 function jvHumanize(v) {
-  return String(v || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
+  return String(v || '').replace(/[_-]+/g, ' ').replace(/(^|\s)\S/g, c => c.toUpperCase()).trim();
 }
 function jvProposalArea(p) {
   const a = jvAgent(p && p.agent_id);
@@ -1297,6 +1297,11 @@ function jvVaultGraphView() {
 function jvReportesView() {
   const informes = JV.reports;
   const areaOf = r => { const k = jvKey([r.tipo, r.generado_por, r.titulo].join(' ')); if (/renta/.test(k)) return 'Rentas'; if (/remodel|obra/.test(k)) return 'Remodelación'; if (/\bff\b|fix.*flip|pipeline/.test(k)) return 'Fix & Flip'; return 'Dirección'; };
+  const authorOf = r => {
+    const key = String(r.generado_por || r.origen || 'Sistema').replace(/\s*\(agentes_ia_exec\)\s*/i, '').trim();
+    const names = { 'cerebro-reunion': 'Cerebro Matutino', 'rentas-gerente': 'Gerente de Rentas', 'rentas-reportes': 'Reportes Rentas', 'rentas-financiero': 'Financiero Rentas', 'rentas-optimizacion': 'Optimización Rentas', 'remod-gerente': 'Gerente de Remodelación', 'remod-reportes': 'Reportes Remodelación', 'ff-gerente': 'Gerente de Fix & Flip', 'ff-reportes': 'Reportes Fix & Flip' };
+    return names[key] || jvHumanize(key);
+  };
   const areas = ['Todas'].concat([...new Set(informes.map(areaOf))]);
   const selected = JV.reportArea === 'Todas' ? informes : informes.filter(r => areaOf(r) === JV.reportArea);
   const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.reportArea === a ? 'on' : '') + '" onclick="jvReportArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? informes.length : informes.filter(r => areaOf(r) === a).length) + '</span></button>').join('') + '</div>';
@@ -1307,7 +1312,7 @@ function jvReportesView() {
     const readable = (v, depth) => {
       if (v == null) return '—';
       if (typeof v !== 'object') return String(v);
-      if (depth > 1) return Array.isArray(v) ? v.length + ' elementos' : Object.keys(v).length + ' datos';
+      if (depth > 2) return Array.isArray(v) ? v.length + ' elementos' : Object.keys(v).length + ' datos';
       if (Array.isArray(v)) return v.slice(0, 8).map(x => readable(x, depth + 1)).join(' · ');
       return Object.keys(v).slice(0, 8).map(x => jvHumanize(x) + ': ' + readable(v[x], depth + 1)).join(' · ');
     };
@@ -1316,7 +1321,7 @@ function jvReportesView() {
   const groups = [...new Set(selected.map(areaOf))].map(area => {
     const rows = selected.filter(r => areaOf(r) === area).slice(0, 40).map(r => {
       const date = (r.corte || r.created_at) ? new Date((r.corte || r.created_at) + (r.corte ? 'T12:00:00' : '')).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Sin fecha';
-      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(r.titulo || jvHumanize(r.tipo)) + '</h3><div class="report-meta">' + OS_E(r.generado_por || r.origen || 'Sistema') + ' · ' + OS_E(date) + ' · ' + OS_E(jvHumanize(r.estado)) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + (reportRows(r.payload) || 'Este reporte todavía no contiene información legible.') + (r.storage_path ? '<div class="jv-chip" style="margin-top:10px">PDF guardado</div>' : '') + '</div></details>';
+      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(r.titulo || jvHumanize(r.tipo)) + '</h3><div class="report-meta">' + OS_E(authorOf(r)) + ' · ' + OS_E(date) + ' · ' + OS_E(jvHumanize(r.estado)) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + (reportRows(r.payload) || 'Este reporte todavía no contiene información legible.') + (r.storage_path ? '<div class="jv-chip" style="margin-top:10px">PDF guardado</div>' : '') + '</div></details>';
     }).join('');
     return '<section class="jv-report-group"><div class="jv-section-title">' + OS_E(area) + ' <span>' + selected.filter(r => areaOf(r) === area).length + '</span></div><div class="jv-report-list">' + rows + '</div></section>';
   }).join('');
