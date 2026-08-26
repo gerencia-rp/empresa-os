@@ -904,6 +904,8 @@ En la raíz del repo:
 - QA autenticado de producción detectó una brecha de representación: el total incluía a `Cerebro Matutino`, pero el mapa no lo dibujaba. Fase 3 lo incorpora como nodo de Comando inspeccionable bajo el Cerebro Ejecutivo para que cada agente contado exista también en el organigrama.
 - La disponibilidad operativa de fase 3 exige tres pruebas simultáneas: ejecutor versionado, estado promovido (`activo`/`live`/`asistido`) y evidencia reciente de negocio. Evals, promociones, registros y ediciones de ficha no cuentan como trabajo. Si `disparadores` está vacío, Jarvis muestra el horario del cron versionado.
 - `Optimización Fix & Flip` permanece correctamente bloqueado: no existe `ff-optimizacion` ni histórico confiable de transiciones por etapa. La interfaz debe mostrar esa brecha y nunca convertir su eval de prueba en estado “funcionando”.
+- Memoria compartida lee las memorias activas reales de `pm_brain_memory` (tipo, fuente, fecha, texto y reafirmaciones); no sustituye memoria por actividad genérica de auditoría.
+- Reportes lee la bandeja canónica `pm_informes`, agrupa por Dirección/Rentas/Remodelación/Fix & Flip y traduce el payload a campos humanos sin mostrar JSON crudo. `agent_proposals` sigue siendo trabajo/decisiones, no la fuente principal de reportes.
 
 Cuando arranques una sesión en este repo:
 

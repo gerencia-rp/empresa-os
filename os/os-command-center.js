@@ -13,7 +13,7 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], lastRun: {}, lastEvidence: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], reports: [], memories: [], lastRun: {}, lastEvidence: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
@@ -600,10 +600,12 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, runs, crit, mem, cap, ns] = await Promise.all([
+    const [reg, props, audit, reports, memories, runs, crit, mem, cap, ns] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(40),
+      sb.from('pm_informes').select('id,tipo,corte,titulo,estado,origen,payload,storage_path,generado_por,emitido_at,created_at').is('archived_at', null).order('corte', { ascending: false }).limit(120),
+      sb.from('pm_brain_memory').select('id,tipo,texto,fuente,fecha,hits,created_at').eq('activo', true).order('fecha', { ascending: false }).limit(80),
       sb.from('agent_audit_log').select('id', { count: 'exact', head: true }),
       sb.from('ct_findings').select('titulo,impacto_usd').eq('active', true).is('resolved_at', null).eq('severidad', 'critica').order('impacto_usd', { ascending: false, nullsFirst: false }),
       sb.from('pm_brain_memory').select('id', { count: 'exact', head: true }).then(r => r).catch(() => ({ count: null })),
@@ -614,6 +616,8 @@ async function jvLoad(force) {
     JV.agents = reg.data || [];
     JV.props = props.error ? [] : (props.data || []);
     JV.audit = audit.error ? [] : (audit.data || []);
+    JV.reports = reports.error ? [] : (reports.data || []);
+    JV.memories = memories.error ? [] : (memories.data || []);
     JV.runsTotal = runs.count || 0;
     JV.crit = crit.error ? [] : (crit.data || []);
     JV.critImpact = JV.crit.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
@@ -1214,14 +1218,14 @@ window.jvVaultPick = jvVaultPick;
 
 function jvVaultView() {
   const sources = JV_FUENTES.map(f => '<div class="jv-simple-row"><div class="jv-av">' + osIcon(f.icon, { size: 14 }) + '</div><div class="body"><b>' + OS_E(f.label) + '</b><span>' + OS_E(f.desc) + '</span></div><span class="jv-badge b-work">fuente conectada</span></div>').join('');
-  const activity = JV.audit.slice(0, 8).map(r => {
-    const tm = r.ts ? jvFmtTs(r.ts) : 'sin fecha'; let out = '';
-    try { const o = r.output; out = o && typeof o === 'object' ? (o.accion || o.nota || o.estado || r.resultado) : (r.resultado || 'actualización'); } catch (_) { out = r.resultado || 'actualización'; }
-    return '<div class="jv-simple-row"><div class="jv-av">' + osIcon('brain', { size: 14 }) + '</div><div class="body"><b>' + OS_E(jvAgentName(r.agent_id)) + '</b><span>' + OS_E(String(out || 'Actualizó la memoria compartida')) + '</span></div><span class="jv-chip">' + OS_E(tm) + '</span></div>';
+  const activity = JV.memories.slice(0, 20).map(m => {
+    const tm = m.fecha ? jvFmtTs(m.fecha) : 'sin fecha';
+    const type = jvHumanize(m.tipo || 'nota');
+    return '<details class="jv-report-item"><summary><div><h3>' + OS_E(type) + '</h3><div class="report-meta">' + OS_E(m.fuente || 'Fuente no declarada') + ' · ' + OS_E(tm) + (m.hits > 1 ? ' · reafirmado ' + jvNum(m.hits) + ' veces' : '') + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + OS_E(m.texto || 'Memoria sin contenido visible.') + '</div></details>';
   }).join('');
   return '<h1 class="jv-page-title">Memoria compartida</h1><div class="jv-lead">El contexto que permite que todos los agentes trabajen con la misma información y continúen donde otro terminó.</div>'
     + '<div class="jv-kpis"><div class="jv-kpi"><div class="n">' + jvNum(JV.memCount) + '</div><div class="l">recuerdos guardados</div><div class="s">Contexto reutilizable entre agentes</div></div><div class="jv-kpi"><div class="n">' + JV_FUENTES.length + '</div><div class="l">fuentes principales</div><div class="s">Datos operativos y financieros</div></div></div>'
-    + '<div class="jv-2col"><section><div class="jv-section-title">Fuentes conectadas</div><div class="jv-simple-list">' + sources + '</div></section><section><div class="jv-section-title">Actividad reciente de la memoria</div><div class="jv-simple-list">' + (activity || '<div class="jv-empty">Todavía no hay actividad reciente.</div>') + '</div></section></div>';
+    + '<div class="jv-2col"><section><div class="jv-section-title">Fuentes conectadas</div><div class="jv-simple-list">' + sources + '</div></section><section><div class="jv-section-title">Memorias activas recientes</div><div class="jv-report-list">' + (activity || '<div class="jv-empty">Todavía no hay memorias activas.</div>') + '</div></section></div>';
 }
 
 function jvVaultGraphView() {
@@ -1291,18 +1295,30 @@ function jvVaultGraphView() {
 // VIEW · REPORTES (informes de los agentes)
 // ════════════════════════════════════════════════════════════════
 function jvReportesView() {
-  const informes = JV.props.filter(p => p.tipo_accion === 'informe' || p.estado === 'ejecutada');
-  const areas = ['Todas'].concat([...new Set(informes.map(jvProposalArea))]);
-  const selected = JV.reportArea === 'Todas' ? informes : informes.filter(p => jvProposalArea(p) === JV.reportArea);
-  const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.reportArea === a ? 'on' : '') + '" onclick="jvReportArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? informes.length : informes.filter(p => jvProposalArea(p) === a).length) + '</span></button>').join('') + '</div>';
-  const groups = [...new Set(selected.map(jvProposalArea))].map(area => {
-    const rows = selected.filter(p => jvProposalArea(p) === area).slice(0, 30).map(p => {
-      const info = jvProposalInfo(p); const raw = jvEvid(p);
-      const body = typeof raw === 'string' ? raw : info.summary;
-      const date = p.created_at ? new Date(p.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Sin fecha';
-      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(info.title) + '</h3><div class="report-meta">' + OS_E(jvAgentName(p.agent_id)) + ' · ' + OS_E(date) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + OS_E(body || 'Este reporte todavía no contiene un resumen legible.') + '</div></details>';
+  const informes = JV.reports;
+  const areaOf = r => { const k = jvKey([r.tipo, r.generado_por, r.titulo].join(' ')); if (/renta/.test(k)) return 'Rentas'; if (/remodel|obra/.test(k)) return 'Remodelación'; if (/\bff\b|fix.*flip|pipeline/.test(k)) return 'Fix & Flip'; return 'Dirección'; };
+  const areas = ['Todas'].concat([...new Set(informes.map(areaOf))]);
+  const selected = JV.reportArea === 'Todas' ? informes : informes.filter(r => areaOf(r) === JV.reportArea);
+  const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.reportArea === a ? 'on' : '') + '" onclick="jvReportArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? informes.length : informes.filter(r => areaOf(r) === a).length) + '</span></button>').join('') + '</div>';
+  const reportRows = payload => {
+    const obj = payload && typeof payload === 'object' ? payload : {};
+    const preferred = ['resumen', 'estado', 'resultado', 'hallazgos', 'decisiones', 'top3', 'kpis', 'recomendaciones', 'fuentes'];
+    const keys = preferred.filter(k => obj[k] != null).concat(Object.keys(obj).filter(k => !preferred.includes(k))).slice(0, 10);
+    const readable = (v, depth) => {
+      if (v == null) return '—';
+      if (typeof v !== 'object') return String(v);
+      if (depth > 1) return Array.isArray(v) ? v.length + ' elementos' : Object.keys(v).length + ' datos';
+      if (Array.isArray(v)) return v.slice(0, 8).map(x => readable(x, depth + 1)).join(' · ');
+      return Object.keys(v).slice(0, 8).map(x => jvHumanize(x) + ': ' + readable(v[x], depth + 1)).join(' · ');
+    };
+    return keys.map(k => '<div class="jv-detail-row"><span>' + OS_E(jvHumanize(k)) + '</span><b>' + OS_E(readable(obj[k], 0)) + '</b></div>').join('');
+  };
+  const groups = [...new Set(selected.map(areaOf))].map(area => {
+    const rows = selected.filter(r => areaOf(r) === area).slice(0, 40).map(r => {
+      const date = (r.corte || r.created_at) ? new Date((r.corte || r.created_at) + (r.corte ? 'T12:00:00' : '')).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Sin fecha';
+      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(r.titulo || jvHumanize(r.tipo)) + '</h3><div class="report-meta">' + OS_E(r.generado_por || r.origen || 'Sistema') + ' · ' + OS_E(date) + ' · ' + OS_E(jvHumanize(r.estado)) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + (reportRows(r.payload) || 'Este reporte todavía no contiene información legible.') + (r.storage_path ? '<div class="jv-chip" style="margin-top:10px">PDF guardado</div>' : '') + '</div></details>';
     }).join('');
-    return '<section class="jv-report-group"><div class="jv-section-title">' + OS_E(area) + ' <span>' + selected.filter(p => jvProposalArea(p) === area).length + '</span></div><div class="jv-report-list">' + rows + '</div></section>';
+    return '<section class="jv-report-group"><div class="jv-section-title">' + OS_E(area) + ' <span>' + selected.filter(r => areaOf(r) === area).length + '</span></div><div class="jv-report-list">' + rows + '</div></section>';
   }).join('');
   return '<h1 class="jv-page-title">Reportes del equipo</h1><div class="jv-lead">Organizados por área. Abre cualquiera para leer el resultado completo y saber qué agente lo generó.</div>' + filters + (groups || '<div class="jv-empty">Todavía no hay reportes en esta área.</div>');
 }
