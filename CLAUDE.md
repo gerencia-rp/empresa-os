@@ -890,12 +890,15 @@ En la raíz del repo:
 - Empresas muestra el equipo real completo de cada negocio; Horarios muestra el calendario declarado y la última ejecución real; Memoria compartida explica fuentes/contexto sin duplicar el mapa de agentes; Reportes traduce resultados técnicos a resúmenes humanos.
 - El Cerebro puede reunir perspectivas de CEO, CFO, CTO, CMO, COO, Legal y Data, pero cualquier acción de publicación, gasto, contrato o cambio sensible conserva aprobación humana.
 
-## 🛰️ JARVIS · ficha operativa desde el organigrama (26 Ago 2026) — LOCAL, PENDIENTE VALIDACIÓN/DEPLOY
+## 🛰️ JARVIS · ficha operativa + cola de trabajo (26 Ago 2026) — FASE 1 EN PRODUCCIÓN; FASE 2 LOCAL
 
 - La vista completa de `/jarvis` conserva las cuatro áreas alrededor del Cerebro Ejecutivo, pero cada nombre de agente ahora funciona como nodo inspeccionable sin abandonar el organigrama.
 - La ficha lateral traduce datos reales ya disponibles: responsabilidad, estado humano derivado de evidencia, última actividad en `agent_audit_log`, horario declarado, jefe según `parent_id`, decisiones pendientes, riesgo, skills y tareas.
 - Si no hay corrida visible, la ficha lo declara; nunca inventa actividad. El botón final abre el área y la ficha ampliada existente para administración.
 - La interacción es accesible por teclado, responsive y respeta `prefers-reduced-motion`. No agrega tablas, migraciones ni nuevas fuentes de datos.
+- Fase 2 agrega **Trabajo** como cola unificada dentro de Jarvis. Combina `agent_proposals` y `agent_audit_log` sin crear actividad ficticia: muestra decisiones pendientes, propuestas aprobadas en cola, ejecuciones completadas y corridas que requieren revisión.
+- La cola permite filtrar por estado, área y agente; cada fila declara responsable, momento y fuente de evidencia. La Sala de Dirección muestra un pulso compacto y la ficha del agente abre directamente su trabajo.
+- “Aprobada · en cola” no significa ejecución confirmada. Solo una fila real de auditoría puede mostrarse como completada.
 
 Cuando arranques una sesión en este repo:
 
@@ -909,4 +912,4 @@ Cuando arranques una sesión en este repo:
 
 ---
 
-*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio desplegado; ficha operativa JARVIS en validación local*
+*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio desplegado; JARVIS fase 1 en producción y fase 2 en validación local*

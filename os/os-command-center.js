@@ -17,6 +17,7 @@ const JV = {
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
+  workArea: 'Todas', workState: 'Todos', workAgentId: null,
 };
 window.JV = JV;
 
@@ -191,6 +192,7 @@ const JV_CAPAS = [
 const JV_NAV = [
   { k: 'network', ic: 'network', t: 'Equipo' },
   { k: 'command', ic: 'layout', t: 'Sala de Dirección' },
+  { k: 'work', ic: 'list', t: 'Trabajo' },
   { k: 'propuestas', ic: 'inbox', t: 'Decisiones' },
   { k: 'vault', ic: 'library', t: 'Memoria compartida' },
   { k: 'reportes', ic: 'chart', t: 'Reportes' },
@@ -372,6 +374,11 @@ function jvCSS() {
     '#os-root .jv-simple-list{display:grid;gap:8px}',
     '#os-root .jv-simple-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--jc-line);border-radius:10px;background:rgba(255,255,255,.015)}',
     '#os-root .jv-simple-row .body{flex:1;min-width:0}#os-root .jv-simple-row .body b{display:block;font-size:12.5px}#os-root .jv-simple-row .body span{display:block;font-size:10.5px;color:var(--jc-mut);margin-top:2px}',
+    '#os-root .jv-work-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 16px}#os-root .jv-work-toolbar select{appearance:none;background:var(--jc-card);color:var(--jc-tx);border:1px solid var(--jc-line);border-radius:9px;padding:7px 30px 7px 10px;font:inherit;font-size:11px;cursor:pointer}#os-root .jv-work-toolbar .jv-filter-tabs{margin:0;flex:1}',
+    '#os-root .jv-work-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:16px}#os-root .jv-work-stat{padding:11px 12px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:11px}#os-root .jv-work-stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}#os-root .jv-work-stat span{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--jc-mut)}',
+    '#os-root .jv-work-table{border:1px solid var(--jc-line);border-radius:13px;overflow:hidden;background:var(--jc-card)}#os-root .jv-work-row{display:grid;grid-template-columns:92px minmax(220px,1.6fr) minmax(150px,.8fr) minmax(130px,.7fr) 90px;gap:12px;align-items:center;padding:11px 13px;border-top:1px solid var(--jc-line);font-size:11px}#os-root .jv-work-row:first-child{border-top:0}#os-root .jv-work-row.head{background:rgba(255,255,255,.025);color:var(--jc-mut);font-size:9px;letter-spacing:.08em;text-transform:uppercase}#os-root .jv-work-task b{display:block;font-size:12px}#os-root .jv-work-task span,#os-root .jv-work-owner span{display:block;color:var(--jc-mut);margin-top:2px;font-size:10px}#os-root .jv-work-owner{cursor:pointer}#os-root .jv-work-owner:hover b{color:var(--jc-cyan)}#os-root .jv-work-time{color:var(--jc-mut);font-variant-numeric:tabular-nums}',
+    '#os-root .jv-work-state{font-size:9px;padding:4px 7px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;width:max-content}#os-root .jv-work-state::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}#os-root .jv-work-state.running{color:var(--jc-cyan);background:rgba(56,189,248,.1)}#os-root .jv-work-state.waiting{color:var(--jc-amber);background:rgba(251,191,36,.1)}#os-root .jv-work-state.done{color:var(--jc-grn);background:rgba(52,211,153,.1)}#os-root .jv-work-state.failed{color:var(--jc-pink);background:rgba(244,114,182,.1)}',
+    '@media(max-width:900px){#os-root .jv-work-summary{grid-template-columns:repeat(2,1fr)}#os-root .jv-work-row{grid-template-columns:82px 1fr}#os-root .jv-work-row.head{display:none}#os-root .jv-work-row>*:nth-child(n+3){grid-column:2}#os-root .jv-work-time{grid-column:1;grid-row:1/5}}',
     // feed
     '#os-root .jv-feed{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:4px 4px;max-height:320px;overflow:auto}',
     '#os-root .jv-frow{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-bottom:1px solid var(--jc-line);font-size:11.5px}',
@@ -550,7 +557,7 @@ async function jvLoad(force) {
     const [reg, props, audit, runs, crit, mem, cap, ns] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
-      sb.from('agent_audit_log').select('id,agent_id,proposal_id,resultado,output,ts').order('ts', { ascending: false }).limit(40),
+      sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(40),
       sb.from('agent_audit_log').select('id', { count: 'exact', head: true }),
       sb.from('ct_findings').select('titulo,impacto_usd').eq('active', true).is('resolved_at', null).eq('severidad', 'critica').order('impacto_usd', { ascending: false, nullsFirst: false }),
       sb.from('pm_brain_memory').select('id', { count: 'exact', head: true }).then(r => r).catch(() => ({ count: null })),
@@ -615,6 +622,7 @@ function jvTopBar() {
 function jvTabBody() {
   switch (JV.tab) {
     case 'command': return jvDashboard();
+    case 'work': return jvWorkView();
     case 'brief': return jvBriefView();
     case 'propuestas': return jvPropuestasView();
     case 'empresas': return jvEmpresasView();
@@ -672,7 +680,7 @@ function jvAgentInspector() {
     + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
     + (tasks.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Tareas asignadas</div><div class="jv-ai-copy">' + tasks.slice(0, 5).map(t => '• ' + OS_E(cleanTask(t))).join('<br>') + '</div></div>' : '')
-    + '<button type="button" class="jv-ai-action" onclick="jvInspectOpenArea(\'' + OS_E(a.linea || '').replace(/'/g, "\\'") + '\')">Abrir equipo y ficha completa →</button></div></aside>';
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="jv-ai-action" onclick="jvWorkAgent(\'' + a.id + '\')">Ver trabajo →</button><button type="button" class="jv-ai-action" onclick="jvInspectOpenArea(\'' + OS_E(a.linea || '').replace(/'/g, "\\'") + '\')">Ficha completa →</button></div></div></aside>';
 }
 function jvInspectAgent(id) { JV.inspectAgentId = id || null; if (window.osRender) osRender(); }
 function jvInspectOpenArea(linea) { JV.inspectAgentId = null; JV.filterLinea = linea || null; JV.tab = 'network'; if (window.osRender) osRender(); }
@@ -810,8 +818,59 @@ function jvDashboard() {
   const pending = JV.props.filter(p => p.estado === 'propuesta').length;
   const decisionCallout = '<div class="jv-command-action"><div><b>' + (pending ? pending + ' decisiones necesitan revisión' : 'No hay decisiones pendientes') + '</b><span>' + (pending ? 'Están organizadas por área y cada una explica qué cambia antes de aprobar.' : 'El equipo puede seguir trabajando sin intervención.') + '</span></div>' + (pending ? '<button onclick="jvNav(\'propuestas\')">Revisar decisiones</button>' : '') + '</div>';
   return jvHudHeader() + jvCounters() + jvNorthStar() + decisionCallout + jvCore() + jvChatUI()
+    + jvWorkPulse()
     + '<div class="jv-section-title" style="margin-top:24px">Actividad reciente del equipo</div>' + jvFeedHTML();
 }
+
+// ════════════════════════════════════════════════════════════════
+// VIEW · TRABAJO (cola unificada, derivada de evidencia real)
+// ════════════════════════════════════════════════════════════════
+function jvAuditWorkInfo(r) {
+  const out = r && r.output && typeof r.output === 'object' ? r.output : {};
+  const inp = r && r.input && typeof r.input === 'object' ? r.input : {};
+  const failed = /error|fail|fall/i.test(String((r && r.resultado) || ''));
+  const title = out.accion || out.titulo || out.hallazgo || out.estado || inp.accion || inp.mode || 'Ejecución del agente';
+  const detail = out.resumen || out.detalle || out.nota || out.mensaje || (failed ? 'La corrida terminó con un error registrado.' : 'La corrida dejó evidencia en la bitácora.');
+  return { title: jvHumanize(title), detail: String(detail), state: failed ? 'failed' : 'done' };
+}
+function jvWorkItems() {
+  const proposalItems = JV.props.map(p => {
+    const info = jvProposalInfo(p);
+    const state = p.estado === 'propuesta' ? 'waiting' : (p.estado === 'aprobada' ? 'running' : 'done');
+    return { id: 'p-' + p.id, kind: 'Decisión', agentId: p.agent_id, area: jvProposalArea(p), title: info.title, detail: info.summary, state, ts: p.created_at, source: info.source || 'agent_proposals' };
+  });
+  const auditItems = JV.audit.map(r => {
+    const info = jvAuditWorkInfo(r), a = jvAgent(r.agent_id);
+    return { id: 'a-' + r.id, kind: 'Ejecución', agentId: r.agent_id, area: a ? jvLineaLabel(a.linea || a.area || 'General') : 'General', title: info.title, detail: info.detail, state: info.state, ts: r.ts, source: 'agent_audit_log' };
+  });
+  return proposalItems.concat(auditItems).sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
+}
+function jvWorkStateLabel(s) {
+  return { waiting: 'necesita decisión', running: 'aprobada · en cola', done: 'completada', failed: 'requiere revisión' }[s] || 'registrada';
+}
+function jvWorkPulse() {
+  const items = jvWorkItems().filter(x => x.state !== 'failed').slice(0, 4);
+  if (!items.length) return '';
+  return '<section style="margin-top:24px"><div class="jv-section-title">Trabajo visible ahora <span>' + items.length + '</span></div><div class="jv-work-table">'
+    + items.map(x => '<div class="jv-work-row" style="grid-template-columns:92px minmax(200px,1.5fr) minmax(150px,.8fr) 110px"><span class="jv-work-state ' + x.state + '">' + OS_E(jvWorkStateLabel(x.state)) + '</span><div class="jv-work-task"><b>' + OS_E(x.title) + '</b><span>' + OS_E(x.detail) + '</span></div><div class="jv-work-owner" onclick="jvWorkAgent(\'' + (x.agentId || '') + '\')"><b>' + OS_E(jvAgentName(x.agentId)) + '</b><span>' + OS_E(x.area) + '</span></div><span class="jv-work-time">' + OS_E(jvFmtTs(x.ts)) + '</span></div>').join('')
+    + '</div><button class="jv-filter-x" style="margin-top:9px" onclick="jvNav(\'work\')">Abrir toda la cola →</button></section>';
+}
+function jvWorkView() {
+  const all = jvWorkItems();
+  const areas = ['Todas'].concat([...new Set(all.map(x => x.area).filter(Boolean))]);
+  const states = [['Todos', 'Todo'], ['waiting', 'Necesita decisión'], ['running', 'En cola'], ['done', 'Completado'], ['failed', 'Revisar']];
+  let rows = all.filter(x => (JV.workArea === 'Todas' || x.area === JV.workArea) && (JV.workState === 'Todos' || x.state === JV.workState) && (!JV.workAgentId || x.agentId === JV.workAgentId));
+  const counts = { waiting: all.filter(x => x.state === 'waiting').length, running: all.filter(x => x.state === 'running').length, done: all.filter(x => x.state === 'done').length, failed: all.filter(x => x.state === 'failed').length };
+  const filters = '<div class="jv-work-toolbar"><div class="jv-filter-tabs">' + states.map(s => '<button class="' + (JV.workState === s[0] ? 'on' : '') + '" onclick="jvWorkState(\'' + s[0] + '\')">' + s[1] + '</button>').join('') + '</div><select onchange="jvWorkArea(this.value)" aria-label="Filtrar trabajo por área">' + areas.map(a => '<option value="' + OS_E(a) + '"' + (JV.workArea === a ? ' selected' : '') + '>' + OS_E(a) + '</option>').join('') + '</select>' + (JV.workAgentId ? '<button class="jv-filter-x" onclick="jvWorkAgent(null)">Agente: ' + OS_E(jvAgentName(JV.workAgentId)) + ' ×</button>' : '') + '</div>';
+  const table = rows.length ? '<div class="jv-work-table"><div class="jv-work-row head"><span>Estado</span><span>Trabajo</span><span>Responsable</span><span>Evidencia</span><span>Hora</span></div>' + rows.slice(0, 120).map(x => '<article class="jv-work-row"><span class="jv-work-state ' + x.state + '">' + OS_E(jvWorkStateLabel(x.state)) + '</span><div class="jv-work-task"><b>' + OS_E(x.title) + '</b><span>' + OS_E(x.detail) + '</span></div><div class="jv-work-owner" role="button" tabindex="0" onclick="jvWorkAgent(\'' + (x.agentId || '') + '\')"><b>' + OS_E(jvAgentName(x.agentId)) + '</b><span>' + OS_E(x.area) + '</span></div><span class="jv-chip">' + OS_E(x.source) + '</span><span class="jv-work-time">' + OS_E(jvFmtTs(x.ts)) + '</span></article>').join('') + '</div>' : '<div class="jv-card"><b>No hay trabajo en este filtro</b><div class="jv-empty">Cambia el área o el estado. Jarvis no completa la cola con actividad simulada.</div></div>';
+  return '<h1 class="jv-page-title">Cola de trabajo</h1><div class="jv-lead">Todo lo que los agentes hicieron, esperan o necesitan revisar, con responsable, hora y fuente de evidencia.</div><div class="jv-work-summary"><div class="jv-work-stat"><b>' + counts.waiting + '</b><span>Necesitan decisión</span></div><div class="jv-work-stat"><b>' + counts.running + '</b><span>Aprobadas en cola</span></div><div class="jv-work-stat"><b>' + counts.done + '</b><span>Completadas visibles</span></div><div class="jv-work-stat"><b>' + counts.failed + '</b><span>Requieren revisión</span></div></div>' + filters + table;
+}
+function jvWorkState(state) { JV.workState = state || 'Todos'; if (window.osRender) osRender(); }
+function jvWorkArea(area) { JV.workArea = area || 'Todas'; if (window.osRender) osRender(); }
+function jvWorkAgent(id) { JV.workAgentId = id || null; JV.tab = 'work'; if (window.osRender) osRender(); }
+window.jvWorkState = jvWorkState;
+window.jvWorkArea = jvWorkArea;
+window.jvWorkAgent = jvWorkAgent;
 
 // ─── métricas vivas del holding (para strip + North-Star) ───
 function jvMetrics() {
