@@ -130,7 +130,14 @@ function jvProposalInfo(p) {
   const e = jvEvidObj(p), type = String((p && p.tipo_accion) || '').toLowerCase();
   const first = (...xs) => xs.find(x => x !== undefined && x !== null && x !== '');
   let title = first(e.titulo, e.hallazgo, e.mensaje, 'Revisión del agente');
-  let summary = first(e.detalle, e.resumen, e.impacto, e.recomendacion, e.accion_recomendada, e.texto, 'Revisá la información y decidí si querés aplicarla.');
+  let summary = first(e.detalle, e.resumen, e.impacto, e.recomendacion, e.accion_recomendada, e.texto, e.nota, e.regla, 'Revisá la información y decidí si querés aplicarla.');
+  const evidenceType = jvKey(e.tipo || '');
+  const evidenceTitles = {
+    draws_hml: 'Revisar draws y Hard Money', calidad_obra: 'Revisar inspecciones de obra', anomalias_carga: 'Revisar anomalías financieras',
+    underwriting: 'Revisar underwriting', higiene: 'Completar categorías faltantes', descuadre_material: 'Revisar posibles pagos duplicados',
+    tiempos_obra: 'Revisar tiempos de obra', ocupacion: 'Revisar ocupación', cobranza: 'Revisar cobranza', pipeline: 'Revisar pipeline',
+  };
+  if (title === 'Revisión del agente' && evidenceType) title = evidenceTitles[evidenceType] || ('Revisar ' + jvHumanize(e.tipo));
   if (type.includes('cobranza')) { title = 'Resumen de cobranza'; summary = 'Hay ' + jvNum(first(e.pendientes, e.total_pendientes, e.cantidad, 0)) + ' cobros para revisar' + (first(e.monto, e.total, e.monto_pendiente) != null ? ', por ' + jvMoney(first(e.monto, e.total, e.monto_pendiente)) : '') + '.'; }
   else if (type.includes('ocupacion')) { title = 'Plan para mejorar ocupación'; summary = first(e.plan, e.recomendacion, e.detalle, summary); }
   else if (type.includes('cuello')) { title = 'Cuello de botella detectado'; summary = first(e.hallazgo, e.impacto, e.detalle, summary); }
@@ -157,7 +164,7 @@ function jvDecisionGroupKey(p) {
 }
 function jvPendingDecisions() {
   const grouped = new Map();
-  JV.props.filter(p => p.estado === 'propuesta').forEach(p => {
+  JV.props.filter(p => p.estado === 'propuesta' && !jvIsLegacy(jvAgent(p.agent_id))).forEach(p => {
     const key = jvDecisionGroupKey(p);
     const current = grouped.get(key);
     if (!current) grouped.set(key, Object.assign({}, p, { _groupIds: [p.id], _groupCount: 1 }));
@@ -1252,7 +1259,18 @@ function jvVaultPick(id) {
 window.jvVaultPick = jvVaultPick;
 
 function jvVaultView() {
-  const sources = JV_FUENTES.map(f => '<div class="jv-simple-row"><div class="jv-av">' + osIcon(f.icon, { size: 14 }) + '</div><div class="body"><b>' + OS_E(f.label) + '</b><span>' + OS_E(f.desc) + '</span></div><span class="jv-badge b-work">fuente conectada</span></div>').join('');
+  const sourceEvidence = f => {
+    if (f.id === 'src-supabase') return { ok: JV.loaded, ts: null };
+    const patterns = { 'src-airtable': /airtable|_at_|at_properties/i, 'src-qbo': /quickbooks|\bqbo\b|realm/i, 'src-clickup': /clickup|weekly_activities/i };
+    const pattern = patterns[f.id];
+    const row = pattern && JV.audit.find(r => jvIsOperationalAudit(r) && pattern.test(JSON.stringify({ input: r.input, output: r.output })));
+    return { ok: !!row, ts: row && row.ts };
+  };
+  const sources = JV_FUENTES.map(f => {
+    const ev = sourceEvidence(f);
+    const badge = ev.ok ? '<span class="jv-badge b-work">evidencia ' + (ev.ts ? OS_E(jvFmtTs(ev.ts)) : 'en vivo') + '</span>' : '<span class="jv-badge b-wait">sin evidencia reciente</span>';
+    return '<div class="jv-simple-row"><div class="jv-av">' + osIcon(f.icon, { size: 14 }) + '</div><div class="body"><b>' + OS_E(f.label) + '</b><span>' + OS_E(f.desc) + '</span></div>' + badge + '</div>';
+  }).join('');
   const activity = JV.memories.slice(0, 20).map(m => {
     const tm = m.fecha ? jvFmtTs(m.fecha) : 'sin fecha';
     const type = jvHumanize(m.tipo || 'nota');
