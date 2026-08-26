@@ -9,7 +9,7 @@ Si este archivo y `CLAUDE.md` parecen contradecirse, detente, muestra la contrad
 ## Convenciones del repositorio
 
 - Rama de producción: `main`. Un push a `main` puede desplegar automáticamente en Vercel.
-- Runtime declarado: Node `20.x`. No uses el Node global 26 para regenerar dependencias o lockfiles.
+- Runtime oficial: Node `24.x`, alineado con `package.json` y D-004. No uses otra versión para regenerar dependencias o lockfiles.
 - Package manager: npm; conserva `package-lock.json`.
 - Comandos principales: `npm run dev`, `npm run build` y `npm run ci:gate`.
 - Antes de proponer un cambio, revisa `git status`, la rama actual y el diff existente. No sobrescribas cambios locales ni archivos sin seguimiento.

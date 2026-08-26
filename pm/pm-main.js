@@ -350,7 +350,10 @@ function pmHouseUnitsOf(propertyId) {
 // (La vieja regla "habitaciones de la casa juntas = 1" daba 36 y DIVERGÍA del headline
 //  v_ocupacion=51 → retirada del CONTEO. El drill por casa muestra cada habitación igual.)
 // ══════════════════════════════════════════════════════════════════════════
-function pmIsPhysUnit(u){ return !!u && u.active !== false && /^unit-rec/.test(u.external_id || '') && !!u.unit_type; }
+function pmIsPhysUnit(u){
+  return !!u && u.active !== false && u.is_active !== false && !u.archived_at
+    && /^unit-rec/.test(u.external_id || '') && !!u.unit_type;
+}
 // Unidades físicas rentables de una casa (deduped), independientes del filtro de "archivados".
 function pmPhysUnitsOf(propertyId){
   const raw = (pmaState._raw && pmaState._raw.units) || pmaState.units || [];

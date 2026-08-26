@@ -106,6 +106,8 @@ function apComps() {
     fecha: c.removedDate || c.lastSeenDate || c.listedDate || null, dom: AP_N(c.daysOnMarket),
     corr: AP_N(c.correlation), lat: AP_N(c.latitude), lng: AP_N(c.longitude),
     status: c.status || null, listingType: c.listingType || null,
+    saleType: c.saleType || c.transactionType || null,
+    closeDate: c.closeDate || c.saleDate || null,
   })).filter(c => c.price > 0);
 }
 
@@ -127,7 +129,28 @@ function apPasaFiltro(s, c, f) { return ArvEngine.pasaFiltro(s, c, f); }
 function apAjustes(s, c) { const st = apState(); return ArvEngine.ajustes(s, c, UW.cfg, st.man[c.id]); }
 function apReconciliar(s, comps) {
   const st = apState();
-  const rec = ArvEngine.reconciliar(s, comps, UW.cfg, { man: st.man, excl: st.excl, filtrosOver: apFiltros() });
+  let rec = ArvEngine.reconciliar(s, comps, UW.cfg, { man: st.man, excl: st.excl, filtrosOver: apFiltros() });
+  const rcValue = (window.ffUwRcSlot && ffUwRcSlot('value')) || null;
+  if (rcValue && rcValue !== 'loading') {
+    const payload = rcValue.payload || {};
+    rec = ArvEngine.conFallbackRentcast(rec, {
+      value: rcValue.value || payload.price || payload.value,
+      priceRangeLow: payload.priceRangeLow,
+      priceRangeHigh: payload.priceRangeHigh,
+    });
+  }
+  if (!(rec && rec.arv > 0)) {
+    const inp = UW.a.inputs || {};
+    const existing = +inp.arv || +inp.arv_airtable || +inp.appraisal || 0;
+    const sqft = +s.sqft || +inp.est_sqft || 0;
+    const local = existing > 0 ? existing : (sqft > 0 ? Math.round(sqft * apCfg('arv_psf_zona', 295)) : 0);
+    rec = ArvEngine.conFallbackLocal(rec, {
+      value: local,
+      source: existing > 0 ? (+inp.appraisal > 0 && existing === +inp.appraisal ? 'appraisal_existente' : 'arv_existente') : 'estimacion_local_psf',
+      score: existing > 0 ? 45 : 30,
+      reason: existing > 0 ? 'ARV de respaldo tomado del valor existente en la ficha' : 'ARV de respaldo calculado con superficie × valor por pie cuadrado configurado para la zona',
+    });
+  }
   // gate PROVISIONAL: dato en conflicto o dudoso SIN confirmar → el ARV no es un número silencioso
   rec.conflictos = apConflictos();
   rec.provisional = rec.conflictos.some(c => c.tipo === 'conflicto' || c.tipo === 'dudoso' || (c.tipo === 'una_fuente' && c.attr === 'beds'));
@@ -513,7 +536,7 @@ function apMapMount() {
 }
 
 // ─── piezas de UI ───
-function apConfColor(nivel) { return nivel === 'alta' ? 'var(--pos,#4ade9e)' : nivel === 'media' ? 'var(--amber,#fbbf24)' : 'var(--neg,#ff6b6b)'; }
+function apConfColor(nivel) { return nivel === 'alta' ? 'var(--pos,#4ade9e)' : (nivel === 'media' || nivel === 'estimado') ? 'var(--amber,#fbbf24)' : 'var(--neg,#ff6b6b)'; }
 function apStat(lbl, val, key, opts) {
   opts = opts || {};
   const inner = key
@@ -567,11 +590,17 @@ function apHeroSimple(rec, inp) {
   const izq = '<div class="ap-card" style="padding:20px 22px' + (prov ? ';border-color:rgba(251,191,36,.45)' : '') + '">'
     + '<div class="ap-lab" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' + (estado === 'remodelada' ? 'Valor estimado (ya remodelada)' : 'ARV — valor después de la reforma planeada') + ' ' + estadoChip + '</div>'
     + (rec && rec.arv
-      ? '<div class="ap-bigsimple" style="' + (prov ? 'opacity:.65' : '') + '">' + AP_M(rec.arv) + (prov ? ' <span style="font-size:13px;color:var(--amber,#fbbf24);font-weight:700">PROVISIONAL</span>' : '') + '</div>'
-      + '<div class="ap-plain">Mediana ponderada de <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca, ajustadas a la tuya.' + (rec.relajado ? ' <span style="color:var(--amber,#fbbf24)">(búsqueda expandida por pocas ventas)</span>' : '') + '</div>'
+      ? '<div class="ap-bigsimple" style="' + (prov ? 'opacity:.65' : '') + '">' + AP_M(rec.arv) + (prov ? ' <span style="font-size:13px;color:var(--amber,#fbbf24);font-weight:700">ESTIMADO</span>' : '') + '</div>'
+      + (rec.fuenteArv === 'rentcast_avm'
+        ? '<div class="ap-plain"><b>ARV automático estimado por RentCast.</b> Los listings cercanos se muestran como contexto, pero no se presentan como cierres individuales verificados.</div>'
+        : rec.fuenteArv === 'estimacion_local_psf'
+          ? '<div class="ap-plain"><b>ARV automático de respaldo.</b> Calculado con la superficie y el valor por pie cuadrado configurado para la zona; actualizá RentCast para elevar la confianza.</div>'
+          : rec.fuenteArv === 'arv_existente' || rec.fuenteArv === 'appraisal_existente'
+            ? '<div class="ap-plain"><b>ARV de respaldo tomado de la ficha existente.</b> Actualizá RentCast para obtener el estimado de mercado actual.</div>'
+        : '<div class="ap-plain">Mediana ponderada de <b>' + rec.usables.length + ' casas parecidas</b> vendidas cerca, ajustadas a la tuya.' + (rec.relajado ? ' <span style="color:var(--amber,#fbbf24)">(búsqueda expandida por pocas ventas)</span>' : '') + '</div>')
       + '<span class="ap-conf" style="margin-top:12px;color:' + apConfColor(cp.nivel) + ';border-color:' + apConfColor(cp.nivel) + '">● Confianza ' + cp.nivel + ' (' + (rec.score != null ? rec.score + '/100' : '—') + ') · ' + cp.why + '</span>'
       + apArvSlider(rec)
-      : '<div class="ap-plain" style="padding:28px 0;text-align:center">Poné la dirección arriba y dale <b>Buscar</b> — el sistema trae las ventas de la zona.</div>')
+      : '<div class="ap-plain" style="padding:28px 0;text-align:center">' + apSinArvHtml(rec) + '</div>')
     + '</div>';
   // ¿Conviene? — semáforo + oferta máxima con la cuenta simple visible (remod real de la Calc 1)
   const negocio = (typeof ffUwCalcNegocio === 'function') ? ffUwCalcNegocio(inp) : { remod: 0 };
@@ -621,8 +650,20 @@ function apCompsSimple(s, comps, rec, f) {
       + '<span class="ap-plain" style="font-size:12px">ajustada a <b style="color:inherit;font-weight:800">' + AP_M(x.adj.valorAjustado) + '</b></span>'
       + '</div></div></div>';
   }).join('');
-  return '<div class="ap-cards" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">' + cards + '</div>'
-    + (ocultas > 0 ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px;text-align:center">' + ocultas + ' casas más no entraron al cálculo (muy lejos, muy viejas o muy distintas) — velas en Experto.</div>' : '');
+  const temperatura = rec && rec.temperatura ? rec.temperatura.length : 0;
+  return (cards ? '<div class="ap-cards" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">' + cards + '</div>' : '<div class="ap-card" style="padding:26px;text-align:center;color:var(--mut,#8b93a1)">' + (rec && rec.fuenteArv === 'rentcast_avm' ? '<b>RentCast calculó el ARV con su AVM.</b><br><span style="font-size:12px">Las propiedades de esta sección son referencias de mercado y no alteran ese estimado.</span>' : apSinArvHtml(rec)) + '</div>')
+    + (ocultas > 0 ? '<div class="ap-plain" style="font-size:11.5px;margin-top:8px;text-align:center">' + ocultas + ' propiedades no entraron al ARV' + (temperatura ? ' · ' + temperatura + ' activas/pendientes se conservan solo como temperatura de mercado' : '') + '. Revisá el detalle en Experto.</div>' : '');
+}
+
+function apSinArvHtml(rec) {
+  if (!rec) return 'Poné la dirección arriba y dale <b>Buscar</b>.';
+  const temperatura = rec.temperatura ? rec.temperatura.length : 0;
+  const motivo = rec.confianza && rec.confianza.razones && rec.confianza.razones[0]
+    ? AP_E(rec.confianza.razones[0])
+    : 'No hay ventas cerradas arms-length verificadas suficientes.';
+  return '<b>No hay evidencia suficiente para calcular un ARV confiable.</b><br><span style="font-size:12px">' + motivo
+    + (temperatura ? ' Hay ' + temperatura + ' propiedades activas/pendientes visibles como temperatura de mercado, pero nunca entran al número.' : '')
+    + '</span>';
 }
 
 function apVistaFicha(s) {
@@ -655,15 +696,15 @@ function apVistaFicha(s) {
 }
 
 function apVistaHero(rec, inp) {
-  if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (comps ajustados)</div><div style="color:var(--mut,#8b93a1);padding:26px 0;text-align:center">Buscá el subject para reconciliar comps.</div></div>';
+  if (!rec || !rec.arv) return '<div class="ap-card"><div class="ap-lab">ARV estimado (ventas verificadas y ajustadas)</div><div style="color:var(--mut,#8b93a1);padding:26px 0;text-align:center">' + apSinArvHtml(rec) + '</div></div>';
   const cc = apConfColor(rec.confianza.nivel);
   const arvAt = +inp.arv_airtable || +inp.arv || 0;   // ancla de Airtable (chip Δ)
   const arvOfi = +inp.arv || 0;                        // ARV OFICIAL vigente del análisis (fuente única)
   const appr = +inp.appraisal || 0;
   return '<div class="ap-card">'
-    + '<div class="ap-lab">ARV estimado (comps ajustados)</div>'
+    + '<div class="ap-lab">' + (rec.fuenteArv === 'rentcast_avm' ? 'ARV automático · RentCast AVM' : rec.fuenteArv === 'estimacion_local_psf' ? 'ARV automático · respaldo por zona' : rec.fuenteArv === 'appraisal_existente' ? 'ARV · appraisal existente' : rec.fuenteArv === 'arv_existente' ? 'ARV · ficha existente' : 'ARV estimado · ventas verificadas ajustadas') + '</div>'
     + '<div class="ap-big">' + AP_M(rec.arv) + '</div>'
-    + '<span class="ap-conf" style="color:' + cc + ';border-color:' + cc + ';background:transparent">● confianza ' + rec.confianza.nivel + ' · ' + rec.usables.length + ' comps · dispersión ' + rec.dispersion.toFixed(0) + '%</span>'
+    + '<span class="ap-conf" style="color:' + cc + ';border-color:' + cc + ';background:transparent">● confianza ' + rec.confianza.nivel + (rec.fuenteArv === 'rentcast_avm' ? ' · estimado directo de RentCast' : ' · ' + rec.usables.length + ' comps · dispersión ' + rec.dispersion.toFixed(0) + '%') + '</span>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:11.5px">'
     + (arvAt ? '<span class="ap-pill">ARV Airtable ' + AP_M(arvAt) + ' · Δ <b class="' + (rec.arv - arvAt >= 0 ? 'ap-pos' : 'ap-neg') + '">' + AP_M(rec.arv - arvAt) + '</b></span>' : '')
     + (appr ? '<span class="ap-pill">Appraisal ' + AP_M(appr) + ' · Δ <b class="' + (Math.abs(rec.arv - appr) / appr <= 0.05 ? 'ap-pos' : 'ap-neg') + '">' + ((rec.arv - appr) / appr * 100).toFixed(1) + '%</b></span>' : '')
@@ -677,7 +718,9 @@ function apVistaHero(rec, inp) {
 
 function apVistaCriterio(f, comps, rec) {
   const chip = (pre, key, val, suf) => '<span class="ap-fchip">' + pre + ' <input value="' + val + '" onchange="apSet(\'filtros.' + key + '\',this.value)">' + (suf || '') + '</span>';
-  return '<div style="margin:14px 0 12px"><div class="ap-lab" style="margin-bottom:7px">Criterio de búsqueda · data set: ventas/listings RentCast · status: vendidas y activas · ' + comps.length + ' encontradas → ' + (rec && rec.usables ? rec.usables.length : 0) + ' reconciliadas</div>'
+  const tempN = rec && rec.temperatura ? rec.temperatura.length : 0;
+  const exclN = rec && rec.noElegibles ? rec.noElegibles.length - tempN : 0;
+  return '<div style="margin:14px 0 12px"><div class="ap-lab" style="margin-bottom:7px">ARV: solo ventas cerradas arms-length verificadas · ' + (rec && rec.usables ? rec.usables.length : 0) + ' reconciliadas · temperatura: ' + tempN + ' activas/pendientes (no calculan)' + (exclN > 0 ? ' · ' + exclN + ' sin evidencia suficiente' : '') + '</div>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
     + chip('Distancia <', 'dist', f.dist, ' mi') + chip('Vendidas <', 'meses', f.meses, ' meses') + chip('Sqft ±', 'sqftPct', f.sqftPct, '%')
     + chip('Camas ±', 'camas', f.camas, '') + chip('Baños ±', 'banos', f.banos, '') + chip('Año ±', 'ano', f.ano, '')
@@ -708,6 +751,7 @@ function apVistaResumen(s, rec) {
 
 function apCardComp(x, esRec) {
   const c = x.c, adj = x.adj, st = apState();
+  const eleg = ArvEngine.clasificaComp(c);
   const man = st.man[c.id] || {};
   const cssId = apCompCssId(c.id);
   const excl = !!st.excl[c.id];
@@ -717,8 +761,10 @@ function apCardComp(x, esRec) {
     + '<div class="ap-photo">' + osIcon('house') + '' + (c.status ? '<span class="ap-status">' + AP_E(c.status) + '</span>' : '') + '<span style="position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--mut,#8b93a1)">foto: no disponible en RentCast</span></div>'
     + '<div style="padding:13px 15px">'
     + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:start"><div style="font-weight:700;font-size:13px">' + AP_E(c.dir.split(',')[0]) + '</div>'
-    + '<label style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--mut,#8b93a1);white-space:nowrap"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> incluir</label></div>'
-    + '<div style="font-size:10.5px;color:var(--mut,#8b93a1);margin:1px 0 7px">' + (c.dist != null ? c.dist.toFixed(2) + ' mi' : '') + ' · ' + AP_D(c.fecha) + (c.dom ? ' · DOM ' + c.dom : '') + (x.filtro.pasa ? '' : ' · <span style="color:var(--amber,#fbbf24)">filtrado: ' + AP_E(x.filtro.razones.join('; ')) + '</span>') + '</div>'
+    + (eleg.elegibleArv
+      ? '<label style="display:flex;gap:5px;align-items:center;font-size:10px;color:var(--mut,#8b93a1);white-space:nowrap"><input type="checkbox" class="ap-cbx" ' + (!excl ? 'checked' : '') + ' onchange="apExclToggle(\'' + c.id + '\')"> incluir</label>'
+      : '<span class="ap-pill">solo referencia</span>') + '</div>'
+    + '<div style="font-size:10.5px;color:var(--mut,#8b93a1);margin:1px 0 7px">' + (c.dist != null ? c.dist.toFixed(2) + ' mi' : '') + ' · ' + AP_D(c.fecha) + (c.dom ? ' · DOM ' + c.dom : '') + (!eleg.elegibleArv ? ' · <span style="color:var(--amber,#fbbf24)">' + AP_E(eleg.razon) + '</span>' : (x.filtro.pasa ? '' : ' · <span style="color:var(--amber,#fbbf24)">filtrado: ' + AP_E(x.filtro.razones.join('; ')) + '</span>')) + '</div>'
     + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:22px;font-weight:800">' + AP_M(c.price) + '</div><div style="font-size:11px;color:var(--mut,#8b93a1)">' + (c.sqft && c.price ? '$' + Math.round(c.price / c.sqft) + '/sqft' : '') + '</div></div>'
     + '<div style="font-size:11.5px;color:var(--mut,#8b93a1);margin:4px 0 9px">' + (c.sqft ? c.sqft.toLocaleString() + ' sqft' : 'sqft ') + ' · ' + (c.beds != null ? c.beds : kitStatusDot('warn')) + ' cm / ' + (c.baths != null ? c.baths : kitStatusDot('warn')) + ' bñ · ' + (c.year || kitStatusDot('warn')) + ' · lote ' + (c.lot ? c.lot.toLocaleString() : kitStatusDot('warn')) + ' · piscina ' + kitStatusDot('warn') + '</div>'
     + '<div style="border-top:1px solid var(--line,rgba(255,255,255,.08));padding-top:7px">' + adjRows + '</div>'
@@ -731,7 +777,7 @@ function apCardComp(x, esRec) {
 }
 
 function apVistaGrilla(s, rec) {
-  if (!rec || !rec.usables || !rec.usables.length) return '<div class="ap-card" style="text-align:center;color:var(--mut,#8b93a1)">Sin comps reconciliados.</div>';
+  if (!rec || !rec.usables || !rec.usables.length) return '<div class="ap-card" style="text-align:center;color:var(--mut,#8b93a1);padding:24px">' + apSinArvHtml(rec) + '</div>';
   const us = rec.usables;
   const st = apState();
   const catSum = (x, cat) => x.adj.rows.filter(r => r.cat === cat).reduce((a, r) => a + r.monto, 0);
@@ -774,7 +820,7 @@ function ffArvProView() {
   const s = apSubjectSano();
   const comps = apComps();
   const f = apFiltros();
-  const rec = comps.length ? apReconciliar(s, comps) : null;
+  const rec = apReconciliar(s, comps);
   const cal = apCalibracion();
 
   // header con toggle Simple/Experto + searchbar
@@ -795,7 +841,7 @@ function ffArvProView() {
       + '<div style="position:absolute;left:12px;top:10px;z-index:500;font-size:11px;color:var(--mut,#8b93a1);background:var(--card,rgba(10,14,20,.75));padding:4px 9px;border-radius:8px;border:1px solid var(--line,rgba(255,255,255,.1))">TU CASA + comps · click en un pin resalta la tarjeta</div></div>';
     setTimeout(apMapMount, 40);
     return head + apPrecision() + apSubjStrip(s) + apProvisionalBanner(rec) + apHeroSimple(rec, inp) + apVistaSenales(rec, inp) + mapaS
-      + '<div class="ap-sectitle">' + osIcon('building') + ' Las casas parecidas que se vendieron cerca</div>' + apCompsSimple(s, comps, rec, f)
+      + '<div class="ap-sectitle">' + osIcon('building') + (rec && rec.fuenteArv === 'rentcast_avm' ? ' Referencias de mercado usadas por RentCast' : ' Ventas cerradas arms-length verificadas') + '</div>' + apCompsSimple(s, comps, rec, f)
       + '<div class="ap-expnote" onclick="apSet(\'modo\',\'experto\')">' + osIcon('eye') + ' ¿Querés ver cómo el sistema ajustó cada casa (tamaño, baños, año, lote…)? Pasate a <b>Experto (tasador)</b> para ver la grilla completa estilo appraisal.</div>';
   }
 

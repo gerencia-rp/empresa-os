@@ -1,5 +1,5 @@
 // CARGA REAL logueada: verifica que el conteo de unidades y la ocupación sean CONSISTENTES
-// (misma cifra que v_ocupacion = 51/36/70.59%) en OS Global y en el Property Manager (Rentas).
+// (misma cifra que v_ocupacion) en OS Global y en el Property Manager (Rentas).
 // Uso: RP_QA_ADMIN_EMAIL=… RP_QA_ADMIN_PASSWORD=… node scripts/qa-unidades-consistencia.mjs
 import puppeteer from 'puppeteer-core';
 
@@ -45,8 +45,8 @@ const global = await page.evaluate(() => {
   const os = window.OS || {};
   return { ocupView: os.ocup || null, snippet: (t.match(/ocupaci[oó]n[\s\S]{0,60}/i) || [''])[0] };
 });
-chk('OS Global: v_ocupacion cargada (51 unidades rentables)',
-  global.ocupView && +global.ocupView.unidades_rentables === 51,
+chk('OS Global: v_ocupacion cargada y reconciliada',
+  global.ocupView && +global.ocupView.unidades_rentables === (+global.ocupView.ocupadas + +global.ocupView.disponibles + +global.ocupView.mantenimiento + +global.ocupView.reservadas),
   global.ocupView ? `${global.ocupView.unidades_rentables}u / ${global.ocupView.ocupadas}ocup / ${global.ocupView.ocupacion_pct}%` : 'sin ocupView');
 
 // 3) PROPERTY MANAGER (Rentas) — abrir el clásico y leer subtítulo + funciones canónicas
@@ -69,13 +69,13 @@ const pm = await page.evaluate(() => {
   out.subtitle = st ? st.trim().slice(0, 160) : null;
   return out;
 });
-chk('PM: pmPhysOccupancy() = 51 total / 36 ocupadas',
-  pm.calc && pm.calc.total === 51 && pm.calc.occupied === 36,
+chk('PM: pmPhysOccupancy() coincide con v_ocupacion',
+  pm.calc && global.ocupView && pm.calc.total === +global.ocupView.unidades_rentables && pm.calc.occupied === +global.ocupView.ocupadas,
   pm.calc ? `${pm.calc.total}/${pm.calc.occupied}/${Math.round(pm.calc.pct*100)}% (${pm.calc.fuente})` : (pm.err || 'sin pmPhysOccupancy'));
 chk('PM: invariante ocup+libres+reserv+mant = total',
   pm.calc && (pm.calc.occupied + pm.calc.free + pm.calc.reserved + pm.calc.maintenance === pm.calc.total),
   pm.calc ? `${pm.calc.occupied}+${pm.calc.free}+${pm.calc.reserved}+${pm.calc.maintenance}` : '');
-if (pm.subtitle) chk('PM: subtítulo lista propiedades (51 unidades)', /51 unidades rentables/.test(pm.subtitle), pm.subtitle);
+if (pm.subtitle) chk('PM: subtítulo lista el total canónico', new RegExp(global.ocupView.unidades_rentables + ' unidades rentables').test(pm.subtitle), pm.subtitle);
 
 chk('0 pageerrors', pageerrors.length === 0, pageerrors.slice(0, 3).join(' || '));
 

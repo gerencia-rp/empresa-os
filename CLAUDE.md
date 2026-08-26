@@ -871,6 +871,16 @@ En la raíz del repo:
 
 ## 🤖 Instrucciones para Claude
 
+## 🏠 Decisión ARV compartida D-020 (25 Ago 2026 — aplicada localmente, pendiente de deploy)
+
+- El ARV se calcula **exclusivamente** con ventas cerradas `sold` y `arms_length` verificadas, con precio y fecha de cierre. Activas y pendientes son solo temperatura de mercado; nunca afectan la mediana ni el rango.
+- `Inactive`/removed en RentCast no demuestra por sí solo una venta cerrada y `Standard` no demuestra arms-length. El payload actual de `/avm/value` no entrega evidencia canónica suficiente; esas filas quedan fuera del ARV hasta enriquecerlas con una fuente de cierres verificable.
+- Implementación: `pm/ff-arv-engine.js`; contrato técnico: `docs/C1-ARV-ENGINE-SPEC.md`; regresión: `node scripts/test-arv-d020.mjs`.
+- Regla sustituida por D-025 y contratos v0.11: si faltan cierres documentados, usar RentCast AVM → appraisal/ARV existente → `sqft × arv_psf_zona`, siempre con origen/verificación/confianza visibles. El ARV no queda vacío cuando existen datos básicos.
+- **C2 (lado Empresa OS) listo:** `scripts/contract-golden-cases.mjs --verify` pasa 3/3 (flip estándar, BRRRR limitado por DSCR, flip lujo). Entrega para paridad: `docs/C2-GOLDEN-CASES-HANDOFF.md`. C2 permanece abierto hasta que Bóveda produzca exactamente los mismos resultados.
+- **C7 sin proveedores nuevos — RentCast aprobado como respaldo automático:** si existen cierres documentados, manda la mediana profesional `sold+arms_length`; si no existen, el AVM de RentCast entrega el ARV y la UI lo identifica como “estimado por RentCast”. Los listings Active/Inactive siguen como contexto, no se falsifican como cierres. Appraisals, HUD/CD, MLS/CMA y datos internos documentados elevan la confianza. Ver `docs/C7-VERIFIED-SALES-SOURCE.md`.
+- **Regla de negocio: ARV nunca vacío en una propiedad con datos básicos.** Cascada: cierres documentados → RentCast AVM → appraisal/ARV existente → `sqft × arv_psf_zona`. La UI declara fuente y confianza; ningún respaldo se disfraza de venta verificada.
+
 ## 🎨 Decisión de producto — Sistema Operativo de IA (24 Ago 2026)
 
 - `/jarvis` se presenta como una **empresa digital viva**: Cerebro Ejecutivo → negocios/áreas → gerentes, managers y operadores.
@@ -892,4 +902,4 @@ Cuando arranques una sesión en este repo:
 
 ---
 
-*Última actualización: 24 Ago 2026 — dirección de producto del Sistema Operativo de IA y estados basados en evidencia*
+*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio M5 en desarrollo local*

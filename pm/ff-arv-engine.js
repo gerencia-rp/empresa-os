@@ -36,6 +36,26 @@
   const glaPsf = (cfg, zip) => (zip != null && cfg && cfg['arv_adj_gla_psf_' + zip] != null && !isNaN(+cfg['arv_adj_gla_psf_' + zip]))
     ? +cfg['arv_adj_gla_psf_' + zip] : cfgN(cfg, 'arv_adj_gla_psf', 90);
 
+  // D-020: solo cierres vendidos y arms-length entran al ARV. Un listing Active/Pending es
+  // temperatura; Inactive/removed NO prueba una venta y queda fuera hasta verificarla.
+  const normToken = v => String(v || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  function clasificaComp(c) {
+    const status = normToken(c && (c.statusCanonical || c.status));
+    const saleType = normToken(c && (c.saleType || c.sale_type || c.transactionType));
+    const temperatura = status === 'active' || status === 'pending';
+    const sold = status === 'sold' || status === 'closed' || status === 'closed_sale';
+    const armsLength = saleType === 'arms_length' || saleType === 'armslength';
+    const elegibleArv = sold && armsLength && +c.price > 0 && !!(c.closeDate || c.close_date || c.fecha);
+    let razon = null;
+    if (!elegibleArv) {
+      if (temperatura) razon = 'temperatura de mercado: listing ' + status + ', nunca entra al ARV';
+      else if (!sold) razon = status === 'inactive' ? 'inactive/removed no demuestra venta cerrada' : 'sin venta cerrada verificada';
+      else if (!armsLength) razon = saleType ? 'venta no arms-length (' + saleType + ')' : 'arms-length sin verificar';
+      else razon = 'venta sin precio o fecha de cierre verificable';
+    }
+    return { status, saleType, temperatura, sold, armsLength, elegibleArv, razon };
+  }
+
   // ─── filtros duros del tasador (defaults directiva: ≤1 mi · ≤6 meses · sqft ±15% · camas ±1 · mismo tipo) ───
   function filtros(cfg, over) {
     const o = over || {};
@@ -103,6 +123,10 @@
   // Si <minN comps: EXPANSIÓN ADAPTATIVA del tasador (6→9→12 meses · +0.5 mi) declarada y con confianza capada.
   function reconciliar(s, comps, cfg, opts) {
     opts = opts || {};
+    const clasificados = (comps || []).map(c => ({ c, elegibilidad: clasificaComp(c) }));
+    const temperatura = clasificados.filter(x => x.elegibilidad.temperatura).map(x => x.c);
+    const noElegibles = clasificados.filter(x => !x.elegibilidad.elegibleArv).map(x => ({ c: x.c, razon: x.elegibilidad.razon }));
+    const ventasElegibles = clasificados.filter(x => x.elegibilidad.elegibleArv).map(x => x.c);
     const f0 = filtros(cfg, opts.filtrosOver);
     const maxN = cfgN(cfg, 'arv_comps_max', 8), minN = cfgN(cfg, 'arv_comps_min', 3);
     const grossWarn = cfgN(cfg, 'arv_gross_adj_warn_pct', 25);
@@ -113,7 +137,7 @@
     let f = f0, relajado = 0, usables = [];
     for (let e = 0; e < escalones.length; e++) {
       f = escalones[e]; relajado = e;
-      usables = comps.map(c => ({ c, filtro: pasaFiltro(s, c, f, opts.hoy), adj: ajustes(s, c, cfg, (opts.man || {})[c.id], opts.hoy) }))
+      usables = ventasElegibles.map(c => ({ c, filtro: pasaFiltro(s, c, f, opts.hoy), adj: ajustes(s, c, cfg, (opts.man || {})[c.id], opts.hoy) }))
         .filter(x => x.filtro.pasa && !(opts.excl || {})[x.c.id])
         .sort((a, b) => a.adj.grossPct - b.adj.grossPct)
         .slice(0, maxN);
@@ -131,7 +155,8 @@
         return true;
       });
     }
-    if (!usables.length) return { usables, outliers, arv: null, provisional: false, relajado, confianza: { nivel: 'sin comps', score: 0, razones: ['ningún comp pasa filtros (ni con búsqueda expandida)'] } };
+    if (!usables.length) return { usables, outliers, temperatura, noElegibles, ventasElegibles, arv: null, provisional: false, relajado,
+      confianza: { nivel: 'sin comps', score: 0, razones: [ventasElegibles.length ? 'ninguna venta arms-length verificada pasa filtros (ni con búsqueda expandida)' : 'no hay ventas cerradas arms-length verificadas; activos/inactivos no entran al ARV'] } };
     // pesos: similitud (menor gross adj) × recencia × cercanía
     usables.forEach(x => {
       const wSim = 1 / (x.adj.grossPct + 2);
@@ -174,8 +199,37 @@
     if (outliers.length) razones.push(outliers.length + ' outlier(s) estadístico(s) excluido(s)');
     if (bias) razones.push('sesgo calibrado ' + (Math.round(bias * 100) / 100) + '%' + (zipBias ? ' (incluye submercado ' + s.zip + ': ' + zipBias + '%)' : ''));
     if (usables.length < minN) razones.push('menos de ' + minN + ' comps válidos');
-    return { usables, outliers, arv, p25, p75, cv, score, grossProm, dispersion: cv, distProm: dProm, mesesProm: mProm, bias, relajado, filtrosUsados: f,
+    return { usables, outliers, temperatura, noElegibles, ventasElegibles, arv, p25, p75, cv, score, grossProm, dispersion: cv, distProm: dProm, mesesProm: mProm, bias, relajado, filtrosUsados: f,
       conservador: p25, optimista: p75, confianza: { nivel, score, razones } };
+  }
+
+  // Respaldo decidido por Nicolás (25-ago-2026): si faltan cierres verificables,
+  // el AVM de RentCast entrega el ARV. Sigue siendo una señal separada, no una
+  // mediana fabricada con listings activos/inactivos.
+  function conFallbackRentcast(rec, avm) {
+    if (rec && rec.arv > 0) return rec;
+    const value = +(avm && (avm.value || avm.price));
+    if (!(value > 0)) return rec;
+    const low = +(avm.priceRangeLow || avm.rangeLow) || Math.round(value * 0.92);
+    const high = +(avm.priceRangeHigh || avm.rangeHigh) || Math.round(value * 1.08);
+    return Object.assign({}, rec || {}, {
+      arv: Math.round(value), conservador: Math.round(low), optimista: Math.round(high),
+      p25: Math.round(low), p75: Math.round(high), fuenteArv: 'rentcast_avm', provisional: true,
+      confianza: { nivel: 'estimado', score: 55, razones: ['ARV automático de respaldo: estimado AVM de RentCast; no equivale a una mediana de ventas cerradas verificadas'] },
+    });
+  }
+
+  function conFallbackLocal(rec, fallback) {
+    if (rec && rec.arv > 0) return rec;
+    const value = +(fallback && fallback.value);
+    if (!(value > 0)) return rec;
+    const pct = +(fallback.rangePct) > 0 ? +(fallback.rangePct) : 8;
+    return Object.assign({}, rec || {}, {
+      arv: Math.round(value), conservador: Math.round(value * (1 - pct / 100)), optimista: Math.round(value * (1 + pct / 100)),
+      p25: Math.round(value * (1 - pct / 100)), p75: Math.round(value * (1 + pct / 100)),
+      fuenteArv: fallback.source || 'estimacion_local', provisional: true,
+      confianza: { nivel: 'estimado', score: +(fallback.score) || 35, razones: [fallback.reason || 'ARV estimado con los datos internos disponibles'] },
+    });
   }
 
   // ─── conflictos del subject: ≥2 fuentes por atributo; discrepancia = NO usar en silencio ───
@@ -295,5 +349,5 @@
     return { params: mejor, antes: backtest(casas, cfgBase), despues: final, probados, zipsCal };
   }
 
-  return { filtros, pasaFiltro, ajustes, reconciliar, saneaSubject, conflictos, triangular, backtest, calibrar, _mediana: mediana, _cuantilPond: cuantilPond, mesesDesde };
+  return { filtros, pasaFiltro, ajustes, clasificaComp, reconciliar, conFallbackRentcast, conFallbackLocal, saneaSubject, conflictos, triangular, backtest, calibrar, _mediana: mediana, _cuantilPond: cuantilPond, mesesDesde };
 });

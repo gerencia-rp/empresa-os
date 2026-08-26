@@ -25,6 +25,7 @@ const UW_NAV = [
   ['ingreso', osIcon('house'), 'Ingreso Mensual', 'renta por modelo de negocio'],
   ['escenarios', osIcon('target'), 'Escenarios', 'Base vs stress-test'],
   ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
+  ['luxury', osIcon('sparkles'), 'Deal Studio', 'riesgo + capital + salida'],
 ];
 // MODO VENTA (flip): el ARV es el precio de salida, no hay refi/renta → nav distinto
 const UW_NAV_VENTA = [
@@ -34,6 +35,7 @@ const UW_NAV_VENTA = [
   ['intereses', osIcon('trending-down'), 'Intereses', 'HML durante la obra'],
   ['escenarios', osIcon('target'), 'Escenarios', 'Base vs stress-test'],
   ['unificada', osIcon('target'), 'Vista Unificada', 'one-pager GO/NO-GO'],
+  ['luxury', osIcon('sparkles'), 'Deal Studio', 'riesgo + capital + salida'],
 ];
 function ffUwEstrategia() { return (UW.a && UW.a.inputs && UW.a.inputs.estrategia === 'venta') ? 'venta' : 'hold'; }
 function ffUwNav() { return ffUwEstrategia() === 'venta' ? UW_NAV_VENTA : UW_NAV; }
@@ -48,7 +50,7 @@ window.ffUwSetEstrategia = ffUwSetEstrategia;
 
 async function ffUwLoad() {
   try {
-    const [cfg, deals, hml, an, draws, pmProps, pmUnits] = await Promise.all([
+    const [cfg, deals, hml, an, draws, pmProps, pmUnits, p360] = await Promise.all([
       sb.from('ff_uw_config').select('key, value, text_value').then(r => r.data || []),
       sb.from('ff_deals').select('*').eq('active', true).order('address').then(r => r.data || []),
       sb.from('ff_hml_loans').select('*').eq('active', true).then(r => r.data || []),
@@ -57,8 +59,10 @@ async function ffUwLoad() {
       // mezcla real de unidades (Rentas) para la Calc 5 — bajo RLS sin área rentas devuelve []
       sb.from('pm_properties').select('id,property_id,name').eq('active', true).then(r => r.data || []).catch(() => []),
       sb.from('pm_units').select('property_id,unit_type,name,target_rent').eq('active', true).then(r => r.data || []).catch(() => []),
+      // Ficha 360 = única capa de propiedad para módulos premium; el Studio nunca consulta fuentes por su cuenta.
+      sb.from('v_property_360').select('*').then(r => r.data || []).catch(() => []),
     ]);
-    UW.pmProps = pmProps; UW.pmUnits = pmUnits;
+    UW.pmProps = pmProps; UW.pmUnits = pmUnits; UW.p360 = p360;
     UW.cfg = {}; UW.cfgTxt = {}; cfg.forEach(c => { UW.cfg[c.key] = c.value; if (c.text_value != null) UW.cfgTxt[c.key] = c.text_value; });
     UW.deals = deals; UW.analyses = an;
     UW.hml = {}; hml.forEach(h => { if (h.address_norm) UW.hml[h.address_norm] = h; });
@@ -585,7 +589,7 @@ function ffUwShell() {
 function ffUwSubBody() {
   // guard: si la estrategia no incluye este tab (p.ej. venir de hold con sub='ingreso' a venta), volvé a Negocio
   if (!ffUwNav().some(n => n[0] === UW.sub)) UW.sub = 'arv';
-  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, venta: ffUwViewVenta, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, escenarios: ffUwViewEscenarios, unificada: ffUwViewUnificada }[UW.sub] || ffUwViewArv)();
+  return ({ negocio: ffUwViewNegocio, arv: ffUwViewArv, cashout: ffUwViewCashout, venta: ffUwViewVenta, intereses: ffUwViewIntereses, ingreso: ffUwViewIngreso, escenarios: ffUwViewEscenarios, unificada: ffUwViewUnificada, luxury: window.ffLuxuryDealStudioView || ffUwViewUnificada }[UW.sub] || ffUwViewArv)();
 }
 // ─── helpers de diseño (premium, legible para no-expertos) ───
 const UW_DLR = '\u0024';

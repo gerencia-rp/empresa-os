@@ -2,7 +2,9 @@
 // Corre el ArvEngine REAL (pm/ff-arv-engine.js) por cada casa finalizada con "Valuación por el
 // Appraisal" (Airtable → ff_deals.appraisal), comps de RentCast (cache 30d, cuota vigilada),
 // mide MdAPE + sesgo, calibra los parámetros y persiste en ff_uw_config + arv_calibracion.
-//   SB_KEY=sb_secret_… node scripts/arv-backtest.mjs [--dry] [--no-persist]
+// Por seguridad, la corrida es de solo lectura por defecto.
+// Para persistir una calibración mejor y dentro de meta se requiere --persist explícito.
+//   SB_KEY=sb_secret_… node scripts/arv-backtest.mjs [--persist]
 // Meta (directiva): MdAPE ≤ 6% · sesgo ±2%. Exit 1 si no la alcanza.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -14,7 +16,7 @@ let KEY = process.env.SB_KEY;
 if (!KEY) { try { KEY = JSON.parse(readFileSync(process.env.HOME + '/.cache/sbkeys.json', 'utf8')).secret; } catch {} }
 if (!KEY) { console.error('Falta SB_KEY'); process.exit(1); }
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
-const DRY = process.argv.includes('--dry') || process.argv.includes('--no-persist');
+const PERSIST = process.argv.includes('--persist');
 
 const q = async (path) => { const r = await fetch(BASE + '/rest/v1/' + path, { headers: H }); if (!r.ok) throw new Error(path + ' → ' + r.status); return r.json(); };
 const rentcast = async (address, endpoint) => {
@@ -47,6 +49,8 @@ function compsDe(valuePayload) {
     baths: c.bathrooms != null ? +c.bathrooms : null, year: c.yearBuilt != null ? +c.yearBuilt : null,
     lot: c.lotSize != null ? +c.lotSize : null, dist: c.distance != null ? +c.distance : null,
     fecha: c.removedDate || c.lastSeenDate || c.listedDate || null, tipo: c.propertyType || null,
+    status: c.status || null, saleType: c.saleType || c.transactionType || null,
+    closeDate: c.closeDate || c.saleDate || null,
     pool: null, garage: null,
   })).filter(c => c.price > 0);
 }
@@ -103,7 +107,8 @@ const pasa = d2.mdape != null && d2.mdape <= META_MDAPE && Math.abs(d2.sesgo) <=
 console.log('\n🎯 META: MdAPE ≤' + META_MDAPE + '% y sesgo ±' + META_SESGO + '% → ' + (pasa ? '✅ ALCANZADA' : '❌ NO alcanzada'));
 
 // ─── persistir ───
-if (!DRY) {
+const mejora = antes.mdape != null && d2.mdape != null && d2.mdape < antes.mdape;
+if (PERSIST && pasa && mejora) {
   for (const k of KEYS) {
     await fetch(BASE + '/rest/v1/ff_uw_config?on_conflict=key', { method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ key: k, value: cal.params[k], updated_at: new Date().toISOString() }) });
   }
@@ -116,5 +121,9 @@ if (!DRY) {
     fuente: 'backtest',
   }) });
   console.log('persistido:', ins.status === 201 ? '✓ ff_uw_config + arv_calibracion' : '⚠ ' + ins.status + ' ' + await ins.text());
+} else if (PERSIST) {
+  console.error('NO persistido: la calibración debe alcanzar la meta y mejorar el MdAPE actual.');
+} else {
+  console.log('modo solo lectura: usa --persist únicamente para una calibración que alcance la meta y mejore el MdAPE.');
 }
 process.exit(pasa ? 0 : 1);

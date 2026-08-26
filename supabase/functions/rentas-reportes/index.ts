@@ -102,7 +102,8 @@ Deno.serve(async (req) => {
           count(*)::int total,
           round(100.0*count(*) filter (where u.status='ocupada')/nullif(count(*),0),1) pct
         from pm_units u join pm_properties pp on pp.id=u.property_id
-        where u.active and pp.active and u.external_id like 'unit-rec%' and u.unit_type is not null
+        where u.active and u.is_active and u.archived_at is null
+          and pp.active and u.external_id like 'unit-rec%' and u.unit_type is not null
         group by 1 order by pct asc nulls last, 1`;
       const payload = {
         corte: corteDate,
