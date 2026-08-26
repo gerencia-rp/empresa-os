@@ -36,27 +36,26 @@ export default async function handler(req, res) {
       body: JSON.stringify({ dry_run: false, archive: false, triggered_by: "vercel-cron" }),
     }, 50000);
     const text = await r.text();
-    // Sync FF (deals/draws/investors/overhead/HML) + Remodelación en el mismo cron — best-effort, no rompen el PM sync.
-    let ffText = null, rmText = null;
-    try {
-      const rf = await fetchWithTimeout(`${base}/sync-ff-airtable`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ triggered_by: "vercel-cron" }),
-      }, 50000);
-      ffText = await rf.text();
-    } catch (e) { ffText = "error: " + e.message; }
-    try {
-      const rr = await fetchWithTimeout(`${base}/sync-remodel-airtable`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ triggered_by: "vercel-cron" }),
-      }, 50000);
-      rmText = await rr.text();
-    } catch (e) { rmText = "error: " + e.message; }
-    try { await fetchWithTimeout(`${base}/sync-clickup`, { method: "POST", headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" }, body: "{}" }, 50000); } catch (e) { /* best effort */ }
+    // Espejos independientes en paralelo: reducen duración total y ninguno
+    // bloquea la respuesta principal de Property Management.
+    const runMirror = async (path, body = "{}") => {
+      try {
+        const response = await fetchWithTimeout(`${base}/${path}`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+          body,
+        }, 50000);
+        return await response.text();
+      } catch (e) { return "error: " + e.message; }
+    };
+    const [ffText, rmText, clickupText, qbText] = await Promise.all([
+      runMirror("sync-ff-airtable", JSON.stringify({ triggered_by: "vercel-cron" })),
+      runMirror("sync-remodel-airtable", JSON.stringify({ triggered_by: "vercel-cron" })),
+      runMirror("sync-clickup"),
+      runMirror("qb-oauth/sync", JSON.stringify({ triggered_by: "vercel-cron" })),
+    ]);
     res.status(r.status).setHeader("content-type", "application/json")
-      .send(JSON.stringify({ pm: safeParse(text), ff: safeParse(ffText), remodel: safeParse(rmText) }));
+      .send(JSON.stringify({ pm: safeParse(text), ff: safeParse(ffText), remodel: safeParse(rmText), clickup: safeParse(clickupText), quickbooks: safeParse(qbText) }));
   } catch (e) {
     res.status(502).json({ error: "Cron proxy error: " + e.message });
   }

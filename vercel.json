@@ -41,10 +41,6 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/sync-quickbooks",
-      "schedule": "15 11 * * *"
-    },
-    {
       "path": "/api/cron/check-contracts",
       "schedule": "0 8 * * *"
     },
