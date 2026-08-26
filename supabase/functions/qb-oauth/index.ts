@@ -13,6 +13,7 @@ const CLIENT_ID = Deno.env.get("QBP_CLIENT_ID") || Deno.env.get("QB_CLIENT_ID") 
 const CLIENT_SECRET = Deno.env.get("QBP_CLIENT_SECRET") || Deno.env.get("QB_CLIENT_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 const SELF = `${SUPABASE_URL}/functions/v1/qb-oauth`;
 const REDIRECT_URI = `${SELF}/callback`;
 const QBO_API = "https://quickbooks.api.intuit.com/v3/company";
@@ -25,6 +26,11 @@ const html = (body: string, status = 200) => new Response(
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o, null, 1), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
 
 function sb() { return createClient(SUPABASE_URL, SERVICE_KEY); }
+function canOperate(req: Request, url: URL) {
+  const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const cron = req.headers.get("x-cron-secret") || url.searchParams.get("secret") || "";
+  return auth === SERVICE_KEY || (!!CRON_SECRET && (auth === CRON_SECRET || cron === CRON_SECRET));
+}
 
 async function tokenExchange(params: Record<string, string>) {
   const res = await fetch("https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer", {
@@ -60,6 +66,10 @@ async function accessTokenFor(empresa: string): Promise<{ token: string; realm: 
 
 async function qboGet(empresa: string, path: string) {
   const { token, realm } = await accessTokenFor(empresa);
+  return qboGetWithToken(token, realm, path);
+}
+
+async function qboGetWithToken(token: string, realm: string, path: string) {
   const res = await fetch(`${QBO_API}/${realm}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
   const data = await res.json();
   if (!res.ok) throw new Error(`QBO ${res.status}: ${JSON.stringify(data).slice(0, 300)}`);
@@ -110,11 +120,12 @@ Deno.serve(async (req) => {
     }
 
     if (path.startsWith("/status")) {
-      const { data } = await sb().from("qb_connections").select("empresa, company_name, realm_id, connected_at, last_refreshed_at, token_expires_at").eq("active", true).order("empresa");
+      const { data } = await sb().from("qb_connections").select("empresa, company_name, connected_at, last_refreshed_at, token_expires_at").eq("active", true).order("empresa");
       return json({ ok: true, conexiones: data || [], esperadas: EMPRESA_LBL });
     }
 
     if (path.startsWith("/pnl") || path.startsWith("/balance")) {
+      if (!canOperate(req, url)) return json({ ok: false, error: "No autorizado" }, 401);
       const empresa = url.searchParams.get("empresa") || "";
       const isPnl = path.startsWith("/pnl");
       const y = new Date().getFullYear();
@@ -131,13 +142,14 @@ Deno.serve(async (req) => {
     }
 
     if (path.startsWith("/sync")) {
+      if (!canOperate(req, url)) return json({ ok: false, error: "No autorizado" }, 401);
       const db = sb();
       const { data: conns } = await db.from("qb_connections").select("empresa").eq("active", true);
       const y = new Date().getFullYear();
       const hoy = new Date().toISOString().slice(0, 10);
       const out: Record<string, any> = {};
       const runStart = new Date().toISOString();
-      for (const c of (conns || [])) {
+      await Promise.all((conns || []).map(async c => {
         const emp = c.empresa;
         const reports: Array<[string, string]> = [
           ["pnl_ytd", `/reports/ProfitAndLoss?start_date=${y}-01-01&end_date=${hoy}`],
@@ -145,9 +157,15 @@ Deno.serve(async (req) => {
           ["balance", `/reports/BalanceSheet?date_macro=Today`],
         ];
         out[emp] = {};
-        for (const [name, pathQ] of reports) {
+        let auth: { token: string; realm: string; company: string };
+        try { auth = await accessTokenFor(emp); }
+        catch (e) {
+          reports.forEach(([name]) => { out[emp][name] = "err: " + String((e as any)?.message || e).slice(0, 100); });
+          return;
+        }
+        await Promise.all(reports.map(async ([name, pathQ]) => {
           try {
-            const rep = await qboGet(emp, pathQ);
+            const rep = await qboGetWithToken(auth.token, auth.realm, pathQ);
             const rows: Array<{ label: string; value: number }> = [];
             const walk = (r: any) => { (r?.Row || []).forEach((row: any) => {
               // totales/subtotales (Summary) + cuentas HOJA (Data rows con ColData directo)
@@ -168,9 +186,19 @@ Deno.serve(async (req) => {
             await db.from("qb_report_cache").update({ active: false, archived_at: new Date().toISOString() }).eq("empresa", emp).eq("report", name).lt("fetched_at", runStart).eq("active", true);
             out[emp][name] = uniq.length;
           } catch (e) { out[emp][name] = "err: " + String((e as any)?.message || e).slice(0, 100); }
-        }
-      }
-      return json({ ok: true, sync: out });
+        }));
+      }));
+      const values = Object.values(out).flatMap(v => Object.values(v || {}));
+      const errors = values.filter(v => typeof v === "string" && v.startsWith("err:")).length;
+      const rows = values.filter(v => typeof v === "number").reduce((sum, v) => sum + Number(v), 0);
+      const { data: agent } = await db.from("agent_registry").select("id").eq("nombre", "Cerebro Ejecutivo").is("deleted_at", null).maybeSingle();
+      if (agent?.id) await db.from("agent_audit_log").insert({
+        agent_id: agent.id,
+        input: { tipo: "ejecucion_negocio", mode: "quickbooks_sync", source: "QuickBooks" },
+        output: { source: "QuickBooks", companies: Object.keys(out).length, reports: values.length, rows, errors, fetched_at: runStart },
+        resultado: errors ? "error" : "ok",
+      });
+      return json({ ok: errors === 0, sync: out, summary: { companies: Object.keys(out).length, reports: values.length, rows, errors, fetched_at: runStart } }, errors ? 207 : 200);
     }
 
     return html(`<h2>QuickBooks · Rental Profits OS</h2><p>Rutas: /authorize?empresa=… · /callback · /status · /pnl?empresa=… · /balance?empresa=…</p>`);
