@@ -13,7 +13,7 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], reports: [], memories: [], lastRun: {}, lastEvidence: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], reports: [], memories: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
@@ -626,10 +626,14 @@ async function jvLoad(force) {
     JV.nsCfg = (ns && ns.data) ? ns.data : null;
     const rr = await Promise.all(JV.agents.map(a =>
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').eq('agent_id', a.id).order('ts', { ascending: false }).limit(50)
-        .then(r => ({ id: a.id, row: (r.data || []).find(jvIsOperationalAudit) || null }))
-        .catch(() => ({ id: a.id, row: null }))));
-    JV.lastRun = {}; JV.lastEvidence = {};
-    rr.forEach(r => { JV.lastRun[r.id] = r.row ? r.row.ts : null; if (r.row) JV.lastEvidence[r.id] = r.row; });
+        .then(r => ({ id: a.id, latest: (r.data || [])[0] || null, row: (r.data || []).find(jvIsOperationalAudit) || null }))
+        .catch(() => ({ id: a.id, latest: null, row: null }))));
+    JV.lastRun = {}; JV.lastEvidence = {}; JV.lastAudit = {};
+    rr.forEach(r => {
+      JV.lastRun[r.id] = r.row ? r.row.ts : null;
+      if (r.row) JV.lastEvidence[r.id] = r.row;
+      if (r.latest) JV.lastAudit[r.id] = r.latest;
+    });
     JV.loaded = true;
   } catch (e) { JV.err = e.message || String(e); }
   JV.loading = false;
@@ -718,6 +722,19 @@ function jvAuditSummary(a) {
   const detail = out.nota || out.resumen || out.detalle || out.mensaje || 'La ejecución dejó evidencia en la bitácora del sistema.';
   return { title: String(title), detail: String(detail) };
 }
+function jvReadinessProgress(a) {
+  const row = JV.lastAudit[a.id];
+  const out = row && row.output && typeof row.output === 'object' ? row.output : null;
+  if (!out || out.ready !== false || !out.minimum) return '';
+  const items = [
+    ['Intervalos reales', Number(out.intervals || 0), Number(out.minimum.intervals || 0)],
+    ['Propiedades', Number(out.deals || 0), Number(out.minimum.deals || 0)],
+    ['Etapas', Number(out.stages || 0), Number(out.minimum.stages || 0)],
+  ];
+  return '<div class="jv-ai-section"><div class="jv-ai-label">Progreso para activarse</div><div class="jv-ai-grid">'
+    + items.map(x => '<div class="jv-ai-metric"><span>' + OS_E(x[0]) + '</span><b>' + Math.min(x[1], x[2]) + ' / ' + x[2] + '</b></div>').join('')
+    + '</div><div class="jv-ai-copy" style="margin-top:9px">Solo avanza con transiciones observadas en propiedades reales. No usa fechas reconstruidas ni datos inventados.</div></div>';
+}
 function jvAgentInspector() {
   const a = jvAgent(JV.inspectAgentId);
   if (!a || jvIsLegacy(a)) return '';
@@ -733,6 +750,7 @@ function jvAgentInspector() {
     + '<div class="jv-ai-body"><div class="jv-ai-section"><div class="jv-ai-label">Responsabilidad</div><div class="jv-ai-copy">' + OS_E(a.responsabilidad || a.proceso || 'Responsabilidad todavía no documentada.') + '</div></div>'
     + (jvAgentIssue(a) ? '<div class="jv-needs-info">' + OS_E(jvAgentIssue(a)) + '</div>' : '')
     + '<div class="jv-ai-section"><div class="jv-ai-label">Qué hizo recientemente</div><div class="jv-ai-now"><b>' + OS_E(audit.title) + '</b><span>' + OS_E(audit.detail) + ' · ' + OS_E(jvFmtTs(jvAgentLastRun(a))) + '</span></div></div>'
+    + jvReadinessProgress(a)
     + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Automatización</span><b>' + OS_E(automation && automation.executor ? automation.executor : 'Sin ejecutor') + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
     + (tasks.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Tareas asignadas</div><div class="jv-ai-copy">' + tasks.slice(0, 5).map(t => '• ' + OS_E(cleanTask(t))).join('<br>') + '</div></div>' : '')
