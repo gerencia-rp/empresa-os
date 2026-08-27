@@ -83,6 +83,10 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     select corte::text corte, payload from pm_informes
     where tipo='continuidad_operativa_diaria' and archived_at is null
     order by corte desc limit 1`;
+  const [decisionSla] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='sla_decisiones' and archived_at is null
+    order by corte desc limit 1`;
   const areaResumen = (t: string, label: string) => {
     const f = fotoDe(t);
     if (!f) return { area: label, foto: null, nota: "sin foto de hoy todavía" };
@@ -137,6 +141,15 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       fuente: "Director de Continuidad Operativa",
     });
   }
+  const decisionSlaPayload = (decisionSla?.payload || {}) as Record<string, unknown>;
+  if (Number(decisionSlaPayload.fuera_de_sla || 0) > 0) {
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Resolver ${Number(decisionSlaPayload.fuera_de_sla)} decisiones fuera de plazo`,
+      requiere: String(decisionSlaPayload.proxima_accion || "asignar responsable y fecha"),
+      fuente: "Director de Continuidad Operativa · SLA de decisiones",
+    });
+  }
 
   const payload = {
     corte,
@@ -155,6 +168,7 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       excepciones: continuidadEx,
       recomendacion: continuidadPayload.recomendacion || null,
     } : { estado: "sin revisión previa disponible" },
+    sla_decisiones: decisionSla ? decisionSlaPayload : { estado: "sin revisión previa disponible" },
     fidelidad: "consolida las 3 fotos de área + números transversales; cada decisión cita su fuente; nada inventado, nada dropeado",
     regla: "el Cerebro SOLO LEE — la directiva es una recomendación; ejecutar/pagar siempre lo confirma un humano",
     origen: "cerebro-reunion (agentes_ia_exec)",

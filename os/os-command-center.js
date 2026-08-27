@@ -1376,8 +1376,10 @@ function jvLanesHTML() {
     const detail = jvProposalDetails(p);
     const busy = JV.busyId === p.id;
     const policy = jvDecisionPolicy(p);
+    const ageHours = p.created_at ? Math.max(0, (Date.now() - new Date(p.created_at).getTime()) / 3600000) : 0;
+    const overdue = p.estado === 'propuesta' && ageHours > Number(policy.sla_hours || 24);
     const meta = [jvProposalArea(p), jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
-    return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span></div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
+    return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span>' + (overdue ? '<span class="badge b-red">SLA vencido · ' + Math.floor(ageHours) + ' h</span>' : '') + '</div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
       + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
       + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
       + '<div class="jv-detail-list"><div class="jv-detail-row"><span>Responsable</span><b>' + OS_E(policy.rol_primario) + '</b></div><div class="jv-detail-row"><span>Respaldo</span><b>' + OS_E(policy.rol_respaldo) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas · escala a ' + OS_E(policy.rol_escalamiento) + '</b></div></div>'
@@ -1388,8 +1390,9 @@ function jvLanesHTML() {
   const areas = ['Todas'].concat([...new Set(allPending.map(jvProposalArea))]);
   const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.decisionArea === a ? 'on' : '') + '" onclick="jvDecisionArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? allPending.length : allPending.filter(p => jvProposalArea(p) === a).length) + '</span></button>').join('') + '</div>';
   const pending = JV.decisionArea === 'Todas' ? allPending : allPending.filter(p => jvProposalArea(p) === JV.decisionArea);
+  const overdueCount = pending.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) / 3600000 > Number(jvDecisionPolicy(p).sla_hours || 24)).length;
   const history = lanes.aprobada.concat(lanes.ejecutada).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-  return filters + '<div class="jv-decisions-layout"><section><div class="jv-section-title">Pendientes <span>' + pending.length + '</span></div>'
+  return filters + '<div class="jv-status-strip"><span>' + pending.length + ' asuntos agrupados</span><span>' + overdueCount + ' fuera de plazo</span><span>Orden: riesgo financiero y comunicación primero</span></div><div class="jv-decisions-layout"><section><div class="jv-section-title">Pendientes <span>' + pending.length + '</span></div>'
     + (pending.length ? pending.slice(0, 40).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>') + '</section>'
     + '<aside><div class="jv-section-title">Resueltas recientemente</div>'
     + (history.length ? history.slice(0, 8).map(p => card(p, false, false)).join('') : '<div class="jv-empty">Todavía no hay historial.</div>') + '</aside></div>';
