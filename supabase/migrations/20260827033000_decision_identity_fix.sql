@@ -1,4 +1,5 @@
--- Revisión diaria de la cola de decisiones. No aprueba ni ejecuta acciones.
+-- Corrige la identidad de decisiones: una tarea ClickUp es un asunto distinto.
+-- Antes, 20 archivos y 10 refetches sin property_id se colapsaban visualmente.
 create or replace function public.run_decision_sla_review()
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
 declare
@@ -21,8 +22,7 @@ begin
     group by p.agent_id,p.tipo_accion,
       coalesce(p.property_id::text,p.payload->>'task_id',p.evidencia->>'task_id',p.evidencia->>'property_id',
         p.evidencia->>'address',p.evidencia->>'casa',p.evidencia->>'inquilino',p.evidencia->>'servicio',
-        p.payload->>'dedup_key',p.id::text),
-      dp.sla_hours,dp.rol_primario
+        p.payload->>'dedup_key',p.id::text),dp.sla_hours,dp.rol_primario
   ), aged as (
     select *,extract(epoch from(now()-created_at))/3600 age_hours from grouped
   )
@@ -35,7 +35,7 @@ begin
   into v_total,v_overdue,v_oldest,v_by_role from aged;
   v_out:=jsonb_build_object('corte',v_corte,'asuntos_pendientes',v_total,
     'fuera_de_sla',v_overdue,'antiguedad_max_horas',round(v_oldest,1),
-    'por_responsable',v_by_role,
+    'por_responsable',v_by_role,'identidad','property_id | task_id | sujeto operativo | id',
     'severidad',case when v_overdue>0 then 'atencion' else 'saludable' end,
     'proxima_accion','La junta diaria atiende primero vencidas financieras/comunicación, luego sensibles, control y operación.',
     'limite','El auditor prioriza y escala; nunca aprueba pagos, mensajes, contratos ni cambios contables.');
@@ -51,10 +51,3 @@ begin
 end $$;
 revoke all on function public.run_decision_sla_review() from public;
 grant execute on function public.run_decision_sla_review() to postgres,service_role;
-do $$ begin
-  perform cron.unschedule(jobname) from cron.job where jobname='continuity-decision-sla';
-exception when others then null; end $$;
-select cron.schedule('continuity-decision-sla','40 12 * * *',
-  $$select public.run_decision_sla_review()$$);
-comment on function public.run_decision_sla_review() is
-  'Agrupa, prioriza y escala decisiones fuera de SLA; no las aprueba ni ejecuta.';

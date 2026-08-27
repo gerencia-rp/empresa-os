@@ -167,7 +167,10 @@ function jvProposalArea(p) {
 }
 function jvDecisionGroupKey(p) {
   const e = jvEvidObj(p);
-  const subject = (p && p.property_id) || e.property_id || e.propiedad || e.property_name || e.property || e.address || '';
+  const payload = p && p.payload && typeof p.payload === 'object' ? p.payload : {};
+  const subject = (p && p.property_id) || payload.task_id || e.task_id || e.property_id || e.propiedad
+    || e.property_name || e.property || e.address || e.casa || e.inquilino || e.servicio
+    || payload.dedup_key || (p && p.id) || '';
   return [p && p.agent_id, p && p.tipo_accion, jvKey(subject)].join('|');
 }
 function jvDecisionPolicy(p) {
