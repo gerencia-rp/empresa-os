@@ -1,0 +1,178 @@
+// CARGA REAL en el DOMINIO OFICIAL (empresa-os.vercel.app): login por el formulario y de ahí
+// al PORTAL del inversionista en la MISMA sesión — navegación normal, sin forzar osInit ni
+// stubear datos (un harness con stubs puede pasar 15/15 sobre un bug real; ya pasó).
+//
+// Verifica las DOS mitades del servicio de deuda pedidas por el CEO (27-ago-2026):
+//   1) pestaña "Flujo Mensual" por casa: flujo del mes = ingresos − gastos operativos − deuda
+//      (4916 Barkbridge, donde el −1,600 tiene que bajar el neto · 5003 Michelle de control)
+//   2) "Mi Portafolio": el TOTAL de todas las casas también resta el servicio de deuda
+//      (inversionista con 4 casas), y cuadra con la suma de inv_portal_resumen.
+//
+// Uso: QA_PASS=… node scripts/qa-flujo-portafolio-deuda.mjs
+import puppeteer from 'puppeteer-core';
+
+const BASE = process.env.QA_BASE || 'https://empresa-os.vercel.app';
+const CHROME = process.env.QA_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const EMAIL = process.env.QA_EMAIL || 'qa-admin-test@rentalprofitss.com';
+const PASS = process.env.QA_PASS;
+if (!PASS) { console.error('Falta QA_PASS'); process.exit(1); }
+
+// casas a verificar en la pestaña Flujo Mensual (esperados = datos reales de Supabase)
+const CASAS = [
+  {
+    nombre: '4916 Barkbridge Trl',
+    inv: 'rec8MhKDmkdD6Ouyr',
+    pid: '6fa5ad93-31a7-462e-b48b-444491dd2b65',
+    // jun-26: renta 2,000 · operativos 569.35 · deuda 1,600 · neto −169.35
+    mes: 'Junio 2026', ing: /2,000/, gas: /569/, deu: /1,600/, neto: /−\$169|-\$169/,
+  },
+  {
+    nombre: '5003 Michelle Ct',
+    inv: 'recRZUim6SaOnNmm5',
+    pid: 'efad086f-3008-49fd-96da-dbeaaba650f2',
+    // jun-26: renta 3,700 · operativos 0 · deuda 2,116.13 · neto 1,583.87
+    mes: 'Junio 2026', ing: /3,700/, gas: /\$0/, deu: /2,116/, neto: /1,584/,
+  },
+];
+// inversionista con 4 casas → sirve para el TOTAL del portafolio
+const PORTA = { inv: 'recNU08Xri3he9jaC', nCasas: 4 };
+
+const ok = [], fail = [], consola = [], pageerrors = [], req404 = [];
+const chk = (n, c, e) => (c ? ok : fail).push(n + (e ? ' — ' + e : ''));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const money = n => (+n < 0 ? '−$' : '$') + Math.abs(Math.round(+n)).toLocaleString('en-US');
+
+const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 1440, height: 1200 });
+// el service worker recarga la página ~1 min después de cargar (controllerchange) y parte la suite
+await page.evaluateOnNewDocument(() => { try { navigator.serviceWorker.register = () => Promise.reject(new Error('stub')); } catch (e) {} });
+page.on('pageerror', e => pageerrors.push(e.message));
+page.on('console', m => { if (m.type() === 'error') consola.push(m.text().slice(0, 200)); });
+page.on('requestfailed', r => req404.push('failed ' + r.url()));
+page.on('response', r => { if (r.status() >= 400) req404.push(r.status() + ' ' + r.url()); });
+
+// ── 1) LOGIN REAL por el formulario ──
+await page.goto(BASE + '/', { waitUntil: 'networkidle2', timeout: 60000 });
+await page.waitForSelector('#auth-email', { timeout: 20000 });
+await page.type('#auth-email', EMAIL, { delay: 10 });
+await page.type('#auth-password', PASS, { delay: 10 });
+await page.click('#auth-login-btn');
+for (let i = 0; i < 40; i++) {
+  if (await page.evaluate(() => !!document.getElementById('os-root') && getComputedStyle(document.getElementById('os-root')).display !== 'none')) break;
+  await sleep(500);
+}
+chk('login real en ' + BASE + ' (shell OS montado)', await page.evaluate(() => !!document.getElementById('os-root')));
+// el ruido del SHELL OS (antes de entrar al portal) se separa: no es del portal del inversionista.
+// Hoy aparece un 401 de remodel_cost_calibracion durante el boot del shell — pre-existente,
+// ajeno a este cambio; se reporta como informativo y NO tumba la corrida.
+const ruidoShell = req404.splice(0, req404.length);
+
+// helper: abre el portal de un inversionista y espera a que rendericen las pestañas
+async function abrirPortal(inv, casa) {
+  await page.goto(BASE + '/inversionista?ver=' + inv + (casa ? '&casa=' + casa : ''), { waitUntil: 'networkidle2', timeout: 60000 });
+  for (let i = 0; i < 60; i++) {
+    if (/Flujo Mensual/i.test(await page.evaluate(() => document.body.innerText || ''))) break;
+    await sleep(500);
+  }
+}
+async function clickTab(label) {
+  const hecho = await page.evaluate(lab => {
+    const b = [...document.querySelectorAll('button')].find(e => e.textContent.trim() === lab);
+    if (b) { b.click(); return true; } return false;
+  }, label);
+  await sleep(400);
+  return hecho;
+}
+
+// ── 2) PESTAÑA "Flujo Mensual" por casa ──
+for (const c of CASAS) {
+  await abrirPortal(c.inv, c.pid);
+  chk(c.nombre + ' · portal cargado', /Flujo Mensual/i.test(await page.evaluate(() => document.body.innerText)));
+  chk(c.nombre + ' · click en la pestaña Flujo Mensual', await clickTab('Flujo Mensual'));
+  for (let i = 0; i < 60; i++) {
+    const t = await page.evaluate(() => document.body.innerText || '');
+    if (/Detalle año/i.test(t) && !/Armando tu flujo mensual/.test(t)) break;
+    await sleep(500);
+  }
+  await sleep(1200);
+
+  const d = await page.evaluate(mes => {
+    const heads = [...document.querySelectorAll('table thead tr')].map(tr => [...tr.children].map(t => t.innerText.trim()).join(' | '));
+    const filas = [...document.querySelectorAll('table tbody tr')].map(tr => [...tr.children].map(t => t.innerText.trim()));
+    return {
+      txt: document.body.innerText,
+      heads,
+      fila: filas.find(f => new RegExp(mes, 'i').test(f[0] || '')) || null,
+      nDeuda: filas.filter(f => /servicio de deuda/i.test(f.join(' '))).length,
+    };
+  }, c.mes);
+
+  const f = d.fila || [];
+  chk(c.nombre + ' · tabla mensual con columna "Servicio de deuda" + "Flujo neto"',
+    d.heads.some(h => /Servicio de deuda/i.test(h) && /Flujo neto/i.test(h)), d.heads.find(h => /Mes/.test(h)));
+  chk(c.nombre + ' · tarjeta "Servicio de deuda"', /Servicio de deuda/i.test(d.txt));
+  chk(c.nombre + ' · tarjeta "Flujo después de deuda"', /Flujo después de deuda/i.test(d.txt));
+  chk(c.nombre + ' · el NOI (Balance operativo) se mantiene aparte', /Balance operativo/i.test(d.txt));
+  chk(c.nombre + ' · ' + c.mes + ' ingresos', c.ing.test(f[1] || ''), JSON.stringify(f));
+  chk(c.nombre + ' · ' + c.mes + ' gastos operativos', c.gas.test(f[2] || ''), JSON.stringify(f));
+  chk(c.nombre + ' · ' + c.mes + ' SERVICIO DE DEUDA', c.deu.test(f[3] || ''), JSON.stringify(f));
+  chk(c.nombre + ' · ' + c.mes + ' FLUJO NETO ya con la deuda restada', c.neto.test(f[4] || ''), JSON.stringify(f));
+  chk(c.nombre + ' · filas 🏦 servicio de deuda en "Todos los movimientos"', d.nDeuda > 0, d.nDeuda + ' filas');
+
+  // coherencia con la distribución automática: mismo mes, mismo neto
+  const rpc = await page.evaluate(async pid => {
+    const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    const r = await sb.rpc('inv_dist_auto', { p_property_id: pid, p_billing_ym: '2026-06' });
+    return r.error ? { err: r.error.message } : { renta: r.data.renta, oper: r.data.operativos, deuda: r.data.deuda, neto: r.data.neto };
+  }, c.pid);
+  chk(c.nombre + ' · el neto del portal = el neto de inv_dist_auto (jun-26)',
+    rpc && rpc.neto != null && (f[4] || '') === money(rpc.neto), (f[4] || '') + ' vs ' + JSON.stringify(rpc));
+  console.log('\n' + c.nombre + ' · ' + c.mes + ': ' + JSON.stringify(d.fila) + '  | inv_dist_auto: ' + JSON.stringify(rpc));
+}
+
+// ── 3) "Mi Portafolio": el TOTAL de todas las casas resta el servicio de deuda ──
+await abrirPortal(PORTA.inv, null);
+chk('portafolio (4 casas) · click en la pestaña Mi Portafolio', await clickTab('Mi Portafolio'));
+for (let i = 0; i < 60; i++) {
+  if (/Tus casas de un vistazo/i.test(await page.evaluate(() => document.body.innerText || ''))) break;
+  await sleep(500);
+}
+await sleep(1200);
+
+// OJO: se lee IP.resumen (el dataset que REALMENTE pinta la pantalla). Llamar a la RPC desde
+// acá daría otra cosa: logueado como admin, inv_portal_resumen() devuelve las 23 casas del
+// portafolio entero, mientras que el portal en modo "ver como" trae solo las de ESE
+// inversionista (inv_portal_como → inv_portal_resumen_de).
+const p = await page.evaluate(() => {
+  const filas = (window.IP && window.IP.resumen ? window.IP.resumen : []).map(x => ({ casa: x.casa, flujo: x.flujo_ult_mes, ym: x.flujo_ult_mes_ym }));
+  const txt = document.body.innerText;
+  const m = txt.match(/Flujo del último mes · todas tus casas:\s*(−?\$[\d,]+)/);
+  return { txt, filas, total: m ? m[1] : null };
+});
+const sumaRpc = p.filas.reduce((s, x) => s + (x.flujo != null ? +x.flujo : 0), 0);
+chk('portafolio · línea de TOTAL "todas tus casas" visible', !!p.total, p.total || 'no encontrada');
+chk('portafolio · el total en pantalla = suma de las casas del resumen',
+  p.total === money(sumaRpc), p.total + ' vs ' + money(sumaRpc));
+chk('portafolio · la línea declara que ya resta el servicio de deuda',
+  /servicio de deuda/i.test(p.txt) && /renta − gastos operativos − servicio de deuda/i.test(p.txt));
+chk('portafolio · las tarjetas dicen "ya con la deuda descontada"', /ya con la deuda descontada/i.test(p.txt));
+chk('portafolio · ' + PORTA.nCasas + ' casas en el resumen', p.filas.length === PORTA.nCasas, p.filas.length + ' casas');
+console.log('\nPortafolio: total en pantalla ' + p.total + ' · suma RPC ' + money(sumaRpc));
+console.log('Casas: ' + JSON.stringify(p.filas));
+
+// ── 4) higiene ──
+chk('0 pageerrors', pageerrors.length === 0, pageerrors.join(' | '));
+// el 404 de /config.js es POR DISEÑO (override local gitignored, con onerror que lo remueve)
+const ruido = req404.filter(u => !/config\.js|favicon\.ico/.test(u));
+const consolaReal = consola.filter(c => !/config\.js|favicon|Failed to load resource/.test(c));
+chk('0 errores de consola (fuera del 404 by-design de /config.js)', consolaReal.length === 0, consolaReal.join(' | '));
+chk('portal · sin requests fallidos ajenos a /config.js y /favicon.ico', ruido.length === 0, ruido.join(' | '));
+const ruidoShellReal = ruidoShell.filter(u => !/config\.js|favicon\.ico/.test(u));
+if (ruidoShellReal.length) console.log('\nℹ ruido del shell OS previo al portal (informativo, ajeno a este cambio): ' + ruidoShellReal.join(' | '));
+
+console.log('\nQA FLUJO + PORTAFOLIO con servicio de deuda (' + BASE + ') — ' + ok.length + ' OK · ' + fail.length + ' FALLAS');
+ok.forEach(o => console.log('  ✓ ' + o));
+fail.forEach(f => console.log('  ✗ ' + f));
+await browser.close();
+process.exit(fail.length ? 1 : 0);

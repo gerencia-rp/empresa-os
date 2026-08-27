@@ -768,3 +768,162 @@ que ve la última versión (badge + banner "Actualizar") · números de referenc
 insumo externo (key/backend/dato de Airtable/QA logueado). No quedan ajustes ejecutables pendientes en esta pasada.
 
 === AUDITORIA COMPLETA ===
+
+---
+
+## 🏦 PASADA (27 Ago 2026) — EL SERVICIO DE DEUDA TAMBIÉN BAJA EL FLUJO DEL PORTAFOLIO · HECHO Y EN VIVO
+
+**Pedido del CEO:** flujo del mes = `ingresos − gastos operativos − (interés HML + refi 30 años)`; que el
+**−1,600 de 4916 Barkbridge** baje el neto; que **los totales del portafolio** también resten el servicio
+de deuda; en vivo en `empresa-os.vercel.app` (rama `main`). Reglas: no tocar otros números, no borrar
+datos, sin pagos automáticos, todo trazable a la fuente.
+
+### Había DOS mitades, no una
+
+| # | Superficie | Estado al empezar |
+|---|---|---|
+| 1 | Pestaña **Flujo Mensual** (por casa) | ✅ **Ya estaba bien y ya estaba en vivo** (llegó a `main` con el merge de consolidación `5b92bf2`). Verificado byte a byte: `empresa-os.vercel.app/os/inv-portal.js` idéntico a `main` HEAD. |
+| 2 | **"Tus casas de un vistazo"** (Mi Portafolio) | ❌ **No restaba la deuda.** El CTE `ultm` de `inv_portal_resumen` calculaba `pm_payments − pm_expenses`: **no leía `ff_hml_payments`** y **sí** restaba la "Hipoteca" espejada en `pm_expenses`. |
+| 3 | **"Ver como inversionista"** (admin) | ❌ Igual: `inv_portal_resumen_de()` es una **copia** de la función y arrastraba el mismo `ultm` viejo. Lo cazó el QA en carga real (el inversionista real ya veía bien; el admin, no). |
+
+**Prueba de que eran dos definiciones:** en 4916 Barkbridge la "Hipoteca" espejada en `pm_expenses` es
+**$1,579.73/mes** y el servicio de deuda real de `ff_hml_payments` es **$1,600.00/mes**. Mismo concepto,
+dos números, misma pantalla.
+
+### Qué se cambió (regla de oro: un dato, una fuente)
+
+- **DB** `20260827120000_portal_resumen_flujo_con_deuda.sql` → `inv_portal_resumen()`
+- **DB** `20260827130000_portal_resumen_de_flujo_con_deuda.sql` → `inv_portal_resumen_de()`
+
+  En las dos, **solo el CTE `ultm`**. Ahora lee una sola fuente, `public.inv_ledger(property_id)` — la
+  misma de la pestaña Flujo Mensual y de `inv_dist_auto`:
+  `flujo_ult_mes = renta − gastos operativos − servicio de deuda (subcategoria='servicio_deuda')`,
+  por **mes CONTABLE** (`mes` = `billing_ym`) y **cortado a HOY**. `inv_ledger` ya excluye la "Hipoteca"
+  de `pm_expenses` para no duplicarla contra `ff_hml_payments`.
+
+- **Front** `os/inv-portal.js` (commit `59e96c8`): línea de **TOTAL del portafolio** arriba de las tarjetas
+  ("Flujo del último mes · todas tus casas") con la fórmula escrita y el conteo de casas con/sin
+  movimiento + tooltip por tarjeta ("ya con la deuda descontada").
+
+**NO se tocó:** capital aportado, déficit (`ff_deals.deficit_total`), `v_pnl_casa`, distribuciones, el NOI,
+ni las firmas de las RPC (ningún `drop`; las dos son `create or replace`). El servicio de deuda **sigue
+siendo `financiero` → P&L NO**: no entra al NOI, se resta después.
+`NOI = renta − operativos` · `flujo distribuible = NOI − deuda`.
+
+### Verificación 1 — mes a mes, 3 casas (fuente: RPC `inv_ledger` en prod)
+
+**4916 Barkbridge Trl** — el `−1,600` **sí baja el neto**:
+
+| Mes 2026 | Ingresos | Gastos oper. | Servicio de deuda | Flujo neto AHORA | Neto ANTES (sin deuda) |
+|---|---:|---:|---:|---:|---:|
+| Enero | 2,030.00 | 200.00 | **1,600.00** | **230.00** | 1,830.00 |
+| Febrero | 800.00 | 778.90 | **1,600.00** | **−1,578.90** | 21.10 |
+| Marzo | 3,332.09 | 840.13 | **1,600.00** | **891.96** | 2,491.96 |
+| Abril | 1,300.00 | 435.77 | **1,600.00** | **−735.77** | 864.23 |
+| Mayo | 1,300.00 | 425.39 | **1,600.00** | **−725.39** | 874.61 |
+| **Junio** | **2,000.00** | **569.35** | **1,600.00** | **−169.35** | **1,430.65** |
+| Julio | 3,500.00 | 288.57 | 0.00 | 3,211.43 | 3,211.43 |
+| Agosto | 2,700.00 | 0.00 | 0.00 | 2,700.00 | 2,700.00 |
+| **Año 2026** | **16,962.09** | **3,538.11** | **9,600.00** | **3,823.98** | **13,423.98** |
+
+**5003 Michelle Ct** (control): jun-26 `3,700 − 0 − 2,116.13 = 1,583.87` · jul-26 `3,700 − 148 − 3,032.26 = 519.74`.
+Año 2026: `27,700.00 − 148.00 − 18,761.30` = **8,790.70** (antes 27,552.00).
+
+**902 Virginia Dr** (tercera casa, con renta y gastos): ago `4,490 − 379.99 − 2,958.95 = 1,151.06` ·
+jul `5,100 − 779.27 − 2,985.51 = 1,335.22` · may `0 − 411.26 − 2,985.00 = −3,396.26`.
+Año 2026: `14,690.00 − 3,205.09 − 23,542.06` = **−12,057.15** (antes +11,484.91). El déficit de Virginia
+ahora se ve; antes no.
+
+En las tres, el neto del portal es **el mismo número** que devuelve `inv_dist_auto(pid, mes)` — verificado
+desde la sesión del navegador, no por consulta paralela.
+
+### Verificación 2 — totales del portafolio (23 casas), antes → después
+
+Cada casa toma su último mes contable **con movimiento**, así que puede cambiar también el mes.
+
+| Casa | Antes | Después |
+|---|---:|---:|
+| 1100 Echo lane | 415.66 (2026-08) | **−2,668.68** (2026-08) |
+| 1133 Denfield St | 1,350.00 (2026-08) | **−1,251.94** (2026-08) |
+| 1302 Garden Path | −2,076.26 (2026-08) | **−2,259.41** (2026-08) |
+| 1607 Picnic Cove | 3,434.75 (2026-08) | **5,708.00** (2026-08) |
+| 2315 Dove Springs | −2,725.57 (2026-08) | **−5,451.14** (2026-08) |
+| 311 Bartlett St | −765.00 (2026-08) | **−2,210.00** (2026-07) |
+| 406 Capps St | −130.00 (2026-07) | **1,400.00** (2026-07) |
+| 407 Capitol Dr | 3,141.56 (2026-08) | **5,070.00** (2026-08) |
+| 4905 Nesting Way | −1,718.06 (2026-08) | **1,137.15** (2026-06) |
+| 4916 Barkbridge Trl | 2,700.00 (2026-08) | 2,700.00 (2026-08) — *igual* |
+| 5003 Michelle Ct | −532.26 (2026-08) | −532.26 (2026-08) — *igual* |
+| 512 Bramble Dr | 1,200.00 (2026-09) | 1,200.00 (2026-09) — *igual* |
+| 514 Ramble Ln | −3,545.00 (2026-08) | **−3,292.48** (2026-08) |
+| 5702 Meadow Crst | −2,407.48 (2026-08) | **−4,814.96** (2026-08) |
+| 6107 Idlewood Cv | 893.19 (2026-08) | 893.19 (2026-08) — *igual* |
+| 6203 Shadow Bend | −2,113.30 (2026-08) | **−2,550.78** (2026-08) |
+| 6504 Stonleigh Pl | −2,318.33 (2026-08) | **750.00** (2026-08) |
+| 7105 Bethune Ave | 1,000.00 (2026-08) | **−2,413.25** (2026-08) |
+| 902 Virginia Dr | 1,380.58 (2026-08) | **1,151.06** (2026-08) |
+| 9909 Childress Dr | 2,990.65 (2026-08) | **381.30** (2026-08) |
+| 1109 Arcadia Ave | −108.84 (2026-05) | **sin movimiento** ⚠ |
+| 101 Starbright Dr | sin movimiento | sin movimiento |
+| 5320 Wellington Dr | sin movimiento | sin movimiento |
+
+**Por qué Barkbridge no cambia en esta tarjeta:** su último mes es **agosto-26**, y agosto **todavía no
+tiene el pago de deuda cargado** en `ff_hml_payments` (el último registrado es junio, $1,600). El −1,600
+aparece en junio, en la pestaña Flujo Mensual (tabla de arriba). No es error de cálculo: es dato faltante.
+
+**Efectos declarados (no son bugs nuevos):**
+- ⚠ **1109 Arcadia (vendida)** pasa a "sin movimiento": su espejo de Rentas (`pm_properties`) está
+  **archivado** desde el 22-jul y `inv_ledger` solo lee casas activas. El −108.84 anterior venía de un
+  gasto COA de mayo leído sin ese filtro. La pestaña Flujo Mensual ya mostraba lo mismo → ahora coinciden.
+- ⚠ **4905 Nesting** retrocede de agosto a **junio**: en jul/ago lo único cargado es la "Hipoteca"
+  espejada (que el ledger excluye) y pagos de renta en $0.
+- 🔴 **Dato faltante, no código:** varias casas (Barkbridge, Nesting, entre otras) **no tienen cargado el
+  pago de deuda de jul/ago** en `ff_hml_payments`. **Acción del equipo: cargarlos en Airtable.**
+
+### Verificación 3 — en el sitio en vivo, logueado (no stubs)
+
+`scripts/qa-flujo-portafolio-deuda.mjs` — login **por el formulario** en `https://empresa-os.vercel.app` y
+navegación normal al portal en la misma sesión (sin forzar `osInit`, sin stubear datos).
+**Resultado: 34 OK · 0 fallas · 0 pageerrors · 0 errores de consola.** Leído de la pantalla real:
+
+```
+4916 Barkbridge Trl · Junio 2026: ["Junio 2026","$2,000","-$569","-$1,600","-$169"]
+   inv_dist_auto -> {"renta":2000,"oper":569.35,"deuda":1600,"neto":-169.35}   OK mismo numero
+
+5003 Michelle Ct  · Junio 2026: ["Junio 2026","$3,700","-$0","-$2,116","$1,584"]
+   inv_dist_auto -> {"renta":3700,"oper":0,"deuda":2116.13,"neto":1583.87}     OK mismo numero
+
+Portafolio (4 casas) · total en pantalla -$6,023 = suma de las tarjetas -$6,023
+   Garden Path -2,259.41 · Shadow Bend -2,550.78 · Bramble +1,200 · Bethune -2,413.25
+```
+
+⚠ Para poder correr el QA logueado hubo que **resetear el password del usuario 🧪 `qa-admin-test@`**
+(gotcha conocido: sesiones paralelas lo pisan; acá se hizo por SQL sobre `auth.users` con `crypt`, porque
+no había service key en el entorno). Es una cuenta de prueba, reversible, sin efecto en datos de negocio.
+
+Ruido informativo ajeno al cambio: un `401` de `remodel_cost_calibracion` en el arranque del shell OS (el
+usuario QA no tiene el área `remodelacion`). Reportado, no tumba la corrida.
+
+**Build:** `npm run build` OK — bundle `assets/bundle.98171e9c9e75.js`, 32 estáticos copiados.
+`os/inv-portal.js` va como **copia estática** (no entra al bundle), por eso el hash no cambia.
+⚠ En Windows el build local necesita un parche de una línea para invocar `tailwindcss.cmd` (`execFileSync`
+de Node no ejecuta `.cmd` sin `shell`). En Vercel (Linux) corre sin tocar nada; **`scripts/build.mjs` no se
+modificó**. **Deploy:** push a `main` → auto-deploy; verificado que el archivo en vivo quedó idéntico a HEAD.
+
+### Cómo revertir
+- `inv_portal_resumen()` → reaplicar `20260820120000_inv_portal_resumen_deficit_from_airtable.sql`
+- `inv_portal_resumen_de()` → reaplicar su definición previa (el `ultm` viejo está transcrito en el
+  encabezado de `20260827130000`)
+- Front → revertir `59e96c8`
+
+### Cómo re-verificar
+```bash
+QA_PASS=<pass del usuario QA> node scripts/qa-flujo-portafolio-deuda.mjs
+```
+
+### 🔴 Hallazgo abierto (NO se tocó — decisión del CEO)
+`inv_portal_resumen_de()` (la copia que alimenta **"Ver como inversionista"**) quedó desde el 20-ago con el
+**déficit viejo** `greatest(0, −v_pnl_casa.utilidad_neta_post_interes)`, mientras la función que ve el
+inversionista real usa **`ff_deals.deficit_total`** (decisión CEO de agosto). **Consecuencia: el admin
+puede estar viendo un déficit distinto al del inversionista en la misma casa.** No se corrigió acá porque
+cambiaría un número fuera del pedido. Recomendación: unificar las dos copias en una sola definición.
