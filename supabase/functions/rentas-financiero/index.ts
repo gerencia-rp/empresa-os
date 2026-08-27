@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     }
 
     let created = 0, refreshed = 0, skipped = 0;
-    const detail: Record<string, unknown> = { cobros_new: 0, cobros_skip: 0, descuadres_new: 0, descuadres_skip: 0, resumen_new: 0, resumen_skip: 0 };
+    const detail: Record<string, unknown> = { cobros_new: 0, cobros_skip: 0, descuadres_new: 0, descuadres_skip: 0, sobrepagos_new: 0, sobrepagos_skip: 0, resumen_new: 0, resumen_skip: 0 };
     const recordProposal = async (tipo: string, payload: Record<string, unknown>, evidence: Record<string, unknown>) => {
       const [result] = await sql!`select outcome from record_agent_proposal(${agent.id},${tipo},${sql!.json(payload)},${sql!.json(evidence)})`;
       if (result?.outcome === "created") created++; else refreshed++;
@@ -109,6 +109,7 @@ Deno.serve(async (req) => {
     };
 
     if (mode === "cobros") {
+      const cobroSeen: string[] = [], descuadreSeen: string[] = [], sobrepagoSeen: string[] = [];
       // (a) COBROS — morosos con vencido neto > 0
       const morosos = await sql`select tenant_id, inquilino, casa, vencido_neto, mes_mas_viejo, aging from v_cartera_inquilino where vencido_neto > 0 order by vencido_neto desc`;
       for (const m of morosos) {
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
         const outcome = await recordProposal("recordatorio_cobro", payload, evid);
         if (outcome === "created") (detail.cobros_new as number)++; else (detail.cobros_skip as number)++;
         cobroKeys.add(key);
+        cobroSeen.push("cobro:" + key);
       }
 
       // (b) DESCUADRES — mismo inquilino + mismo mes con >1 fila (fractura/carga cruzada), excluye plataformas
@@ -133,9 +135,26 @@ Deno.serve(async (req) => {
         const outcome = await recordProposal("conciliacion", payload, evid);
         if (outcome === "created") (detail.descuadres_new as number)++; else (detail.descuadres_skip as number)++;
         descKeys.add(d.casa);
+        descuadreSeen.push("descuadre:" + d.casa);
       }
 
-      // (c) RESUMEN DE COBRANZA DEL DÍA (dedup por corte)
+      // (c) SALDOS A FAVOR — se revisan, nunca se convierten en cobros automáticos.
+      const sobrepagos = await sql`select tenant_id, inquilino, casa, a_favor from v_cartera_inquilino where a_favor > 0 order by a_favor desc`;
+      for (const s of sobrepagos) {
+        const key = "sobrepago:" + s.tenant_id;
+        const payload = { requiere_aprobacion: true, accion: "verificar_sobrepago", dedup_key: key };
+        const evid = { tipo: "sobrepago", inquilino: s.inquilino, casa: s.casa, saldo_a_favor: s.a_favor, hallazgo: "El espejo de cartera muestra saldo a favor; verificar aplicación contable antes de compensar o devolver.", fuente: "v_cartera_inquilino", origen: "ejecutor rentas-financiero" };
+        const outcome = await recordProposal("conciliacion", payload, evid);
+        if (outcome === "created") (detail.sobrepagos_new as number)++; else (detail.sobrepagos_skip as number)++;
+        sobrepagoSeen.push(key);
+      }
+
+      const [cobroRetired] = await sql`select reconcile_agent_proposal_set(${agent.id},'recordatorio_cobro','cobro:',${cobroSeen}::text[]) retired`;
+      const [descuadreRetired] = await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','descuadre:',${descuadreSeen}::text[]) retired`;
+      const [sobrepagoRetired] = await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','sobrepago:',${sobrepagoSeen}::text[]) retired`;
+      detail.retirados = Number(cobroRetired.retired || 0) + Number(descuadreRetired.retired || 0) + Number(sobrepagoRetired.retired || 0);
+
+      // (d) RESUMEN DE COBRANZA DEL DÍA (dedup por corte)
       const corte = todayCT();
         const [kpi] = await sql`select * from v_cartera_kpi`;
         const buckets = await sql`select case when mes_mas_viejo>='2026-07' then '0-30' when mes_mas_viejo='2026-06' then '31-60' when mes_mas_viejo<'2026-06' then '60+' else 's/d' end b, count(*) n, coalesce(sum(vencido_neto),0) v from v_cartera_inquilino where vencido_neto>0 group by 1`;
