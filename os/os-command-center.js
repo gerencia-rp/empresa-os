@@ -15,7 +15,7 @@ const JV = {
   tab: 'network',
   agents: [], props: [], audit: [], reports: [], memories: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
-  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
+  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.9,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
   decisionPreview: null,
@@ -570,6 +570,10 @@ function jvCSS() {
     '@media(max-width:1100px){#os-root .jv-holo-map{grid-template-columns:1fr 1fr;grid-template-rows:auto;gap:14px;padding:270px 18px 24px}#os-root .jv-holo-core{top:120px}#os-root .jv-holo-lines{display:none}#os-root .jv-holo-area:nth-of-type(n){grid-column:auto;grid-row:auto}}',
     '@media(max-width:680px){#os-root .jv{display:block}#os-root .jv-side{width:100%;padding:7px 8px;border-right:0;border-bottom:1px solid var(--jc-line);overflow:hidden}#os-root .jv-logo,#os-root .jv-lbl,#os-root .jv-mini{display:none}#os-root .jv-nav{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none}#os-root .jv-nav::-webkit-scrollbar{display:none}#os-root .jv-nav a{flex:0 0 auto;white-space:nowrap;margin:0;padding:7px 9px}#os-root .jv-main{padding:14px 10px}#os-root .jv-top{margin-bottom:12px}#os-root .jv-holo-head{display:block;padding:18px 16px 0}#os-root .jv-holo-stats{justify-content:flex-start;margin-top:12px}#os-root .jv-holo-map{grid-template-columns:1fr;padding:310px 12px 18px}#os-root .jv-holo-core{top:135px}#os-root .jv-holo-area:nth-of-type(n){grid-column:1}#os-root .jv-agent-inspector{position:fixed;left:10px;right:10px;top:78px;width:auto;max-height:calc(100dvh - 92px)}}',
     '@media(prefers-reduced-motion:reduce){#os-root .jv-holo-lines path,#os-root .jv-core-ring,#os-root .jv-core-reactor{animation:none!important}}',
+    '#os-root .jv-org-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;min-height:620px}#os-root .jv-org-canvas{position:relative;min-width:0;overflow:auto;border:1px solid rgba(80,145,205,.18);border-radius:14px;background-color:#07101c;background-image:linear-gradient(rgba(83,148,205,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(83,148,205,.035) 1px,transparent 1px);background-size:24px 24px;padding:18px 18px 12px}#os-root .jv-org-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}#os-root .jv-org-toolbar h1{font-size:19px;margin:0}#os-root .jv-org-toolbar p{font-size:10.5px;color:var(--jc-mut);margin:3px 0 0}#os-root .jv-org-counts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}#os-root .jv-org-counts span{font-size:9px;color:#8ba0bc;border-left:1px solid rgba(94,217,255,.24);padding:3px 7px}#os-root .jv-org-counts b{color:#e7f5ff;font-size:12px;margin-right:3px}',
+    '#os-root .jv-org-tree{min-width:660px;padding:4px 0 46px;transform-origin:top center}#os-root .jv-org-root{position:relative;width:230px;margin:0 auto 50px;--oc:var(--jc-purple)}#os-root .jv-org-root::after{content:"";position:absolute;left:50%;top:100%;height:28px;border-left:1px solid #49c7ff;box-shadow:0 0 8px rgba(73,199,255,.45)}#os-root .jv-org-command{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:8px}#os-root .jv-org-command:has(>:only-child){grid-template-columns:1fr}#os-root .jv-org-command .jv-org-node{padding:6px 7px}#os-root .jv-org-command .jv-org-node .ico{width:20px;height:20px}#os-root .jv-org-command .jv-org-node b{font-size:8.5px}#os-root .jv-org-command .jv-org-node small{font-size:6.5px}#os-root .jv-org-depts{position:relative;display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px}#os-root .jv-org-depts::before{content:"";position:absolute;left:12.5%;right:12.5%;top:-22px;border-top:1px solid rgba(73,199,255,.75);box-shadow:0 0 8px rgba(73,199,255,.25)}#os-root .jv-org-dept{position:relative;--oc:var(--jc-cyan)}#os-root .jv-org-dept::before{content:"";position:absolute;left:50%;top:-22px;height:22px;border-left:1px solid var(--oc)}#os-root .jv-org-dept-label{height:20px;display:flex;align-items:center;gap:5px;color:var(--oc);font-size:7.5px;letter-spacing:.11em;text-transform:uppercase;margin-bottom:5px;padding:0 2px}#os-root .jv-org-dept-label span{flex:1}#os-root .jv-org-dept-label b{color:#7188a5;font-weight:600}#os-root .jv-org-node{position:relative;width:100%;border:1px solid color-mix(in srgb,var(--oc) 62%,#20304a);background:linear-gradient(145deg,color-mix(in srgb,var(--oc) 7%,#0b1524),#09111d);color:#dcecff;border-radius:7px;padding:9px 10px;text-align:left;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.2);transition:border-color .16s,transform .16s,background .16s}#os-root .jv-org-node:hover,#os-root .jv-org-node:focus-visible,#os-root .jv-org-node[aria-pressed="true"]{border-color:var(--oc);background:color-mix(in srgb,var(--oc) 11%,#0a1422);transform:translateY(-1px);outline:none;box-shadow:0 0 18px color-mix(in srgb,var(--oc) 16%,transparent)}#os-root .jv-org-node .top{display:flex;align-items:center;gap:7px}#os-root .jv-org-node .ico{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--oc);background:color-mix(in srgb,var(--oc) 12%,transparent);flex:0 0 auto}#os-root .jv-org-node .copy{min-width:0;flex:1}#os-root .jv-org-node b{display:block;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-org-node small{display:block;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;color:#6f849e;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-org-node .dot{width:6px;height:6px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 7px var(--jc-grn);flex:0 0 auto}#os-root .jv-org-node .dot.wait{background:var(--jc-amber);box-shadow:0 0 7px var(--jc-amber)}#os-root .jv-org-root>.jv-org-node{padding:12px 13px}#os-root .jv-org-root>.jv-org-node b{font-size:12px}#os-root .jv-org-children{position:relative;display:grid;gap:6px;margin-top:18px;padding-left:12px}#os-root .jv-org-children::before{content:"";position:absolute;left:4px;top:-18px;bottom:19px;border-left:1px solid color-mix(in srgb,var(--oc) 58%,transparent)}#os-root .jv-org-children .jv-org-node::before{content:"";position:absolute;left:-9px;top:50%;width:8px;border-top:1px solid color-mix(in srgb,var(--oc) 58%,transparent)}#os-root .jv-org-zoom{position:absolute;left:16px;bottom:13px;display:flex;gap:5px;z-index:2}#os-root .jv-org-zoom button{border:1px solid rgba(94,217,255,.2);background:#091522;color:#a9bdd4;border-radius:7px;padding:6px 9px;font-size:9px;cursor:pointer}#os-root .jv-org-zoom button:hover,#os-root .jv-org-zoom button:focus-visible{border-color:#5ed9ff;color:#e9faff;outline:none}',
+    '#os-root .jv-org-layout>.jv-agent-inspector{position:relative;right:auto;top:auto;width:auto;max-height:620px;overflow:auto;border-radius:14px;animation:jvInspectorIn .24s ease-out}#os-root .jv-org-empty-inspector{border:1px solid rgba(94,217,255,.16);border-radius:14px;background:linear-gradient(155deg,rgba(13,25,43,.96),rgba(5,10,18,.98));display:grid;place-items:center;text-align:center;padding:28px;color:#7188a5;font-size:11px}',
+    '@media(max-width:1080px){#os-root .jv-org-layout{grid-template-columns:1fr}#os-root .jv-org-layout>.jv-agent-inspector{position:fixed;left:auto;right:12px;top:74px;width:min(360px,calc(100% - 24px));max-height:calc(100dvh - 88px);z-index:20}}@media(max-width:720px){#os-root .jv-org-layout{display:block}#os-root .jv-org-canvas{border-radius:10px;padding:12px 10px}#os-root .jv-org-tree{min-width:610px}#os-root .jv-org-counts{display:none}}',
     '#os-root .jv-card2{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;padding:14px;display:flex;flex-direction:column}',
     '#os-root .jv-card2.jv-editing{border-color:var(--jc-purple)}',
     '#os-root .jv-c2-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}',
@@ -729,27 +733,51 @@ function jvTabBody() {
 // ════════════════════════════════════════════════════════════════
 // VIEW · MAPA DE AGENTES (organigrama por escuadra + fichas editables)
 // ════════════════════════════════════════════════════════════════
+function jvOrgNode(a, opts) {
+  opts = opts || {};
+  if (!a) return '';
+  const active = jvOperational(a);
+  const state = jvHumanState(a);
+  const subtitle = opts.subtitle || jvLineaLabel(a.linea || a.area || 'Equipo');
+  return '<button type="button" class="jv-org-node" aria-pressed="' + (JV.inspectAgentId === a.id ? 'true' : 'false') + '" onclick="jvInspectAgent(\'' + a.id + '\')" title="Abrir ficha de ' + OS_E(a.nombre) + '"><span class="top"><span class="ico">' + osIcon(jvAgentIcon(a), { size: opts.root ? 17 : 13 }) + '</span><span class="copy"><b>' + OS_E(a.nombre.replace(/\s*\([^)]*\)/g, '')) + '</b><small>' + OS_E(subtitle + ' · ' + state.label) + '</small></span><i class="dot ' + (active ? '' : 'wait') + '"></i></span></button>';
+}
 function jvMapaOverview(current, activos, pendientes) {
-  const commandAgents = current.filter(a => a.linea === 'Comando' && !/cerebro ejecutivo/i.test(a.nombre || ''));
-  const commandChips = commandAgents.map(a => '<button type="button" class="jv-ha-agent" aria-pressed="' + (JV.inspectAgentId === a.id ? 'true' : 'false') + '" onclick="event.stopPropagation();jvInspectAgent(\'' + a.id + '\')"><i class="' + (jvOperational(a) ? '' : 'wait') + '"></i>' + OS_E(a.nombre) + '</button>').join('');
+  const byOrder = (a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden);
+  const root = current.find(a => /cerebro ejecutivo/i.test(a.nombre || '')) || current.find(a => a.linea === 'Comando') || null;
+  const commandAgents = current.filter(a => a.linea === 'Comando' && (!root || a.id !== root.id)).sort(byOrder);
+  if (!JV.inspectAgentId) {
+    const defaultAgent = current.find(a => /gerente de rentas/i.test(a.nombre || '')) || root || current[0];
+    JV.inspectAgentId = defaultAgent ? defaultAgent.id : null;
+  }
   const areas = JV_LINEAS.filter(L => ['Meta', 'Rentas', 'Remodelación', 'Fix & Flip'].includes(L.linea));
   const areaHTML = areas.map(L => {
-    const agents = current.filter(a => a.linea === L.linea).sort((a, b) => (a.orden == null ? 99 : a.orden) - (b.orden == null ? 99 : b.orden));
-    const working = agents.filter(jvOperational).length;
-    const waiting = agents.length - working;
-    const chips = agents.map(a => '<button type="button" class="jv-ha-agent" aria-pressed="' + (JV.inspectAgentId === a.id ? 'true' : 'false') + '" onclick="event.stopPropagation();jvInspectAgent(\'' + a.id + '\')"><i class="' + (jvOperational(a) ? '' : 'wait') + '"></i>' + OS_E(a.nombre.replace(/\s*\([^)]*\)/g, '')) + '</button>').join('');
-    const label = jvLineaLabel(L.linea);
-    const descriptor = L.linea === 'Meta' ? 'Administra y verifica el equipo digital' : agents.length + ' empleados digitales';
-    return '<section class="jv-holo-area" style="--ac:' + L.color + '" tabindex="0" role="button" onclick="jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jvFilterLinea(\'' + OS_E(L.linea).replace(/'/g, "\\'") + '\')}" aria-label="Abrir organigrama de ' + OS_E(label) + '">'
-      + '<div class="jv-ha-head"><div class="jv-ha-icon">' + osIcon(L.icon, { size: 17 }) + '</div><div class="jv-ha-title"><b>' + OS_E(label) + '</b><span>' + OS_E(descriptor) + '</span></div><div class="jv-ha-count">' + working + '/' + agents.length + ' activos</div></div>'
-      + '<div class="jv-ha-agents">' + chips + '</div><div class="jv-ha-foot"><span>' + (waiting ? waiting + ' requieren atención' : 'equipo sincronizado') + '</span><strong>EXPANDIR ÁREA →</strong></div></section>';
+    const agents = current.filter(a => a.linea === L.linea).sort(byOrder);
+    if (!agents.length) return '';
+    const manager = agents.find(a => /gerente|auditor|arquitecto/i.test(a.nombre || '')) || agents[0];
+    const specialists = agents.filter(a => a.id !== manager.id);
+    return '<section class="jv-org-dept" style="--oc:' + L.color + '" aria-label="' + OS_E(jvLineaLabel(L.linea)) + '"><div class="jv-org-dept-label">' + osIcon(L.icon, { size: 11 }) + '<span>' + OS_E(jvLineaLabel(L.linea)) + '</span><b>' + agents.filter(jvOperational).length + '/' + agents.length + '</b></div>'
+      + jvOrgNode(manager, { subtitle: 'Responsable de ' + jvLineaLabel(L.linea) })
+      + (specialists.length ? '<div class="jv-org-children">' + specialists.map(a => jvOrgNode(a)).join('') + '</div>' : '') + '</section>';
   }).join('');
-  return '<div class="jv-holo-shell"><div class="jv-holo-head"><div class="jv-holo-title"><b>Red Operativa JARVIS</b><span>Una inteligencia central. Cuatro áreas. Un solo contexto compartido.</span></div>'
-    + '<div class="jv-holo-stats"><span class="jv-holo-stat"><b>' + activos + '</b> funcionando</span><span class="jv-holo-stat"><b>' + pendientes + '</b> requieren atención</span><span class="jv-holo-stat"><b>' + jvNum(JV.runsTotal) + '</b> ejecuciones registradas</span></div></div>'
-    + '<div class="jv-holo-map"><svg class="jv-holo-lines" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="jv-holo-grad"><stop offset="0" stop-color="#9568ff"/><stop offset=".5" stop-color="#5ed9ff"/><stop offset="1" stop-color="#48e0b0"/></linearGradient></defs><path d="M500 300 C390 270 310 170 160 130"/><path d="M500 300 C610 270 690 170 840 130"/><path d="M500 300 C390 330 310 430 160 480"/><path d="M500 300 C610 330 690 430 840 480"/><circle cx="500" cy="300" r="4"/></svg>'
-    + '<div class="jv-holo-core" role="button" tabindex="0" aria-label="Abrir Sala de Dirección" onclick="jvNav(\'command\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jvNav(\'command\')}" title="Abrir Sala de Dirección"><div class="jv-core-ring"></div><div class="jv-core-ring r2"></div><div class="jv-core-ring r3"></div><div class="jv-core-reactor">' + osIcon('brain', { size: 27 }) + '</div><div class="jv-core-label"><b>Cerebro Ejecutivo</b><span>orquestación en vivo</span></div>' + (commandChips ? '<div class="jv-command-strip">' + commandChips + '</div>' : '') + '</div>'
-    + areaHTML + '</div>' + jvAgentInspector() + '</div>';
+  const rootHTML = root ? jvOrgNode(root, { root: true, subtitle: 'Capa de mando · orquestando' }) : '<button type="button" class="jv-org-node" onclick="jvNav(\'command\')"><span class="top"><span class="ico">' + osIcon('brain', { size: 17 }) + '</span><span class="copy"><b>Cerebro Ejecutivo</b><small>Capa de mando · orquestando</small></span><i class="dot"></i></span></button>';
+  const commandHTML = commandAgents.length ? '<div class="jv-org-command">' + commandAgents.map(a => jvOrgNode(a, { subtitle: 'Comando ejecutivo' })).join('') + '</div>' : '';
+  const inspector = jvAgentInspector() || '<aside class="jv-org-empty-inspector">Seleccioná un agente para ver sus tareas, horario, actividad y evidencia real.</aside>';
+  return '<div class="jv-org-layout"><section class="jv-org-canvas"><div class="jv-org-toolbar"><div><div class="jv-eyebrow">JARVIS · ORGANIGRAMA OPERATIVO</div><h1>Tu empresa digital, en una sola vista.</h1><p>Del Cerebro Ejecutivo a cada especialista. Seleccioná cualquier nodo para ver qué hace ahora.</p></div><div class="jv-org-counts"><span><b>' + current.length + '</b> agentes</span><span><b>4</b> áreas</span><span><b>' + activos + '</b> funcionando</span><span><b>' + pendientes + '</b> atención</span></div></div>'
+    + '<div class="jv-org-tree" style="zoom:' + Number(JV.orgZoom || 0.9).toFixed(2) + '"><div class="jv-org-root">' + rootHTML + commandHTML + '</div><div class="jv-org-depts">' + areaHTML + '</div></div>'
+    + '<div class="jv-org-zoom"><button type="button" onclick="jvOrgZoom(-.1)" aria-label="Alejar">−</button><button type="button" onclick="jvOrgZoom(.1)" aria-label="Acercar">+</button><button type="button" onclick="jvOrgFit()">' + Math.round((JV.orgZoom || .9) * 100) + '% · Acomodar</button></div></section>' + inspector + '</div>';
 }
+
+function jvOrgZoom(delta) {
+  JV.orgZoom = Math.max(.7, Math.min(1.1, Number((JV.orgZoom + delta).toFixed(2))));
+  if (window.osRender) osRender();
+}
+function jvOrgFit() {
+  const canvas = document.querySelector('#os-root .jv-org-canvas');
+  JV.orgZoom = canvas && canvas.clientWidth < 760 ? .78 : .9;
+  if (window.osRender) osRender();
+}
+window.jvOrgZoom = jvOrgZoom;
+window.jvOrgFit = jvOrgFit;
 
 function jvAuditSummary(a) {
   const row = JV.lastEvidence[a.id] || JV.audit.find(r => r.agent_id === a.id && jvIsOperationalAudit(r));
