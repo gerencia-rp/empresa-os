@@ -18,6 +18,7 @@ const JV = {
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
+  decisionPreview: null,
   controls: { occupancy: null, lineage: null },
 };
 window.JV = JV;
@@ -435,6 +436,7 @@ function jvCSS() {
     '#os-root .jv-filter-tabs button{flex:0 0 auto;border:1px solid var(--jc-line);background:transparent;color:var(--jc-mut);border-radius:9px;padding:7px 10px;cursor:pointer;font:inherit;font-size:11px}#os-root .jv-filter-tabs button.on{color:#fff;background:rgba(167,139,250,.14);border-color:rgba(167,139,250,.42)}#os-root .jv-filter-tabs button span{margin-left:5px;color:var(--jc-cyan)}',
     '#os-root .jv-decisions-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.75fr);gap:22px;align-items:start}#os-root .jv-section-title{font-size:13px;font-weight:700;margin:0 0 10px}#os-root .jv-section-title span{color:var(--jc-amber);margin-left:5px}',
     '#os-root .jv-decision-head{display:flex;align-items:center;gap:8px;color:var(--jc-mut);font-size:10px;margin-bottom:9px}#os-root .jv-decision-more{margin-top:10px;border-top:1px solid var(--jc-line);padding-top:8px}#os-root .jv-decision-more summary{cursor:pointer;color:var(--jc-cyan);font-size:11px}#os-root .jv-detail-list{display:grid;gap:5px;margin-top:9px}#os-root .jv-detail-row{display:grid;grid-template-columns:120px 1fr;gap:10px;font-size:10.5px}#os-root .jv-detail-row span{color:var(--jc-mut)}#os-root .jv-detail-row b{font-weight:550;overflow-wrap:anywhere}',
+    '#os-root .jv-review-backdrop{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px;background:rgba(2,5,11,.78);backdrop-filter:blur(10px)}#os-root .jv-review{width:min(620px,100%);max-height:calc(100dvh - 36px);overflow:auto;border:1px solid rgba(94,217,255,.3);border-radius:18px;background:linear-gradient(155deg,#101b2c,#080c15);box-shadow:0 34px 100px rgba(0,0,0,.7);color:var(--jc-tx)}#os-root .jv-review-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid var(--jc-line)}#os-root .jv-review-head span{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--jc-cyan)}#os-root .jv-review-head h2{font-size:20px;margin:3px 0 0}#os-root .jv-review-head button{border:1px solid var(--jc-line);background:transparent;color:var(--jc-mut);width:30px;height:30px;border-radius:9px;cursor:pointer}#os-root .jv-review-body{padding:18px 20px}#os-root .jv-review-agent{font-size:10px;color:var(--jc-purple);text-transform:uppercase;letter-spacing:.1em}#os-root .jv-review-body h3{font-size:17px;margin:7px 0}#os-root .jv-review-body>p{font-size:12.5px;line-height:1.6;color:#b8c4d8;margin:0}#os-root .jv-review-impact{display:grid;gap:5px;margin:15px 0;padding:12px 13px;border:1px solid rgba(96,165,250,.22);border-radius:11px;background:rgba(96,165,250,.06)}#os-root .jv-review-impact b,#os-root .jv-review-source b{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--jc-cyan)}#os-root .jv-review-impact span,#os-root .jv-review-source span{font-size:11px;line-height:1.55;color:#b8c4d8}#os-root .jv-review-source{display:flex;justify-content:space-between;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--jc-line)}#os-root .jv-review-actions{display:flex;justify-content:flex-end;gap:9px;padding:14px 20px;border-top:1px solid var(--jc-line);background:rgba(255,255,255,.018)}#os-root .jv-review-actions button{border-radius:9px;padding:9px 13px;font:inherit;font-size:11px;cursor:pointer}#os-root .jv-review-actions .cancel{border:1px solid var(--jc-line);background:transparent;color:var(--jc-mut)}#os-root .jv-review-actions .confirm{border:1px solid rgba(52,211,153,.35);background:rgba(52,211,153,.12);color:var(--jc-grn);font-weight:700}#os-root .jv-review-actions .confirm.no{border-color:rgba(244,114,182,.35);background:rgba(244,114,182,.1);color:#f69bc8}#os-root .jv-review-actions button:disabled{opacity:.4;cursor:not-allowed}',
     '#os-root .jv-needs-info{margin-top:10px;padding:9px 10px;border-radius:9px;background:rgba(251,191,36,.08);color:#f6d784;font-size:10.5px;line-height:1.45}',
     '#os-root .jv-command-action{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 16px;margin:0 0 18px;border:1px solid rgba(96,165,250,.24);border-radius:13px;background:rgba(96,165,250,.055)}#os-root .jv-command-action b{display:block;font-size:13px}#os-root .jv-command-action span{display:block;color:var(--jc-mut);font-size:11px;margin-top:3px}#os-root .jv-command-action button{border:0;border-radius:9px;background:#506ff2;color:#fff;padding:8px 12px;cursor:pointer;white-space:nowrap;font-weight:650}',
     '#os-root .jv-controls{margin-top:24px}#os-root .jv-controls-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#os-root .jv-control-card{display:flex;gap:12px;padding:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;min-width:0}#os-root .jv-control-card.ok{border-color:rgba(52,211,153,.28)}#os-root .jv-control-card.warn{border-color:rgba(251,191,36,.34)}#os-root .jv-control-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:rgba(96,165,250,.1);color:var(--jc-cyan)}#os-root .jv-control-card.ok .jv-control-icon{background:rgba(52,211,153,.1);color:var(--jc-grn)}#os-root .jv-control-card.warn .jv-control-icon{background:rgba(251,191,36,.1);color:var(--jc-amber)}#os-root .jv-control-copy{min-width:0;flex:1}#os-root .jv-control-title{display:flex;justify-content:space-between;gap:8px;align-items:center}#os-root .jv-control-title b{font-size:12px}#os-root .jv-control-title span{font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--jc-mut)}#os-root .jv-control-copy>strong{display:block;font-size:17px;margin-top:8px;font-variant-numeric:tabular-nums}#os-root .jv-control-copy p{font-size:10.5px;line-height:1.5;color:var(--jc-mut);margin:5px 0}#os-root .jv-control-copy small{font-size:9px;color:var(--jc-cyan)}',
@@ -563,6 +565,8 @@ function jvCSS() {
     '#os-root .jv-ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#os-root .jv-ai-metric{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.035)}#os-root .jv-ai-metric span{display:block;color:#7188a5;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em}#os-root .jv-ai-metric b{display:block;margin-top:4px;color:#e7f2ff;font-size:11px}',
     '#os-root .jv-ai-tags{display:flex;flex-wrap:wrap;gap:5px}#os-root .jv-ai-tags span{padding:4px 7px;border:1px solid rgba(120,160,205,.15);border-radius:7px;color:#9cafc5;font-size:9.5px;background:rgba(255,255,255,.025)}',
     '#os-root .jv-ai-action{width:100%;margin-top:12px;padding:9px 12px;border-radius:10px;border:1px solid rgba(94,217,255,.3);background:rgba(94,217,255,.08);color:#bdefff;cursor:pointer;font-size:10.5px;font-weight:650}#os-root .jv-ai-action:hover,#os-root .jv-ai-action:focus-visible{background:rgba(94,217,255,.14);outline:none}',
+    '#os-root .jv-ai-history{margin:0}#os-root .jv-ai-history>summary{cursor:pointer;color:#7edfff;font-size:10.5px;list-style:none}#os-root .jv-ai-history>summary::after{content:" +";color:#7188a5}#os-root .jv-ai-history[open]>summary::after{content:" −"}',
+    '#os-root .jv-agent-timeline{position:relative;margin-top:11px;padding-left:13px;border-left:1px solid rgba(94,217,255,.2)}#os-root .jv-agent-event{position:relative;padding:0 0 13px 10px}#os-root .jv-agent-event:last-child{padding-bottom:0}#os-root .jv-agent-event>i{position:absolute;left:-17px;top:3px;width:7px;height:7px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 7px rgba(52,211,153,.65)}#os-root .jv-agent-event.failed>i{background:var(--jc-pink);box-shadow:0 0 7px rgba(244,114,182,.65)}#os-root .jv-agent-event b{display:block;font-size:10.5px;color:#e7f2ff}#os-root .jv-agent-event span{display:block;font-size:9.5px;color:#8da0b9;line-height:1.45;margin-top:2px}#os-root .jv-agent-event small{display:block;font-size:8.5px;color:#5f7692;margin-top:3px}',
     '@media(max-width:1100px){#os-root .jv-holo-map{grid-template-columns:1fr 1fr;grid-template-rows:auto;gap:14px;padding:270px 18px 24px}#os-root .jv-holo-core{top:120px}#os-root .jv-holo-lines{display:none}#os-root .jv-holo-area:nth-of-type(n){grid-column:auto;grid-row:auto}}',
     '@media(max-width:680px){#os-root .jv{display:block}#os-root .jv-side{width:100%;padding:7px 8px;border-right:0;border-bottom:1px solid var(--jc-line);overflow:hidden}#os-root .jv-logo,#os-root .jv-lbl,#os-root .jv-mini{display:none}#os-root .jv-nav{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none}#os-root .jv-nav::-webkit-scrollbar{display:none}#os-root .jv-nav a{flex:0 0 auto;white-space:nowrap;margin:0;padding:7px 9px}#os-root .jv-main{padding:14px 10px}#os-root .jv-top{margin-bottom:12px}#os-root .jv-holo-head{display:block;padding:18px 16px 0}#os-root .jv-holo-stats{justify-content:flex-start;margin-top:12px}#os-root .jv-holo-map{grid-template-columns:1fr;padding:310px 12px 18px}#os-root .jv-holo-core{top:135px}#os-root .jv-holo-area:nth-of-type(n){grid-column:1}#os-root .jv-agent-inspector{position:fixed;left:10px;right:10px;top:78px;width:auto;max-height:calc(100dvh - 92px)}}',
     '@media(prefers-reduced-motion:reduce){#os-root .jv-holo-lines path,#os-root .jv-core-ring,#os-root .jv-core-reactor{animation:none!important}}',
@@ -628,7 +632,7 @@ async function jvLoad(force) {
     const [reg, props, audit, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
-      sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(40),
+      sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
       sb.from('pm_informes').select('id,tipo,corte,titulo,estado,origen,payload,storage_path,generado_por,emitido_at,created_at').is('archived_at', null).order('corte', { ascending: false }).limit(120),
       sb.from('pm_brain_memory').select('id,tipo,texto,fuente,fecha,hits,created_at').eq('activo', true).order('fecha', { ascending: false }).limit(80),
       sb.from('agent_audit_log').select('id', { count: 'exact', head: true }),
@@ -689,7 +693,7 @@ function jvView() {
   if (jvRole() !== 'admin') return '<div class="empty"><div style="font-size:40px">' + osIcon('shield') + '</div><div style="margin-top:10px">Solo el administrador (dueño) puede abrir el Command Center.</div></div>';
   if (!JV.loaded && !JV.err) { jvLoad(); return '<div class="empty">' + osIcon('loader') + ' Encendiendo el Agent Network…</div>'; }
   if (JV.err) return '<div class="empty"><div style="font-size:40px">' + osIcon('alert') + '</div><div class="down" style="margin-top:10px">' + OS_E(JV.err) + '</div><button class="cbtn" style="margin-top:14px" onclick="jvLoad(true)">Reintentar</button></div>';
-  return '<div class="jv">' + jvSidebar() + '<div class="jv-main">' + jvTopBar() + jvTabBody() + '</div></div>';
+  return '<div class="jv">' + jvSidebar() + '<div class="jv-main">' + jvTopBar() + jvTabBody() + '</div></div>' + jvDecisionPreviewHTML();
 }
 window.jvView = jvView;
 
@@ -755,6 +759,16 @@ function jvAuditSummary(a) {
   const detail = out.nota || out.resumen || out.detalle || out.mensaje || 'La ejecución dejó evidencia en la bitácora del sistema.';
   return { title: String(title), detail: String(detail) };
 }
+function jvAgentTimeline(a) {
+  const rows = JV.audit.filter(r => r.agent_id === a.id).slice(0, 5);
+  if (!rows.length) return '<div class="jv-ai-copy">Todavía no hay ejecuciones visibles para este agente.</div>';
+  return '<div class="jv-agent-timeline">' + rows.map(r => {
+    const info = jvAuditWorkInfo(r);
+    const ok = info.state !== 'failed';
+    const when = r.ts ? new Date(r.ts).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'sin fecha';
+    return '<div class="jv-agent-event ' + (ok ? 'ok' : 'failed') + '"><i></i><div><b>' + OS_E(info.title) + '</b><span>' + OS_E(info.detail) + '</span><small>' + OS_E(when) + ' · agent_audit_log</small></div></div>';
+  }).join('') + '</div>';
+}
 function jvReadinessProgress(a) {
   const row = JV.lastAudit[a.id];
   const out = row && row.output && typeof row.output === 'object' ? row.output : null;
@@ -783,6 +797,7 @@ function jvAgentInspector() {
     + '<div class="jv-ai-body"><div class="jv-ai-section"><div class="jv-ai-label">Responsabilidad</div><div class="jv-ai-copy">' + OS_E(a.responsabilidad || a.proceso || 'Responsabilidad todavía no documentada.') + '</div></div>'
     + (jvAgentIssue(a) ? '<div class="jv-needs-info">' + OS_E(jvAgentIssue(a)) + '</div>' : '')
     + '<div class="jv-ai-section"><div class="jv-ai-label">Qué hizo recientemente</div><div class="jv-ai-now"><b>' + OS_E(audit.title) + '</b><span>' + OS_E(audit.detail) + ' · ' + OS_E(jvFmtTs(jvAgentLastRun(a))) + '</span></div></div>'
+    + '<details class="jv-ai-section jv-ai-history"><summary>Historial de ejecuciones con evidencia</summary>' + jvAgentTimeline(a) + '</details>'
     + jvReadinessProgress(a)
     + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Automatización</span><b>' + OS_E(automation && automation.executor ? automation.executor : 'Sin ejecutor') + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
@@ -1196,7 +1211,7 @@ function jvLanesHTML() {
       + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
       + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
       + '<div class="who">' + OS_E(meta) + '</div>'
-      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (detail.sufficient ? 'Aprobar propuesta' : 'Falta información')) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>No aplicar</button></div>' : '') + '</article>';
+      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (detail.sufficient ? 'Revisar y aprobar' : 'Falta información')) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>Revisar y no aplicar</button></div>' : '') + '</article>';
   };
   const allPending = lanes.alerta.concat(lanes.propuesta);
   const areas = ['Todas'].concat([...new Set(allPending.map(jvProposalArea))]);
@@ -1424,16 +1439,43 @@ window.jvReportArea = jvReportArea;
 // ════════════════════════════════════════════════════════════════
 // ACCIONES (aprobar/rechazar) + chat
 // ════════════════════════════════════════════════════════════════
-async function jvDecide(id, estado) {
+function jvDecide(id, estado) {
   const p = JV.props.find(x => x.id === id); if (!p || JV.busyId) return;
+  JV.decisionPreview = { id: id, estado: estado };
+  if (window.osRender) osRender();
+}
+function jvDecisionCancel() { JV.decisionPreview = null; if (window.osRender) osRender(); }
+function jvDecisionPreviewHTML() {
+  const preview = JV.decisionPreview;
+  if (!preview) return '';
+  const p = JV.props.find(x => x.id === preview.id);
+  if (!p) return '';
+  const info = jvProposalInfo(p), detail = jvProposalDetails(p);
+  const approving = preview.estado === 'aprobada';
+  const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
+  const effect = approving
+    ? 'La propuesta quedará aprobada y entrará a la cola del agente. No se ejecuta ninguna migración, pago, deploy ni cambio de producción desde esta pantalla.'
+    : 'La propuesta quedará cerrada como no aplicada. La evidencia original seguirá disponible en el historial.';
+  return '<div class="jv-review-backdrop" role="presentation" onclick="if(event.target===this)jvDecisionCancel()"><section class="jv-review" role="dialog" aria-modal="true" aria-labelledby="jv-review-title">'
+    + '<div class="jv-review-head"><div><span>Confirmación humana</span><h2 id="jv-review-title">' + (approving ? 'Aprobar propuesta' : 'No aplicar propuesta') + '</h2></div><button onclick="jvDecisionCancel()" aria-label="Cerrar">×</button></div>'
+    + '<div class="jv-review-body"><div class="jv-review-agent">' + OS_E(jvAgentName(p.agent_id)) + ' · ' + OS_E(jvProposalArea(p)) + '</div><h3>' + OS_E(info.title) + '</h3><p>' + OS_E(info.summary) + '</p>'
+    + '<div class="jv-review-impact"><b>Qué cambiará</b><span>' + OS_E(effect) + '</span></div>'
+    + (detail.html ? '<div class="jv-detail-list">' + detail.html + '</div>' : '<div class="jv-needs-info">No hay suficiente detalle para aprobar esta propuesta.</div>')
+    + '<div class="jv-review-source"><b>Fuente</b><span>' + OS_E(info.source || 'agent_proposals') + (info.cut ? ' · corte ' + OS_E(info.cut) : '') + '</span></div>'
+    + (groupIds.length > 1 ? '<div class="jv-needs-info">Esta decisión consolidará ' + groupIds.length + ' actualizaciones del mismo control y conservará su trazabilidad.</div>' : '') + '</div>'
+    + '<div class="jv-review-actions"><button class="cancel" onclick="jvDecisionCancel()">Volver sin cambiar nada</button><button class="confirm ' + (approving ? 'ok' : 'no') + '" onclick="jvCommitDecision()"' + (!detail.sufficient && approving ? ' disabled' : '') + '>' + (approving ? 'Sí, aprobar' : 'Sí, no aplicar') + '</button></div></section></div>';
+}
+async function jvCommitDecision() {
+  const preview = JV.decisionPreview;
+  if (!preview) return;
+  const p = JV.props.find(x => x.id === preview.id); if (!p || JV.busyId) return;
+  const estado = preview.estado;
   const me = jvMe(); const verb = estado === 'aprobada' ? 'Aprobar' : 'Rechazar';
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
-  const groupedNote = groupIds.length > 1 ? ' También se cerrarán ' + (groupIds.length - 1) + ' actualizaciones anteriores del mismo control.' : '';
-  if (!confirm(verb + ' esta propuesta de "' + jvAgentName(p.agent_id) + '"?' + groupedNote)) return;
-  JV.busyId = id; if (window.osRender) osRender();
+  JV.busyId = p.id; JV.decisionPreview = null; if (window.osRender) osRender();
   try {
     const decidedAt = new Date().toISOString();
-    const olderIds = groupIds.filter(x => x !== id);
+    const olderIds = groupIds.filter(x => x !== p.id);
     if (estado === 'rechazada') {
       const { error: rejectError } = await sb.from('agent_proposals').update({ estado: 'rechazada', approved_by: me, approved_at: decidedAt }).in('id', groupIds);
       if (rejectError) throw rejectError;
@@ -1442,15 +1484,17 @@ async function jvDecide(id, estado) {
         const { error: supersedeError } = await sb.from('agent_proposals').update({ estado: 'rechazada', approved_by: me, approved_at: decidedAt }).in('id', olderIds);
         if (supersedeError) throw supersedeError;
       }
-      const { error: approveError } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: decidedAt }).eq('id', id);
+      const { error: approveError } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: decidedAt }).eq('id', p.id);
       if (approveError) throw approveError;
     }
-    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: id, input: { accion: estado, por: me, tipo: p.tipo_accion, actualizaciones_agrupadas: groupIds.length }, output: { estado: estado, por: me, accion: verb + ' desde Command Center', actualizaciones_anteriores_cerradas: olderIds.length }, resultado: 'ok' });
+    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: p.id, input: { accion: estado, por: me, tipo: p.tipo_accion, actualizaciones_agrupadas: groupIds.length }, output: { estado: estado, por: me, accion: verb + ' desde Command Center', actualizaciones_anteriores_cerradas: olderIds.length }, resultado: 'ok' });
     if (e2) console.warn('audit_log insert:', e2.message);
   } catch (e) { alert('No se pudo ' + verb.toLowerCase() + ': ' + (e.message || e)); }
   JV.busyId = null; await jvLoad(true);
 }
 window.jvDecide = jvDecide;
+window.jvDecisionCancel = jvDecisionCancel;
+window.jvCommitDecision = jvCommitDecision;
 
 function jvSnapshot() {
   const informes = JV.props.filter(p => p.tipo_accion === 'informe').slice(0, 6).map(p => jvEvid(p));

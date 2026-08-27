@@ -911,6 +911,7 @@ En la raíz del repo:
 - Sala de Dirección incorpora controles de integridad vivos para `v_ocupacion` y `lineage_coverage_runs`: solo muestra “control aprobado” cuando la distribución reconcilia y el linaje tiene ≤7 días, cero métricas sin fuente y `ok` vigente. Lectura ausente o vieja queda ámbar; nunca se completa con cifras simuladas.
 - El crawler `scripts/lineage-coverage.mjs` ya puede operar con la sesión RLS del usuario QA, sin service key ni llavero. Como `lineage_coverage_runs` conserva INSERT cerrado por RLS, el resultado se registra por `brain-chat?resource=lineage-run`, que valida sesión + perfil admin activo y escribe server-side. No se amplió ninguna policy.
 - Compuerta integral 26-ago: `npm run ci:gate` también autentica el usuario QA cuando recibe `QA_PASS` como secreto de ejecución (nunca embebido en el repo); resultado real **15/15**. Ocupación canónica 47 = 37 ocupadas + 6 disponibles + 4 mantenimiento + 0 reservadas (78.72%); QBO fresco 26-ago; 20 aliases; linaje fresco 190/190 en 29 pantallas y cero pendientes de fuente.
+- Fase operativa 27-ago: las fichas de agente incluyen una línea temporal expandible basada exclusivamente en `agent_audit_log` (resultado, detalle, hora y fuente). Las decisiones ya no escriben al primer clic: abren una revisión humana con agente, área, resumen, efecto exacto, fuente y cantidad de actualizaciones consolidadas; aprobar solo mueve la propuesta a la cola y nunca ejecuta pagos, migraciones ni deploys desde esa pantalla.
 
 Cuando arranques una sesión en este repo:
 
