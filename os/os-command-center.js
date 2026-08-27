@@ -18,6 +18,7 @@ const JV = {
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
+  controls: { occupancy: null, lineage: null },
 };
 window.JV = JV;
 
@@ -436,6 +437,8 @@ function jvCSS() {
     '#os-root .jv-decision-head{display:flex;align-items:center;gap:8px;color:var(--jc-mut);font-size:10px;margin-bottom:9px}#os-root .jv-decision-more{margin-top:10px;border-top:1px solid var(--jc-line);padding-top:8px}#os-root .jv-decision-more summary{cursor:pointer;color:var(--jc-cyan);font-size:11px}#os-root .jv-detail-list{display:grid;gap:5px;margin-top:9px}#os-root .jv-detail-row{display:grid;grid-template-columns:120px 1fr;gap:10px;font-size:10.5px}#os-root .jv-detail-row span{color:var(--jc-mut)}#os-root .jv-detail-row b{font-weight:550;overflow-wrap:anywhere}',
     '#os-root .jv-needs-info{margin-top:10px;padding:9px 10px;border-radius:9px;background:rgba(251,191,36,.08);color:#f6d784;font-size:10.5px;line-height:1.45}',
     '#os-root .jv-command-action{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 16px;margin:0 0 18px;border:1px solid rgba(96,165,250,.24);border-radius:13px;background:rgba(96,165,250,.055)}#os-root .jv-command-action b{display:block;font-size:13px}#os-root .jv-command-action span{display:block;color:var(--jc-mut);font-size:11px;margin-top:3px}#os-root .jv-command-action button{border:0;border-radius:9px;background:#506ff2;color:#fff;padding:8px 12px;cursor:pointer;white-space:nowrap;font-weight:650}',
+    '#os-root .jv-controls{margin-top:24px}#os-root .jv-controls-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#os-root .jv-control-card{display:flex;gap:12px;padding:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;min-width:0}#os-root .jv-control-card.ok{border-color:rgba(52,211,153,.28)}#os-root .jv-control-card.warn{border-color:rgba(251,191,36,.34)}#os-root .jv-control-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:rgba(96,165,250,.1);color:var(--jc-cyan)}#os-root .jv-control-card.ok .jv-control-icon{background:rgba(52,211,153,.1);color:var(--jc-grn)}#os-root .jv-control-card.warn .jv-control-icon{background:rgba(251,191,36,.1);color:var(--jc-amber)}#os-root .jv-control-copy{min-width:0;flex:1}#os-root .jv-control-title{display:flex;justify-content:space-between;gap:8px;align-items:center}#os-root .jv-control-title b{font-size:12px}#os-root .jv-control-title span{font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--jc-mut)}#os-root .jv-control-copy>strong{display:block;font-size:17px;margin-top:8px;font-variant-numeric:tabular-nums}#os-root .jv-control-copy p{font-size:10.5px;line-height:1.5;color:var(--jc-mut);margin:5px 0}#os-root .jv-control-copy small{font-size:9px;color:var(--jc-cyan)}',
+    '@media(max-width:800px){#os-root .jv-controls-grid{grid-template-columns:1fr}}',
     '#os-root .jv-report-group{margin-bottom:26px}#os-root .jv-report-list{display:grid;gap:9px}#os-root .jv-report-item{border-top:1px solid var(--jc-line);padding:13px 2px 2px}#os-root .jv-report-item:first-child{border-top:0}#os-root .jv-report-item summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;cursor:pointer;list-style:none}#os-root .jv-report-item summary::-webkit-details-marker{display:none}#os-root .jv-report-item h3{font-size:13px;margin:0}#os-root .jv-report-item .report-meta{font-size:10px;color:var(--jc-mut);margin-top:3px}#os-root .jv-report-body{max-width:75ch;color:#b8c4d8;font-size:12px;line-height:1.65;padding:12px 0 6px;white-space:pre-wrap}',
     '@media(max-width:900px){#os-root .jv-decisions-layout{grid-template-columns:1fr}}',
     '#os-root .jv-simple-list{display:grid;gap:8px}',
@@ -622,7 +625,7 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, reports, memories, runs, crit, mem, cap, ns] = await Promise.all([
+    const [reg, props, audit, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(40),
@@ -633,6 +636,8 @@ async function jvLoad(force) {
       sb.from('pm_brain_memory').select('id', { count: 'exact', head: true }).then(r => r).catch(() => ({ count: null })),
       sb.from('v_inversionistas').select('capital_desplegado').then(r => r).catch(() => ({ data: null })),
       sb.from('cc_northstar').select('*').maybeSingle().then(r => r).catch(() => ({ data: null })),
+      sb.from('v_ocupacion').select('unidades_rentables,ocupadas,disponibles,mantenimiento,reservadas,ocupacion_pct').maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar ocupación.' } })),
+      sb.from('lineage_coverage_runs').select('run_at,pantallas,numeros_vistos,con_linaje,sin_linaje,ok').order('run_at', { ascending: false }).limit(1).maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar linaje.' } })),
     ]);
     if (reg.error) throw reg.error;
     JV.agents = reg.data || [];
@@ -646,6 +651,12 @@ async function jvLoad(force) {
     JV.memCount = (mem && typeof mem.count === 'number') ? mem.count : null;
     JV.capital = (cap && cap.data) ? cap.data.reduce((s, r) => s + (+r.capital_desplegado || 0), 0) : null;
     JV.nsCfg = (ns && ns.data) ? ns.data : null;
+    JV.controls = {
+      occupancy: occupancy && occupancy.data ? occupancy.data : null,
+      occupancyError: occupancy && occupancy.error ? occupancy.error.message : null,
+      lineage: lineage && lineage.data ? lineage.data : null,
+      lineageError: lineage && lineage.error ? lineage.error.message : null,
+    };
     const rr = await Promise.all(JV.agents.map(a =>
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').eq('agent_id', a.id).order('ts', { ascending: false }).limit(50)
         .then(r => ({ id: a.id, latest: (r.data || [])[0] || null, row: (r.data || []).find(jvIsOperationalAudit) || null }))
@@ -914,8 +925,35 @@ function jvDashboard() {
   const pending = jvPendingDecisions().length;
   const decisionCallout = '<div class="jv-command-action"><div><b>' + (pending ? pending + ' decisiones necesitan revisión' : 'No hay decisiones pendientes') + '</b><span>' + (pending ? 'Están organizadas por área y cada una explica qué cambia antes de aprobar.' : 'El equipo puede seguir trabajando sin intervención.') + '</span></div>' + (pending ? '<button onclick="jvNav(\'propuestas\')">Revisar decisiones</button>' : '') + '</div>';
   return jvHudHeader() + jvCounters() + jvNorthStar() + decisionCallout + jvCore() + jvChatUI()
+    + jvControlsPanel()
     + jvWorkPulse()
     + '<div class="jv-section-title" style="margin-top:24px">Actividad reciente del equipo</div>' + jvFeedHTML();
+}
+
+function jvControlsPanel() {
+  const c = JV.controls || {};
+  const o = c.occupancy;
+  const l = c.lineage;
+  const n = v => Number(v || 0);
+  const occSum = o ? n(o.ocupadas) + n(o.disponibles) + n(o.mantenimiento) + n(o.reservadas) : null;
+  const occDelta = o ? n(o.unidades_rentables) - occSum : null;
+  const occOk = !!o && occDelta === 0;
+  const lineAgeDays = l && l.run_at ? (Date.now() - new Date(l.run_at).getTime()) / 86400000 : null;
+  const lineFresh = lineAgeDays != null && lineAgeDays <= 7;
+  const lineOk = !!l && lineFresh && n(l.sin_linaje) === 0 && l.ok !== false;
+  const card = (icon, title, ok, value, detail, source) => '<article class="jv-control-card ' + (ok ? 'ok' : 'warn') + '"><div class="jv-control-icon">' + osIcon(icon, { size: 18 }) + '</div><div class="jv-control-copy"><div class="jv-control-title"><b>' + OS_E(title) + '</b><span>' + (ok ? 'control aprobado' : 'requiere revisión') + '</span></div><strong>' + OS_E(value) + '</strong><p>' + OS_E(detail) + '</p><small>Fuente: ' + OS_E(source) + '</small></div></article>';
+  const occValue = o ? jvNum(o.ocupadas) + ' / ' + jvNum(o.unidades_rentables) + ' ocupadas' : 'Sin lectura disponible';
+  const occDetail = o
+    ? (occOk ? 'La distribución reconcilia: ' + jvNum(o.ocupadas) + ' ocupadas + ' + jvNum(o.disponibles) + ' disponibles + ' + jvNum(o.mantenimiento) + ' mantenimiento + ' + jvNum(o.reservadas) + ' reservadas = ' + jvNum(o.unidades_rentables) + '.' : 'La distribución difiere por ' + jvNum(Math.abs(occDelta)) + ' unidad(es). Jarvis no la presenta como conciliada.')
+    : (c.occupancyError || 'No existe evidencia suficiente para certificar este control.');
+  const lineValue = l ? jvNum(l.con_linaje) + ' / ' + jvNum(l.numeros_vistos) + ' métricas trazadas' : 'Sin corrida disponible';
+  const lineDetail = l
+    ? (lineOk ? 'Cobertura completa y corrida fresca: ' + jvFmtTs(l.run_at) + ' en ' + jvNum(l.pantallas) + ' pantallas.' : (n(l.sin_linaje) ? jvNum(l.sin_linaje) + ' métricas visibles todavía no tienen fuente definida.' : 'La última corrida tiene ' + Math.floor(lineAgeDays || 0) + ' días; debe renovarse para volver a aprobar el control.'))
+    : (c.lineageError || 'No existe evidencia suficiente para certificar este control.');
+  return '<section class="jv-controls"><div class="jv-section-title">Controles de integridad <span>evidencia viva</span></div><div class="jv-controls-grid">'
+    + card('home', 'Ocupación reconciliada', occOk, occValue, occDetail, 'v_ocupacion')
+    + card('git-branch', 'Linaje de datos', lineOk, lineValue, lineDetail, 'lineage_coverage_runs')
+    + '</div></section>';
 }
 
 // ════════════════════════════════════════════════════════════════

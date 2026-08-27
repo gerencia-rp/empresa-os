@@ -908,6 +908,8 @@ En la raíz del repo:
 - Reportes lee la bandeja canónica `pm_informes`, agrupa por Dirección/Rentas/Remodelación/Fix & Flip y traduce el payload a campos humanos sin mostrar JSON crudo. `agent_proposals` sigue siendo trabajo/decisiones, no la fuente principal de reportes.
 - `ff_deal_stage_history` captura únicamente cambios futuros observados en `ff_deals.stage`. Las 28 filas iniciales son baseline explícito y se excluyen de duraciones; al instalar: 28 baselines, 0 intervalos válidos, 0 etapas abiertas duplicadas y cron semanal activo.
 - `ff-optimizacion` está desplegado, pero conserva el agente en `dry-run`. Exige 3 intervalos completos, 2 propiedades y 2 etapas; mientras no haya cobertura responde `ready:false`/`skipped`. Cuando alcance cobertura solo crea una propuesta para revisión humana; nunca se autopromueve ni modifica el pipeline.
+- Sala de Dirección incorpora controles de integridad vivos para `v_ocupacion` y `lineage_coverage_runs`: solo muestra “control aprobado” cuando la distribución reconcilia y el linaje tiene ≤7 días, cero métricas sin fuente y `ok` vigente. Lectura ausente o vieja queda ámbar; nunca se completa con cifras simuladas.
+- El crawler `scripts/lineage-coverage.mjs` ya puede operar con la sesión RLS del usuario QA, sin service key ni llavero. Como `lineage_coverage_runs` conserva INSERT cerrado por RLS, el resultado se registra por `brain-chat?resource=lineage-run`, que valida sesión + perfil admin activo y escribe server-side. No se amplió ninguna policy.
 
 Cuando arranques una sesión en este repo:
 
@@ -921,4 +923,4 @@ Cuando arranques una sesión en este repo:
 
 ---
 
-*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio desplegado; JARVIS fases 1–2 en producción; auditoría operativa en curso*
+*Última actualización: 26 Ago 2026 — contratos v0.11 certificados; D-025 vigente; Luxury Deal Studio desplegado; JARVIS con controles vivos de ocupación/linaje; auditoría operativa en curso*

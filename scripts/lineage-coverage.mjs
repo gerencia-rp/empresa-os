@@ -10,14 +10,15 @@
 //   tablas de registros no son métricas: su linaje es el de sus columnas, ya trazado.
 // Uso: SERVICE_KEY=sb_secret_... QA_BASE=http://localhost:5173/index.html node scripts/lineage-coverage.mjs --register
 import puppeteer from 'puppeteer-core';
+import { PUBLIC_ANON_KEY } from '../api/_pm-report-data.mjs';
 
 const BASE = process.env.QA_BASE || 'http://localhost:5173/index.html';
 const SB_URL = 'https://nezbaljfhhyznhltpjnk.supabase.co';
 const SK = process.env.SERVICE_KEY || process.env.SB_KEY;
+const APIKEY = process.env.SB_APIKEY || PUBLIC_ANON_KEY;
 const MODE = process.argv.includes('--gate') ? 'gate' : 'register';
 const EMAIL = 'qa-admin-test@rentalprofitss.com';
-const PASS = 'QaPortal2026!cov';
-if (!SK) { console.error('Falta SERVICE_KEY'); process.exit(1); }
+const PASS = process.env.QA_PASS || 'QaPortal2026!cov';
 
 // ── pantallas: shell OS + overlays con drivers (pre = JS a evaluar, wait = selector a esperar) ──
 const S = (emp, sys, pre, host, wait) => ({ emp, sys, pre, host: host || '#os-root', wait });
@@ -95,11 +96,30 @@ function norm(s) {
 }
 const matches = (a, b) => a && b && (a === b || a.startsWith(b) || b.startsWith(a) || (a.length > 6 && b.includes(a)) || (b.length > 6 && a.includes(b)));
 
-const H = { Authorization: 'Bearer ' + SK, apikey: SK, 'Content-Type': 'application/json' };
+let REST_BEARER = SK || '';
 async function rest(path, opts) {
-  const r = await fetch(SB_URL + '/rest/v1/' + path, { headers: { ...H, Prefer: 'return=representation' }, ...opts });
+  if (!REST_BEARER) throw new Error('La sesión de QA todavía no está lista.');
+  const headers = { apikey: APIKEY, Authorization: 'Bearer ' + REST_BEARER, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+  const r = await fetch(SB_URL + '/rest/v1/' + path, { headers, ...opts });
   if (!r.ok) throw new Error(path + ': ' + r.status + ' ' + (await r.text()).slice(0, 200));
   return r.json();
+}
+
+async function persistCoverageRun(row) {
+  try {
+    return await rest('lineage_coverage_runs', { method: 'POST', body: JSON.stringify(row) });
+  } catch (error) {
+    if (!/403|row-level security/i.test(error.message || '')) throw error;
+    const endpoint = new URL('/api/brain-chat?resource=lineage-run', BASE).toString();
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + REST_BEARER, 'Content-Type': 'application/json' },
+      body: JSON.stringify(row),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('lineage-run endpoint: ' + r.status + ' ' + (data.error || 'error desconocido'));
+    return data;
+  }
 }
 
 // extracción en el browser — multi-patrón, filtra filas-registro
@@ -144,12 +164,14 @@ const EXTRACT = (host) => `(() => {
 })()`;
 
 async function main() {
-  const j = await (await fetch(SB_URL + '/auth/v1/admin/users?per_page=1000', { headers: H })).json();
-  const u = (j.users || []).find(x => x.email === EMAIL);
-  await fetch(SB_URL + '/auth/v1/admin/users/' + u.id, { method: 'PUT', headers: H, body: JSON.stringify({ password: PASS }) });
-
-  const lineage = await rest('data_lineage_map?select=metric_key,empresa,sistema,dato&active=eq.true&limit=3000');
-  const normed = lineage.map(r => ({ ...r, n: norm(r.dato) }));
+  // La service key es opcional. Si está disponible, conserva la capacidad histórica
+  // de reparar la contraseña del usuario QA; en CI/local normal usamos su sesión RLS.
+  if (SK) {
+    const adminHeaders = { apikey: SK, Authorization: 'Bearer ' + SK, 'Content-Type': 'application/json' };
+    const j = await (await fetch(SB_URL + '/auth/v1/admin/users?per_page=1000', { headers: adminHeaders })).json();
+    const u = (j.users || []).find(x => x.email === EMAIL);
+    if (u) await fetch(SB_URL + '/auth/v1/admin/users/' + u.id, { method: 'PUT', headers: adminHeaders, body: JSON.stringify({ password: PASS }) });
+  }
 
   const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new', args: ['--no-sandbox'] });
   const page = await browser.newPage();
@@ -162,6 +184,14 @@ async function main() {
     const { error } = await c.auth.signInWithPassword({ email, password: pw });
     if (error) throw new Error(error.message);
   }, EMAIL, PASS);
+  REST_BEARER = await page.evaluate(async () => {
+    const c = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    const { data } = await c.auth.getSession();
+    return data && data.session && data.session.access_token || '';
+  });
+  if (!REST_BEARER) throw new Error('La sesión QA no entregó un token válido.');
+  const lineage = await rest('data_lineage_map?select=metric_key,empresa,sistema,dato&active=eq.true&limit=3000');
+  const normed = lineage.map(r => ({ ...r, n: norm(r.dato) }));
   await page.goto(BASE, { waitUntil: 'networkidle2' });
   await page.waitForFunction(() => window.OS && window.OS.loaded, { timeout: 60000 });
 
@@ -204,11 +234,11 @@ async function main() {
   const sinFinal = MODE === 'register' ? 0 : sin.length;
   const porSys = {};
   vistos.forEach(v => { const k = v.emp + ' › ' + v.sys; porSys[k] = porSys[k] || { n: 0, sin: 0 }; porSys[k].n++; if (!v.hit) porSys[k].sin++; });
-  await rest('lineage_coverage_runs', { method: 'POST', body: JSON.stringify({
+  await persistCoverageRun({
     pantallas: SCREENS.filter(s => !s.sys.startsWith('(')).length, numeros_vistos: vistos.length, con_linaje: conLinaje + (MODE === 'register' ? nuevos : 0),
     sin_linaje: sinFinal, nuevos_registrados: nuevos,
     detalle: { modo: MODE, base: BASE, sin: sin.slice(0, 120), por_pantalla: Object.entries(porSys).map(([k, v]) => ({ sys: k, ...v })) },
-  }) });
+  });
   console.log('\n📈 ' + vistos.length + ' números vistos en ' + Object.keys(porSys).length + ' pantallas · ' + conLinaje + ' ya trazados · ' + sin.length + ' sin entrada' + (MODE === 'register' ? ' → ' + nuevos + ' registrados (pend, curar en /mapa)' : ''));
   if (MODE === 'gate' && sin.length) {
     console.error('⛔ GATE: números visibles SIN entrada en data_lineage:');

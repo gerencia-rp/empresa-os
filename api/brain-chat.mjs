@@ -91,6 +91,42 @@ async function healthHandler(req, res) {
   res.status(ok ? 200 : 503).json({ ok, status: ok ? 'ready' : 'degraded', version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local', region: process.env.VERCEL_REGION || 'local', duration_ms: Date.now() - started, checks, timestamp: new Date().toISOString() });
 }
 
+// Registra el resultado del crawler de linaje sin abrir INSERT por RLS a todo
+// usuario autenticado. El endpoint valida la sesión y confirma el rol admin;
+// la escritura se hace server-side con la service key y un payload acotado.
+async function lineageRunHandler(req, res) {
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  const auth = await verifyAuth(req);
+  if (!auth.ok || auth.via !== 'user' || !auth.email) { res.status(401).json({ ok: false, error: 'Sesión de usuario requerida.' }); return; }
+  try {
+    const profile = await sbREST(`profiles?select=role,active&email=eq.${encodeURIComponent(auth.email)}&limit=1`, { bearer: auth.token });
+    const me = Array.isArray(profile) ? profile[0] : null;
+    if (!me || me.role !== 'admin' || me.active === false) { res.status(403).json({ ok: false, error: 'Solo administradores activos pueden registrar esta auditoría.' }); return; }
+    const b = jsonSafe(req.body, {}) || {};
+    const num = (v, max = 100000) => Math.max(0, Math.min(max, Math.trunc(Number(v) || 0)));
+    const row = {
+      pantallas: num(b.pantallas, 500),
+      numeros_vistos: num(b.numeros_vistos),
+      con_linaje: num(b.con_linaje),
+      sin_linaje: num(b.sin_linaje),
+      nuevos_registrados: num(b.nuevos_registrados),
+      ok: num(b.sin_linaje) === 0,
+      detalle: {
+        modo: b.detalle && b.detalle.modo === 'register' ? 'register' : 'gate',
+        base: String((b.detalle && b.detalle.base) || '').slice(0, 240),
+        registrado_por: auth.email,
+        origen: 'authenticated-browser-crawler',
+        sin: Array.isArray(b.detalle && b.detalle.sin) ? b.detalle.sin.slice(0, 120) : [],
+        por_pantalla: Array.isArray(b.detalle && b.detalle.por_pantalla) ? b.detalle.por_pantalla.slice(0, 120) : [],
+      },
+    };
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    if (!serviceKey) { res.status(503).json({ ok: false, error: 'Servicio de auditoría no configurado.' }); return; }
+    const created = await sbREST('lineage_coverage_runs', { method: 'POST', body: row, bearer: serviceKey, prefer: 'return=representation' });
+    res.status(200).json({ ok: true, run: Array.isArray(created) ? created[0] : created });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message || String(e) }); }
+}
+
 // Fase 3: acá se recuperará memoria relevante (pm_brain_memory + embeddings VoyageAI).
 // Por ahora acepta hechos que ya vengan del front (si los hubiera) y los formatea.
 function buildMemoryBlock(memory) {
@@ -180,6 +216,7 @@ async function parseDocHandler(req, res) {
 export default async function handler(req, res) {
   // Routing: ?resource=memory → CRUD de memoria; ?resource=parse-doc → parser Capa 0; si no → chat.
   if ((req.query && req.query.resource) === 'health') return healthHandler(req, res);
+  if ((req.query && req.query.resource) === 'lineage-run') return lineageRunHandler(req, res);
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
   if ((req.query && req.query.resource) === 'parse-doc') return parseDocHandler(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
