@@ -1069,9 +1069,23 @@ function iaTabLedger() {
   let acum = 0;
   const full = led.map(m => { if (pnl(m)) acum += (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0); return { ...m, acum, pnl: pnl(m) }; });
   // filtro de MES ("Julio 2026", solo meses con movimientos, default Todos)
+  // ── filtro de PERÍODO: todos los años / un año completo / un mes de ese año ──
+  // Los años y los meses salen SOLO de las fechas reales de los movimientos de esta casa: si
+  // mañana hay 2027 aparece solo, y no se listan períodos vacíos. El valor del <select> es el
+  // PREFIJO de la fecha ("2026" o "2026-06"), así el filtro sigue siendo el mismo startsWith de
+  // antes — no cambia ninguna cuenta, solo el rango que se muestra y se suma arriba.
   const mesesAll = [...new Set(led.map(m => String(m.fecha || "").slice(0, 7)))].filter(Boolean).sort().reverse();
-  const mf = IA.ledgerMes && mesesAll.includes(IA.ledgerMes) ? IA.ledgerMes : "todos";
-  const mesSel = "<select class=\"osa-in\" style=\"padding:6px\" onchange=\"IA.ledgerMes=this.value;osRender()\"><option value=\"todos\">Todos los meses</option>" + mesesAll.map(m => "<option value=\"" + m + "\"" + (mf === m ? " selected" : "") + ">" + invEngine.mesEs(m) + "</option>").join("") + "</select>";
+  const aniosAll = [...new Set(mesesAll.map(m => m.slice(0, 4)))].sort().reverse();
+  const periodosOk = ["todos"].concat(aniosAll).concat(mesesAll);
+  const mf = IA.ledgerMes && periodosOk.includes(IA.ledgerMes) ? IA.ledgerMes : "todos";
+  const perLbl = v => v === "todos" ? "todos los años" : (/^[0-9]{4}$/.test(v) ? "año " + v : invEngine.mesEs(v));
+  const mesSel = "<select class=\"osa-in\" style=\"padding:6px\" title=\"período que se muestra y que suman los totales de arriba\" onchange=\"IA.ledgerMes=this.value;osRender()\">"
+    + "<option value=\"todos\"" + (mf === "todos" ? " selected" : "") + ">Todos los años</option>"
+    + aniosAll.map(y => "<optgroup label=\"" + y + "\">"
+        + "<option value=\"" + y + "\"" + (mf === y ? " selected" : "") + ">Todo " + y + "</option>"
+        + mesesAll.filter(m => m.slice(0, 4) === y).map(m => "<option value=\"" + m + "\"" + (mf === m ? " selected" : "") + ">" + invEngine.mesEs(m) + "</option>").join("")
+      + "</optgroup>").join("")
+    + "</select>";
   const vis = full.filter(m => mf === "todos" || String(m.fecha || "").startsWith(mf));
   const saldoPer = vis.filter(m => m.pnl).reduce((s2, m) => s2 + (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0), 0);
   // 🔴 SERVICIO DE DEUDA (interés HML + cuota refi 30a) — marcado en el motor con
@@ -1091,8 +1105,8 @@ function iaTabLedger() {
   const tagDeuda = "<span class=\"badge\" style=\"font-size:8px;background:rgba(240,104,122,.16);color:#f0687a\" title=\"" + OS_E(deudaTip) + "\">servicio de deuda</span>";
   const ayuda = "<div class=\"card\" style=\"margin-bottom:12px;border-color:var(--a2)\"><div style=\"font-size:12.5px;line-height:1.6;color:var(--ink)\"><b>💰 Qué es el Ledger.</b> Es el libro contable P&L de esta casa: la lista de todos los movimientos reales (rentas cobradas y gastos) que forman la utilidad operativa. Es <b>SOLO LECTURA</b> y es el respaldo del NOI que ve el inversor. Se edita en <b>📐 Modelo &amp; movimientos</b>.</div></div>";
   return ayuda + "<div style=\"display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap\">" + casaSel + mesSel
-    + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + saldoTip + "\">Saldo de caja (P&L) ⓘ" + (mf === "todos" ? "" : " · " + OS_E(invEngine.mesEs(mf))) + ": <span style=\"color:" + (saldoPer >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(saldoPer) + "</span></span>"
-    + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + deudaTip + "\">Servicio de deuda ⓘ: <span style=\"color:var(--neg)\">" + iaMoney(deudaPer) + "</span></span>"
+    + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + saldoTip + "\">Saldo de caja (P&L) ⓘ · " + OS_E(perLbl(mf)) + ": <span style=\"color:" + (saldoPer >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(saldoPer) + "</span></span>"
+    + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + deudaTip + "\">Servicio de deuda ⓘ · " + OS_E(perLbl(mf)) + ": <span style=\"color:var(--neg)\">" + iaMoney(deudaPer) + "</span></span>"
     + "<span class=\"meta\">" + vis.length + " movimientos · mueven el saldo las rentas y los gastos del mes, incluido el servicio de deuda · no lo mueven inversión/financiero/distribución (capital) · <b>SOLO LECTURA</b> — se edita en 📐 Modelo & movimientos</span></div>"
     + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
