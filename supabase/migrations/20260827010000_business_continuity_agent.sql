@@ -185,12 +185,23 @@ begin
   select count(distinct a.id) into v_recent
     from public.agent_registry a join public.agent_audit_log l on l.agent_id=a.id
    where a.deleted_at is null and a.linea not ilike 'Transversal%'
-     and l.ts>=now()-interval '8 days'
+     and l.ts>=now()-make_interval(days => case
+       when lower(coalesce(a.disparadores::text,'')) ~ 'mensual|d[ií]a 1' then 40
+       when lower(coalesce(a.disparadores::text,'')) ~ 'quincenal|cada 15' then 20
+       when lower(coalesce(a.disparadores::text,'')) ~ 'semanal|lunes|martes|mi[eé]rcoles|jueves|viernes' then 10
+       else 8 end)
      and coalesce(l.input->>'accion','') not in ('editar_ficha','reordenar','guardar_ficha');
   select count(*) into v_failed from public.agent_audit_log
    where ts>=now()-interval '24 hours' and lower(coalesce(resultado,'')) in ('error','failed','abort');
-  select count(*) into v_old_decisions from public.agent_proposals
-   where estado='propuesta' and deleted_at is null and created_at<now()-interval '7 days';
+  select count(*) into v_old_decisions from (
+    select agent_id,tipo_accion,
+      coalesce(property_id::text,evidencia->>'property_id',evidencia->>'address',payload->>'dedup_key','sin-asunto') asunto
+    from public.agent_proposals
+    where estado='propuesta' and deleted_at is null and created_at<now()-interval '7 days'
+      and tipo_accion<>'informe'
+    group by agent_id,tipo_accion,
+      coalesce(property_id::text,evidencia->>'property_id',evidencia->>'address',payload->>'dedup_key','sin-asunto')
+  ) decisiones_agrupadas;
   select count(*) into v_inactive_crons from cron.job
    where active=false and (jobname like 'agent-%' or jobname like 'rentas-%'
      or jobname like 'remod-%' or jobname like 'ff-%' or jobname like 'cerebro-%');
@@ -214,7 +225,7 @@ begin
 
   v_out:=jsonb_build_object(
     'modo',p_mode,'corte',v_corte,'severidad',v_severity,
-    'equipo',jsonb_build_object('puestos',v_total,'con_evidencia_8d',v_recent,'sin_evidencia_8d',greatest(v_total-v_recent,0)),
+    'equipo',jsonb_build_object('puestos',v_total,'con_evidencia_en_sla',v_recent,'sin_evidencia_en_sla',greatest(v_total-v_recent,0)),
     'excepciones',jsonb_build_object('fallos_24h',v_failed,'decisiones_mayores_7d',v_old_decisions,
       'crons_inactivos',v_inactive_crons,'fotos_ejecutivas_faltantes',v_missing_reports,'empresas_qb_desactualizadas',v_qb_stale),
     'recomendacion',case

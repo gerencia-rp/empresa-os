@@ -172,7 +172,7 @@ function jvDecisionGroupKey(p) {
 }
 function jvPendingDecisions() {
   const grouped = new Map();
-  JV.props.filter(p => p.estado === 'propuesta' && !jvIsLegacy(jvAgent(p.agent_id))).forEach(p => {
+  JV.props.filter(p => p.estado === 'propuesta' && !JV_INFORMATIONAL_TIPOS.includes(p.tipo_accion) && !jvIsLegacy(jvAgent(p.agent_id))).forEach(p => {
     const key = jvDecisionGroupKey(p);
     const current = grouped.get(key);
     if (!current) grouped.set(key, Object.assign({}, p, { _groupIds: [p.id], _groupCount: 1 }));
@@ -215,6 +215,7 @@ function jvAgentIcon(a) {
 
 // ─── clasificación de propuestas / alertas ───
 const JV_ALERT_TIPOS = ['conciliacion', 'correccion_dato'];
+const JV_INFORMATIONAL_TIPOS = ['informe'];
 function jvIsAlert(p) { return p.estado === 'propuesta' && JV_ALERT_TIPOS.indexOf(p.tipo_accion) >= 0; }
 function jvLaneOf(p) {
   if (jvIsAlert(p)) return 'alerta';
