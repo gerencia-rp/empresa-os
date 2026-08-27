@@ -1117,6 +1117,11 @@ function jvControlsPanel() {
   const roles = JV.roleCoverage || [];
   const coveredRoles = roles.filter(r => r.primary_ready && r.backup_ready).length;
   const rolesOk = roles.length > 0 && coveredRoles === roles.length;
+  const absenceReport = JV.reports.find(r => r.tipo === 'continuidad_ausencia_6_meses');
+  const absence = absenceReport && absenceReport.payload && typeof absenceReport.payload === 'object' ? absenceReport.payload : null;
+  const absencePassed = absence ? Number(absence.compuertas_aprobadas || 0) : 0;
+  const absenceTotal = absence ? Number(absence.compuertas_totales || 8) : 8;
+  const absenceOk = !!absence && absence.estado === 'listo' && absencePassed === absenceTotal;
   const card = (icon, title, ok, value, detail, source) => '<article class="jv-control-card ' + (ok ? 'ok' : 'warn') + '"><div class="jv-control-icon">' + osIcon(icon, { size: 18 }) + '</div><div class="jv-control-copy"><div class="jv-control-title"><b>' + OS_E(title) + '</b><span>' + (ok ? 'control aprobado' : 'requiere revisión') + '</span></div><strong>' + OS_E(value) + '</strong><p>' + OS_E(detail) + '</p><small>Fuente: ' + OS_E(source) + '</small></div></article>';
   const occValue = o ? jvNum(o.ocupadas) + ' / ' + jvNum(o.unidades_rentables) + ' ocupadas' : 'Sin lectura disponible';
   const occDetail = o
@@ -1131,10 +1136,13 @@ function jvControlsPanel() {
     ? 'La matriz de responsabilidades todavía no está disponible.'
     : rolesOk ? 'Cada rol crítico tiene titular, respaldo y permisos de área verificados.'
       : (roles.length - coveredRoles) + ' rol(es) todavía no tienen titular y respaldo con permisos confirmados. Jarvis no los presenta como delegados.';
+  const absenceValue = absence ? absencePassed + ' / ' + absenceTotal + ' compuertas' : 'Sin certificación disponible';
+  const absenceDetail = absence ? (absenceOk ? 'Los controles de continuidad están verificados para una ausencia prolongada.' : String(absence.bloqueo_principal || 'Hay compuertas pendientes.')) : 'Todavía no existe una corrida de preparación para ausencia prolongada.';
   return '<section class="jv-controls"><div class="jv-section-title">Controles de integridad <span>evidencia viva</span></div><div class="jv-controls-grid">'
     + card('home', 'Ocupación reconciliada', occOk, occValue, occDetail, 'v_ocupacion')
     + card('git-branch', 'Linaje de datos', lineOk, lineValue, lineDetail, 'lineage_coverage_runs')
     + card('users', 'Cobertura humana', rolesOk, rolesValue, rolesDetail, 'v_operational_role_coverage')
+    + card('shield-check', 'Ausencia de 6 meses', absenceOk, absenceValue, absenceDetail, 'continuidad_ausencia_6_meses')
     + '</div></section>';
 }
 
