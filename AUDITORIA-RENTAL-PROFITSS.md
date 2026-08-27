@@ -1068,3 +1068,131 @@ desplegado**, con los datos ya corregidos.
 3. **Sigue faltando cargar en Airtable los pagos de deuda de agosto-2026** de varias casas (Barkbridge
    entre ellas): mientras no estén, agosto muestra el flujo sin deuda. Ahora que el cron corre cada hora,
    apenas se carguen aparecen solos.
+
+---
+
+## 🏦 PASADA (27 Ago 2026 · 3) — EL SERVICIO DE DEUDA RESTA COMO GASTO DEL MES · HECHO Y EN VIVO
+
+**Pedido del CEO:** "Pago interés HML" y "Pago Refi 30 años" estaban como categoría `financiero`
+con etiqueta **P&L NO**, así que **no restaban ni movían el saldo del Ledger**. Deben contar como
+una salida de caja del mes, igual que un utility o una reparación — por casa y en los totales.
+
+### Qué se cambió
+
+**SOLO el pago mensual recurrente de deuda** que viene de `ff_hml_payments` (espejo de Airtable
+"Pagos interes (HML & REFI)") pasa de categoría `financiero` a **`operativo`**, conservando
+`subcategoria = 'servicio_deuda'`. Como `invEngine.pnlSi()` ya trata `operativo` como **P&L SÍ**,
+el saldo del Ledger empieza a bajar con estos pagos.
+
+- El **concepto no cambia**: sigue siendo "Pago interés HML" o "Pago Refi 30 años" según el mes.
+- La **trazabilidad no cambia**: fuente `FF:ff_hml_payments`.
+- `subcategoria='servicio_deuda'` **se conserva**: es lo que permite sumarlo aparte sin doblarlo.
+
+**Lo que NO se movió** (sigue `financiero`/`inversion` → P&L NO, es capital y no gasto del mes).
+Verificado en el ledger de 3 casas — 12 conceptos de capital siguen sin mover el saldo:
+
+| Concepto | Categoría | Trato |
+|---|---|---|
+| Desembolso Hard Money · Draw 1–5 · Draws (construcción) | financiero | no mueve el saldo |
+| Cash-out del refinanciamiento · Cash out refinanciación | financiero | no mueve el saldo |
+| Fee HML (comisión puntual, `subcategoria='fee_hml'`) | financiero | no mueve el saldo |
+| Distribución al inversionista (utilidad / devolución de capital) | distribucion | no mueve el saldo |
+| Compra de la casa · Gastos de cierre · Remodelación (draws) | inversion | no mueve el saldo |
+| **Pago interés HML · Pago Refi 30 años** | **operativo** | **RESTA y baja el saldo** |
+
+### El riesgo real de este cambio: el DOBLE CONTEO
+
+Había **4 lugares** que sumaban "gastos operativos" y "servicio de deuda" **por separado** y después
+restaban los dos. Si la deuda pasa a `operativo` sin tocarlos, se restaría **dos veces**. Los cuatro
+ahora excluyen explícitamente `subcategoria='servicio_deuda'` del bucket operativo:
+
+1. `inv_dist_auto` — neto distribuible del mes
+2. `inv_portal_resumen` — flujo del último mes (tarjetas del portafolio)
+3. `inv_portal_resumen_de` — ídem, modo "ver como inversionista"
+4. `os/inv-portal.js` — `renderFlujo` (pestaña Flujo Mensual) y el CoC real de `ipMetrics`
+
+**Prueba de que no se dobla** (Barkbridge jun-2026, leído de `inv_dist_auto` en prod):
+`renta 2,000 − operativos 569.35 (5 movimientos, sin la deuda) − deuda 1,579.73 (1 movimiento) = −149.08`
+— exactamente el mismo neto que antes del cambio. **Los netos no se movieron; lo que se movió es el saldo.**
+
+La "Hipoteca" espejada en `pm_expenses` **sigue excluida** del ledger: el servicio de deuda tiene
+**una sola fuente**, `ff_hml_payments`. No hay forma de contarlo dos veces por ahí.
+
+### Antes → después, por casa
+
+Lo que cambia es el **saldo acumulado del Ledger** (ahora sí baja con el pago de deuda). El **neto
+mensual no cambia** — ya restaba la deuda desde la pasada anterior:
+
+| Casa | Ingresos | Gastos oper. (sin deuda) | Servicio de deuda | Saldo ANTES | Saldo AHORA |
+|---|---:|---:|---:|---:|---:|
+| 4916 Barkbridge Trl | 30,743.47 | 4,288.11 | **20,832.38** | 26,455.36 | **5,622.98** |
+| 5003 Michelle Ct | 30,200.00 | 148.00 | **27,225.82** | 30,052.00 | **2,826.18** |
+| 311 Bartlett St | 8,250.00 | 0.00 | **22,722.10** | 8,250.00 | **−14,472.10** |
+
+311 Bartlett es el caso que más se ve: cobró $8,250 de renta y pagó $22,722.10 de interés del HML.
+Antes el Ledger decía saldo **+$8,250**; ahora dice **−$14,472.10**, que es la plata real.
+
+Fila por fila en la pantalla (Barkbridge, junio-2026): el saldo venía en **$1,291**, entra
+`Pago Refi 30 años −$1,580` y queda en **−$288**. La fila siguiente, `Draw 4`, deja el saldo
+**igual (−$2,474 → −$2,474)** y conserva su etiqueta P&L NO.
+
+### Guía de clasificación actualizada (como pidió el CEO)
+
+En el admin (📐 Modelo & movimientos), la guía y el tooltip ahora dicen:
+
+- **Ingreso** — renta recibida, otros ingresos.
+- **Operativo (RESTA del mes)** — utilities, mantenimiento, property mgmt, HOA, seguro, limpieza
+  **y el pago mensual de deuda (interés HML + cuota Refi-30)**.
+- **Inversión (NO resta del mes)** — compra, CapEx mayor, venta.
+- **Financiero (NO resta del mes)** — DRAW del HML, aporte de capital, cash-out del refi,
+  distribuciones. *"El pago mensual de intereses/cuota del HML-refi YA NO va acá: va en Operativo."*
+- **Tax** — predial, renta.
+
+La **sugerencia automática de categoría** se reordenó para que "Pago interés HML" / "Pago Refi 30 años"
+caigan en `operativo` y no en `financiero` (la regla de deuda se evalúa antes que la de capital).
+Probada con 11 casos: `Pago interés HML`→operativo · `Pago Refi 30 años`→operativo ·
+`Cuota refi mensual`→operativo · `Draw 3`→financiero · `Cash out refinanciación`→financiero ·
+`Desembolso Hard Money`→financiero · `Aporte de capital`→financiero · `Distribución`→financiero ·
+`Spectrum internet`→operativo · `Impuesto predial`→tax · `Renta cobrada junio`→ingreso. **11/11.**
+
+### UI
+
+La columna del Ledger pasa de **"Saldo operativo"** a **"Saldo de caja" ⓘ** (portal y admin): ahora
+incluye el servicio de deuda, y decir "operativo" sería mentir. El **NOI se sigue mostrando aparte y
+sin deuda** — es lo que lo hace comparable entre casas — con el tooltip explicando la diferencia.
+
+### Verificación en el sitio en vivo (logueado, sin stubs)
+
+`scripts/qa-flujo-portafolio-deuda.mjs` sobre `https://empresa-os.vercel.app`:
+**65 OK · 0 fallas · 0 pageerrors · 0 errores de consola.** Checks nuevos, en las 3 casas:
+
+```
+la columna del Ledger es "Saldo de caja"                                   OK x3
+el pago de deuda BAJA el saldo del Ledger                                  OK x3
+   Barkbridge: "Pago Refi 30 anos"  saldo previo $1,291   -> -$288
+   Michelle:   "Pago Refi 30 anos"  saldo previo $3,358   -> $326
+   Bartlett:   "Pago interes HML"   saldo previo -$12,262 -> -$15,322
+el pago de deuda YA NO lleva la etiqueta "P&L NO"                          OK x3
+draw / cash-out / distribucion NO mueve el saldo (sigue P&L NO)            OK x3
+   Barkbridge: "Draw 4"                     -$2,474 -> -$2,474  (sin cambio)
+   Michelle:   "Distribucion (utilidad)"     $2,826 ->  $2,826  (sin cambio)
+   Bartlett:   "Desembolso Hard Money"           $0 ->      $0  (sin cambio)
+neto del mes = el mismo de inv_dist_auto (sin doblar)                      OK x3
+total del portafolio (4 casas) -$6,023 = suma de las tarjetas              OK
+```
+
+**Build:** `npm run build` OK — bundle **`assets/bundle.bca280b2dd4e.js`** (esta vez el hash SÍ cambia:
+`os/inv-admin.js` va en el bundle). **Deploy:** push a `main` → `version.json` en vivo = commit `713d7bb`;
+`os/inv-portal.js` en vivo idéntico a HEAD.
+
+### Cómo revertir
+- `inv_ledger`, `inv_dist_auto`, `inv_portal_resumen`, `inv_portal_resumen_de` → reaplicar
+  `20260827140000`, `20260806110000`, `20260827120000` y `20260827130000` respectivamente.
+- Front → revertir el commit `713d7bb`.
+- Ninguna migración borra datos ni cambia firmas: las 4 son `create or replace`.
+
+### Nota de alcance
+Este cambio es del **Ledger del inversionista** (`inv_ledger` y sus consumidores). **No** toca
+`v_pnl_casa`, el motor de proyección (`inv-engine`), los indicadores ni las vistas contables: ahí el
+servicio de deuda se sigue tratando con sus propias definiciones. Sigue abierto el hallazgo de la
+pasada anterior: `v_pnl_casa.interes_hml_real` suma solo `pago_hml` e ignora `ref30`.
