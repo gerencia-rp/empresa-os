@@ -238,8 +238,11 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   // Persistir la foto (dedup por día).
   let created = 0, skipped = 0;
   const [ex] = await sql`select id from pm_informes where tipo='foto_ejecutiva_holding' and corte=${corte} and archived_at is null limit 1`;
-  if (ex) { skipped++; }
-  else {
+  if (ex) {
+    await sql`update pm_informes set payload=${sql.json(payload)}, updated_at=now()
+              where id=${ex.id as string}`;
+    skipped++;
+  } else {
     await sql`insert into pm_informes (tipo, corte, titulo, estado, origen, payload, generado_por)
               values ('foto_ejecutiva_holding', ${corte}, ${"Directiva del día " + corte}, 'borrador', 'ejecutor', ${sql.json(payload)}, 'cerebro-reunion (agentes_ia_exec)')`;
     created++;
@@ -248,7 +251,9 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   // ACTA en memoria (tipo='decisión') — que el Cerebro aprenda la directiva de hoy. Dedup por día.
   const actaTxt = `Directiva ${corte}: ${directiva} (por qué: ${porque}). Números: caja atrapada ${money(defTot)} en ${defRows.length} casas · vencido ${money(vencido)}/${morosos} morosos · ocupación ${occPct ?? "?"}% · ${propuestasTotal} propuestas en cola.`;
   const [mex] = await sql`select id from pm_brain_memory where tipo='decisión' and fuente='cerebro-reunion' and texto like ${"Directiva " + corte + ":%"} and activo=true limit 1`;
-  if (!mex) {
+  if (mex) {
+    await sql`update pm_brain_memory set texto=${actaTxt}, fecha=now(), updated_at=now() where id=${mex.id as string}`;
+  } else {
     await sql`insert into pm_brain_memory (tipo, texto, fuente, fecha, activo) values ('decisión', ${actaTxt}, 'cerebro-reunion', now(), true)`;
   }
 
