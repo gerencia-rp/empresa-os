@@ -100,7 +100,7 @@ function osInjectCSS() {
   #os-root .crumbs{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);margin-left:8px}
   #os-root .crumbs a{color:var(--mut);cursor:pointer;text-decoration:none}#os-root .crumbs a:hover{color:var(--ink)}#os-root .crumbs .sep{color:var(--mut2)}#os-root .crumbs b{color:var(--ink)}
   #os-root .barr{margin-left:auto;display:flex;gap:8px;align-items:center}
-  #os-root .ibtn{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);height:34px;padding:0 12px;border-radius:10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(10px)}
+  #os-root .ibtn{background:var(--glass);border:1px solid var(--glassb);color:var(--mut);height:44px;min-width:44px;padding:0 12px;border-radius:10px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;backdrop-filter:blur(10px)}
   #os-root .ibtn:hover{color:var(--ink);border-color:var(--a2)}
   #os-root h1{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:640;letter-spacing:-.3px}#os-root h1 span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   #os-root .sub{color:var(--mut);font-size:13px;margin:5px 0 20px}
