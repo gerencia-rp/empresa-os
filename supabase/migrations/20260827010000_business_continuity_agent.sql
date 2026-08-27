@@ -38,6 +38,40 @@ where not exists (
   where nombre='Gerente de Éxito Estudiantil' and deleted_at is null
 );
 
+create table if not exists public.agent_decision_policies (
+  tipo_accion text primary key,
+  categoria text not null check (categoria in ('control','operativa','financiera','comunicacion','sensible')),
+  rol_primario text not null,
+  rol_respaldo text not null,
+  rol_escalamiento text not null default 'CEO',
+  sla_hours integer not null check (sla_hours between 1 and 720),
+  auto_execute boolean not null default false,
+  requiere_evidencia boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+alter table public.agent_decision_policies enable row level security;
+drop policy if exists agent_decision_policies_read on public.agent_decision_policies;
+create policy agent_decision_policies_read on public.agent_decision_policies
+  for select to authenticated using (true);
+
+insert into public.agent_decision_policies
+  (tipo_accion,categoria,rol_primario,rol_respaldo,rol_escalamiento,sla_hours,auto_execute,requiere_evidencia)
+values
+  ('conciliacion','control','Controller','Director de Continuidad Operativa','CEO',24,false,true),
+  ('correccion_dato','control','Auditor de Agentes','Director de Continuidad Operativa','CEO',24,false,true),
+  ('nudge','operativa','Gerente del área','Director de Continuidad Operativa','CEO',24,false,true),
+  ('recordatorio_cobro','comunicacion','Gerente de Rentas','Controller','CEO',24,false,true),
+  ('cuello_botella','control','Gerente del área','Director de Continuidad Operativa','CEO',12,false,true),
+  ('plan_ocupacion','operativa','Gerente de Rentas','Director de Continuidad Operativa','CEO',48,false,true),
+  ('precio_dinamico','financiera','Gerente de Rentas','Controller','CEO',24,false,true),
+  ('nomina','financiera','Controller','Gerente de Remodelación','CEO',12,false,true),
+  ('refechar_tarea','operativa','Gerente del área','Director de Continuidad Operativa','CEO',48,false,true),
+  ('archivar_tarea','sensible','Gerente del área','Auditor de Agentes','CEO',72,false,true)
+on conflict (tipo_accion) do update set
+  categoria=excluded.categoria,rol_primario=excluded.rol_primario,rol_respaldo=excluded.rol_respaldo,
+  rol_escalamiento=excluded.rol_escalamiento,sla_hours=excluded.sla_hours,
+  auto_execute=excluded.auto_execute,requiere_evidencia=excluded.requiere_evidencia,updated_at=now();
+
 insert into public.agent_knowledge_domains
   (codigo,nombre,area,descripcion,fuentes,metricas_clave,sistemas,freshness_hours)
 values
