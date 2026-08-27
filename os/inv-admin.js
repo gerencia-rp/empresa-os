@@ -248,7 +248,7 @@ function iaPnl(cat) { return IA_PNL_SI.includes(String(cat || '').toLowerCase())
 const IA_PNL_TIP = 'P&L = ¿resta del dinero del mes (afecta la utilidad)? SÍ: ingreso, operativo (incluye el PAGO MENSUAL DE DEUDA: interés HML + cuota Refi-30) y tax. NO: inversión y financiero (draw del HML, aporte de capital, cash-out, distribuciones): son capital, no gasto del mes.';
 const IA_CAT_GUIA = [
   ['ingreso', 'Ingreso', 'renta recibida, otros ingresos'],
-  ['operativo', 'Operativo (RESTA del mes)', 'utilities, mantenimiento, property mgmt, HOA, seguro, limpieza y el PAGO MENSUAL DE DEUDA (interés HML + cuota Refi-30)'],
+  ['operativo', 'Operativo (RESTA del mes)', 'utilities, mantenimiento, HOA, seguro, limpieza, el PAGO MENSUAL DE DEUDA (interés HML + cuota Refi-30) y el PAGO PROPERTY MANAGEMENT (5% de la renta cobrada del mes, automático y editable)'],
   ['inversion', 'Inversión (NO resta del mes)', 'compra de propiedad, CapEx mayor, venta de propiedad'],
   ['financiero', 'Financiero (NO resta del mes)', 'DRAW del HML (no es ingreso), aporte de capital, cash-out del refi, distribuciones — es capital. El pago mensual de intereses/cuota del HML-refi YA NO va acá: va en Operativo'],
   ['tax', 'Tax', 'impuesto predial, impuesto de renta'],
@@ -337,6 +337,60 @@ async function iaSaveMov(id) {
   await iaLoadCasa(IA.casa); osRender();
 }
 window.iaSaveMov = iaSaveMov;
+
+// ─── 🔵 "Pago Property Management" — el ÚNICO auto EDITABLE ───────────────────────────────
+// El ítem se CALCULA en inv_ledger (% de la renta cobrada del mes, key inv_pm_fee_pct), así que
+// se recalcula solo cuando cambia la renta. Lo que se persiste acá es la EDICIÓN MANUAL, en
+// inv_pm_fee_overrides (una por casa+mes): mientras exista y esté activa, MANDA sobre el cálculo
+// y el recálculo NO la pisa. Mismo patrón que inv_param_overrides: reversible (↩) y auditado.
+function iaEsPmFee(m) { return m && m.subcategoria === 'pm_fee'; }
+function iaPmMes(m) { return String(m.mes || String(m.fecha || '').slice(0, 7)); }
+function iaEditPmFee(mes) { IA.pmEdit = mes; osRender(); }
+window.iaEditPmFee = iaEditPmFee;
+// escribe/actualiza el override vigente de esa casa+mes (el índice único es PARCIAL —solo activas—
+// así que no se puede usar on_conflict de PostgREST: se busca y se decide insert vs update)
+async function iaPmUpsert(mes, patch) {
+  const { data: ex, error: e0 } = await sb.from('inv_pm_fee_overrides')
+    .select('id').eq('property_id', IA.casa).eq('billing_ym', mes).eq('active', true).limit(1);
+  if (e0) return alert('Error: ' + e0.message);
+  const base = Object.assign({ editado_por: IA.email || null, updated_at: new Date().toISOString() }, patch);
+  const { error } = (ex && ex.length)
+    ? await sb.from('inv_pm_fee_overrides').update(base).eq('id', ex[0].id)
+    : await sb.from('inv_pm_fee_overrides').insert(Object.assign({ property_id: IA.casa, billing_ym: mes }, base));
+  if (error) return alert('Error: ' + error.message);
+  IA.pmEdit = null;
+  delete IA.ledgerCache[IA.casa];
+  await iaLoadCasa(IA.casa); osRender();
+  return true;
+}
+async function iaSavePmFee(mes, valorAuto) {
+  const g = k => (document.getElementById('ia-pm-' + k) || {}).value || '';
+  const monto = parseFloat(g('valor'));
+  const fecha = g('fecha');
+  if (!(monto > 0)) return alert('El monto tiene que ser mayor a 0. Para quitar el ítem del mes usá el botón de eliminar.');
+  if (!fecha) return alert('La fecha es obligatoria');
+  const ok = await iaPmUpsert(mes, { monto: monto, fecha: fecha, eliminado: false, valor_auto: valorAuto != null ? valorAuto : null });
+  if (ok && window.toast) toast('✓ Property Management editado a mano — el recálculo ya no lo pisa', 'success');
+}
+window.iaSavePmFee = iaSavePmFee;
+async function iaDelPmFee(mes, valorAuto) {
+  if (!confirm('¿Quitar el Property Management de ' + mes + '? Deja de restar en ese mes. Es reversible con ↩ volver al automático.')) return;
+  const ok = await iaPmUpsert(mes, { eliminado: true, monto: null, fecha: null, valor_auto: valorAuto != null ? valorAuto : null });
+  if (ok && window.toast) toast('✓ Ítem quitado de ese mes (reversible)', 'success');
+}
+window.iaDelPmFee = iaDelPmFee;
+async function iaResetPmFee(mes) {
+  if (!confirm('¿Volver al cálculo automático en ' + mes + '? Se descarta la edición manual (queda en el audit).')) return;
+  const { error } = await sb.from('inv_pm_fee_overrides')
+    .update({ active: false, archived_at: new Date().toISOString(), editado_por: IA.email || null })
+    .eq('property_id', IA.casa).eq('billing_ym', mes).eq('active', true);
+  if (error) return alert('Error: ' + error.message);
+  IA.pmEdit = null;
+  delete IA.ledgerCache[IA.casa];
+  await iaLoadCasa(IA.casa); osRender();
+  if (window.toast) toast('✓ Vuelve a calcularse solo', 'success');
+}
+window.iaResetPmFee = iaResetPmFee;
 function iaToggleGuia() { const el = document.getElementById('ia-guia-cat'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
 window.iaToggleGuia = iaToggleGuia;
 
@@ -1324,6 +1378,19 @@ function iaMovsCard() {
   const led = IA.ledgerCache[IA.casa];
   if (led === undefined) iaLoadLedger(IA.casa);
   const autos = Array.isArray(led) ? led.filter(m => !/^OS:manual/.test(m.fuente || '')) : null;
+  // form inline del Property Management (el auto editable): monto + fecha de ESE mes
+  const editPmRow = (m, mes, manual) => {
+    if (IA.pmEdit !== mes) return '';
+    return '<div style="background:var(--glass);border:1px solid var(--a2);border-radius:9px;padding:10px;margin:4px 0">'
+      + '<div class="meta" style="font-size:10.5px;margin-bottom:6px">Property Management de <b>' + OS_E(invEngine.mesEs(mes)) + '</b> — se calcula solo como % de la renta cobrada del mes. Si lo editás, tu valor manda y el recálculo NO lo pisa.</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+      + '<input id="ia-pm-fecha" type="date" class="osa-in" style="padding:6px" value="' + OS_E(m.fecha) + '">'
+      + '<input id="ia-pm-valor" type="number" step="0.01" class="osa-in" style="padding:6px" value="' + OS_E(m.monto) + '">'
+      + '</div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+      + '<button class="cbtn" style="padding:6px 12px" onclick="iaSavePmFee(\'' + mes + '\', ' + (+m.monto || 0) + ')">' + osIcon('save') + ' Guardar</button>'
+      + (manual ? '<button class="ct-btn" onclick="iaResetPmFee(\'' + mes + '\')">↩ Volver al automático</button>' : '')
+      + '<button class="ct-btn" onclick="IA.pmEdit=null;osRender()">Cancelar</button></div></div>';
+  };
   const editRow = m => {
     if (IA.movEdit !== m.id) return '';
     return '<div style="background:var(--glass);border:1px solid var(--a2);border-radius:9px;padding:10px;margin:4px 0">'
@@ -1350,11 +1417,25 @@ function iaMovsCard() {
     + (IA.cashflow.map(m => editRow(m) + '<div class="kv"><span title="' + OS_E(m.fecha) + '">' + OS_E(invEngine.mesEs(String(m.fecha || '').slice(0, 7))) + ' · ' + OS_E(m.concepto || m.item || m.linea) + ' <span class="badge b-warn" style="font-size:8px">manual</span> ' + iaPnlBadge(m.categoria) + (m.factura_url ? ' <a href="' + OS_E(m.factura_url) + '" target="_blank" style="color:var(--a2);font-size:10px">' + osIcon('file') + ' Ver factura</a>' : (m.id_factura ? ' · #' + OS_E(m.id_factura) : '')) + '</span>'
       + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.valor : -m.valor)
       + ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" onclick="iaEditMov(\'' + m.id + '\')">' + osIcon('pencil') + '</button><button class="ct-btn" style="padding:1px 6px;font-size:9px;color:var(--neg)" onclick="iaDelMov(\'' + m.id + '\')">' + osIcon('trash') + '</button></b></div>').join('') || '<div class="meta" style="padding:6px 2px">Sin movimientos manuales.</div>')
-    + '<div class="lab" style="margin-top:12px">' + osIcon('settings') + ' Auto-importados (' + (autos ? autos.length : osIcon('loader')) + ') — de FF/Rentas, con su linaje, no se re-teclean</div>'
+    + '<div class="lab" style="margin-top:12px">' + osIcon('settings') + ' Auto-importados (' + (autos ? autos.length : osIcon('loader')) + ') — de FF/Rentas, con su linaje, no se re-teclean · <span class="meta" style="font-size:10px;text-transform:none">el <b>Pago Property Management</b> es el único que SÍ podés editar</span></div>'
     + (autos === null ? '<div class="meta">' + osIcon('loader') + ' cargando…</div>'
-      : autos.slice(-40).reverse().map(m => '<div class="kv"><span title="' + OS_E(m.fecha) + ' · ' + OS_E(m.fuente) + '">' + OS_E(invEngine.mesEs(String(m.fecha || '').slice(0, 7))) + ' · ' + OS_E(m.concepto) + ' <span class="badge b-ok" style="font-size:8px">auto · ' + OS_E(String(m.fuente || '').split(':')[0]) + '</span> ' + iaPnlBadge(m.categoria === 'renta' ? 'ingreso' : m.categoria) + (m.comprobante ? ' <a href="' + OS_E(m.comprobante) + '" target="_blank" style="color:var(--a2);font-size:10px">' + osIcon('paperclip') + '</a>' : '') + '</span>'
-        + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.monto : -m.monto) + '</b></div>').join(''))
-    + '<div class="meta" style="margin-top:8px;font-size:10.5px">El ' + osIcon('dollar') + ' Ledger es la vista de SOLO LECTURA de estos mismos movimientos (manuales + auto) agrupados por categoría — cero doble digitación. Para corregir un auto: cargá un movimiento manual de ajuste (queda auditado).</div>'
+      : autos.slice(-40).reverse().map(m => {
+        const pm = iaEsPmFee(m), mes = pm ? iaPmMes(m) : null, manual = pm && /manual/.test(m.fuente || '');
+        return (pm ? editPmRow(m, mes, manual) : '')
+          + '<div class="kv"><span title="' + OS_E(m.fecha) + ' · ' + OS_E(m.fuente) + '">' + OS_E(invEngine.mesEs(String(m.fecha || '').slice(0, 7))) + ' · ' + OS_E(m.concepto)
+          + (pm
+              ? ' <span class="badge" style="font-size:8px;background:rgba(58,160,255,.14);color:#3aa0ff" title="' + OS_E(m.fuente) + '">' + (manual ? 'editado a mano' : 'auto · calculado') + '</span>'
+              : ' <span class="badge b-ok" style="font-size:8px">auto · ' + OS_E(String(m.fuente || '').split(':')[0]) + '</span>')
+          + ' ' + iaPnlBadge(m.categoria === 'renta' ? 'ingreso' : m.categoria)
+          + (m.comprobante ? ' <a href="' + OS_E(m.comprobante) + '" target="_blank" style="color:var(--a2);font-size:10px">' + osIcon('paperclip') + '</a>' : '') + '</span>'
+          + '<b class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '" style="white-space:nowrap">' + iaMoney(m.tipo === 'ingreso' ? m.monto : -m.monto)
+          + (pm ? ' <button class="ct-btn" style="padding:1px 6px;font-size:9px" title="editar este mes (el recálculo no lo pisa)" onclick="iaEditPmFee(\'' + mes + '\')">' + osIcon('pencil') + '</button>'
+                  + '<button class="ct-btn" style="padding:1px 6px;font-size:9px;color:var(--neg)" title="quitar el ítem de este mes (reversible)" onclick="iaDelPmFee(\'' + mes + '\', ' + (+m.monto || 0) + ')">' + osIcon('trash') + '</button>'
+                  + (manual ? '<button class="ct-btn" style="padding:1px 6px;font-size:9px" title="volver al cálculo automático" onclick="iaResetPmFee(\'' + mes + '\')">↩</button>' : '')
+             : '')
+          + '</b></div>';
+      }).join(''))
+    + '<div class="meta" style="margin-top:8px;font-size:10.5px">El ' + osIcon('dollar') + ' Ledger es la vista de SOLO LECTURA de estos mismos movimientos (manuales + auto) agrupados por categoría — cero doble digitación. Para corregir un auto: cargá un movimiento manual de ajuste (queda auditado). La excepción es el <b>Pago Property Management</b>: ese se edita ahí mismo (✎), y tu valor manda sobre el cálculo automático.</div>'
     + '</div>';
 }
 

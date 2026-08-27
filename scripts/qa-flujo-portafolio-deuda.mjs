@@ -27,6 +27,8 @@ const CASAS = [
     pid: '6fa5ad93-31a7-462e-b48b-444491dd2b65',
     // jun-26: renta 2,000 · operativos 569.35 · REFI 30 1,579.73 · neto −149.08
     mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /569/, deu: /1,580/, neto: /−\$149|-\$149/,
+    // Property Management: jun-26 fue EDITADO a mano ($120 en vez del 5% = $100) -> el manual manda
+    pm: { concepto: 'Pago Property Management (editado a mano)', monto: '$120', fecha: '2026-06-28' },
     // HML hasta sep-2025, Refi 30 desde oct-2025: los DOS conceptos tienen que aparecer
     conceptos: ['Pago Refi 30 años', 'Pago interés HML'], prohibidos: [/Pago interés HML.*1,600|1,600/],
   },
@@ -36,6 +38,8 @@ const CASAS = [
     pid: 'efad086f-3008-49fd-96da-dbeaaba650f2',
     // jun-26 todavía HML: renta 3,700 · operativos 0 · deuda 2,116.13 · neto 1,583.87
     mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /\$0/, deu: /2,116/, neto: /1,584/,
+    // renta 3,700 x 5% = 185, al ultimo dia del mes. En jul-26 NO debe existir (hay uno manual de $148)
+    pm: { concepto: 'Pago Property Management (5%)', monto: '$185', fecha: '2026-06-30' },
     conceptos: ['Pago interés HML', 'Pago Refi 30 años'], prohibidos: [],
   },
   {
@@ -44,6 +48,8 @@ const CASAS = [
     pid: '565c8ef9-f019-4acb-8b54-4c57d1056e01',
     // jul-26: renta 850 · operativos 0 · interés HML 3,060 · neto −2,210
     mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /\$0/, deu: /3,060/, neto: /−\$2,210|-\$2,210/,
+    // renta 850 x 5% = 42.50 -> se muestra redondeado a $43
+    pm: { concepto: 'Pago Property Management (5%)', monto: '$43', fecha: '2026-07-31' },
     // sin refi: NINGÚN movimiento puede decir "Refi 30"
     conceptos: ['Pago interés HML'], prohibidos: [/Refi 30/],
   },
@@ -138,6 +144,10 @@ for (const c of CASAS) {
       // ¿el pago de deuda BAJA el saldo? ¿el draw/cash-out lo deja igual?
       movDeuda: saldoMueve(/servicio de deuda/i),
       movCapital: saldoMueve(/Desembolso Hard Money|Cash-out|Draw|Distribuci/i),
+      // Property Management: todas sus filas (fecha | concepto | monto | saldo)
+      pmRows: movs.filter(f => /Property Management/i.test(f[1] || ''))
+                  .map(f => ({ fecha: f[0], concepto: f[1], categoria: f[2], monto: f[3], saldo: f[4], fuente: f[5] })),
+      movPm: saldoMueve(/Property Management/i),
     };
   }, c.mes);
 
@@ -166,6 +176,21 @@ for (const c of CASAS) {
   if (d.movCapital) {
     chk(c.nombre + ' · draw / cash-out / distribución NO mueve el saldo (sigue P&L NO)',
       d.movCapital.cambia === false, JSON.stringify(d.movCapital));
+  }
+  // ── ítem automático "Pago Property Management" (5% de la renta del mes) ──
+  if (c.pm) {
+    const fila = (d.pmRows || []).find(f => f.fecha === c.pm.fecha);
+    chk(c.nombre + ' · PM: hay ítem en ' + c.pm.fecha, !!fila, JSON.stringify((d.pmRows || []).slice(0, 3)));
+    chk(c.nombre + ' · PM: concepto "' + c.pm.concepto + '"', !!(fila && fila.concepto.includes(c.pm.concepto)), fila && fila.concepto);
+    chk(c.nombre + ' · PM: monto ' + c.pm.monto, !!(fila && fila.monto.includes(c.pm.monto)), fila && fila.monto);
+    chk(c.nombre + ' · PM: categoría operativo (resta del mes)', !!(fila && /operativo/i.test(fila.categoria)), fila && fila.categoria);
+    chk(c.nombre + ' · PM: fecha = fin de mes o la editada', !!(fila && /-(28|29|30|31)$/.test(fila.fecha)), fila && fila.fecha);
+    chk(c.nombre + ' · PM: BAJA el saldo del Ledger', !!(d.movPm && d.movPm.cambia), JSON.stringify(d.movPm));
+    chk(c.nombre + ' · PM: todas las fechas son fin de mes o edición manual',
+      (d.pmRows || []).every(f => /-(28|29|30|31)$/.test(f.fecha)), (d.pmRows || []).map(f => f.fecha).join(', '));
+    chk(c.nombre + ' · PM: un solo ítem por mes (sin duplicados)',
+      new Set((d.pmRows || []).map(f => String(f.fecha).slice(0, 7))).size === (d.pmRows || []).length,
+      (d.pmRows || []).map(f => f.fecha).join(', '));
   }
 
   // coherencia con la distribución automática: mismo mes, mismo neto
