@@ -19,7 +19,8 @@ const SK = process.env.SERVICE_KEY || process.env.SB_KEY;
 const APIKEY = process.env.SB_APIKEY || PUBLIC_ANON_KEY;
 const MODE = process.argv.includes('--gate') ? 'gate' : 'register';
 const EMAIL = 'qa-admin-test@rentalprofitss.com';
-const PASS = process.env.QA_PASS || 'QaPortal2026!cov';
+const PASS = process.env.QA_PASS || '';
+if (!PASS) { console.error('Falta QA_PASS (secreto de ejecución; nunca se guarda en el repo).'); process.exit(1); }
 
 // ── pantallas: shell OS + overlays con drivers (pre = JS a evaluar, wait = selector a esperar) ──
 const S = (emp, sys, pre, host, wait) => ({ emp, sys, pre, host: host || '#os-root', wait });

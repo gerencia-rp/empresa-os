@@ -7,11 +7,22 @@
 // pero pasando por RLS): SB_APIKEY=<anon key> SB_KEY=<access_token del admin> npm run ci:gate
 // ════════════════════════════════════════════════════════════════
 import { readFileSync } from 'node:fs';
+import { PUBLIC_ANON_KEY } from '../api/_pm-report-data.mjs';
 
 const REST = 'https://nezbaljfhhyznhltpjnk.supabase.co/rest/v1/';
-const KEY = process.env.SB_KEY;
-const APIKEY = process.env.SB_APIKEY || KEY; // el gateway exige una API key válida en `apikey`
-if (!KEY) { console.error('Falta SB_KEY'); process.exit(1); }
+let KEY = process.env.SB_KEY || '';
+const APIKEY = process.env.SB_APIKEY || PUBLIC_ANON_KEY; // el gateway exige una API key válida en `apikey`
+if (!KEY) {
+  const qaPass = process.env.QA_PASS || '';
+  if (!qaPass) { console.error('Falta SB_KEY o QA_PASS (secreto de ejecución; nunca se guarda en el repo).'); process.exit(1); }
+  const login = await fetch('https://nezbaljfhhyznhltpjnk.supabase.co/auth/v1/token?grant_type=password', {
+    method: 'POST', headers: { apikey: APIKEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'qa-admin-test@rentalprofitss.com', password: qaPass }),
+  });
+  const auth = await login.json().catch(() => ({}));
+  KEY = auth.access_token || '';
+  if (!login.ok || !KEY) { console.error('No se pudo iniciar la sesión QA para el gate.'); process.exit(1); }
+}
 const q = async (path) => {
   const r = await fetch(REST + path, { headers: { apikey: APIKEY, Authorization: 'Bearer ' + KEY } });
   if (!r.ok) throw new Error(path + ' → ' + r.status);
