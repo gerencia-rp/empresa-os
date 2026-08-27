@@ -34,8 +34,6 @@ Deno.serve(async (req) => {
     try { await sql`select 1 from pm_credentials limit 1`; iso.pm_credentials = "LEAK"; } catch (e) { iso.pm_credentials = /permission denied/i.test(String((e as Error).message || e)) ? "PASS" : "ERR"; }
     try { await sql`select document_id from pm_tenants limit 1`; iso.document_id = "LEAK"; } catch (e) { iso.document_id = /permission denied/i.test(String((e as Error).message || e)) ? "PASS" : "ERR"; }
     if (iso.pm_credentials !== "PASS" || iso.document_id !== "PASS") { await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ accion: "abort" })},${sql.json({ iso })},'ABORT')`; return json({ ok: false, aborted: true, iso }, 500); }
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
     // Obras EN CONSTRUCCIÓN con vencidas (excluye Finalizado/Pre-construcción = artefacto/no-arrancó)
     const obras = await sql`
       select wa.property_name casa, count(*) filter (where wa.status<>'done' and wa.date < current_date)::int vencidas,
@@ -44,17 +42,20 @@ Deno.serve(async (req) => {
       join remodel_at_properties ap on lower(btrim(ap.address)) like '%'||lower(btrim(wa.property_name))||'%' and ap.active is not false and ap.proceso='En construcción'
       group by 1 having count(*) filter (where wa.status<>'done' and wa.date < current_date) > 0
       order by 2 desc`;
-    let created = 0, skipped = 0; const nudged: string[] = [];
+    let created = 0, refreshed = 0, skipped = 0, retired = 0; const nudged: string[] = [], seenKeys: string[] = [];
     for (const o of obras) {
       const key = "remodej:nudge:" + o.casa + ":" + corte;
-      if (keys.has(key)) { skipped++; continue; }
+      seenKeys.push(key);
       const payload = { requiere_aprobacion: true, accion: "enviar_nudge", dedup_key: key, canal: "whatsapp/clickup" };
       const evid = { tipo: "nudge", casa: o.casa, vencidas: Number(o.vencidas), sin_dueno: Number(o.sin_dueno), hallazgo: `${o.casa}: ${o.vencidas} tareas vencidas, ${o.sin_dueno} sin dueño. Piso humano: la obra la hacen Diego/Structure One.`, nota: "DRY-RUN: no envía; excluye obras Finalizado (planner sin cerrar) y Pre-construcción", fuente: "weekly_activities + remodel_at_properties", origen: "ejecutor remod-ejecucion" };
-      await sql`insert into agent_proposals (agent_id,tipo_accion,estado,payload,evidencia) values (${agent.id},'nudge','propuesta',${sql.json(payload)},${sql.json(evid)})`;
-      created++; nudged.push(o.casa as string);
+      const [result] = await sql`select outcome from record_agent_proposal(${agent.id},'nudge',${sql.json(payload)},${sql.json(evid)})`;
+      if (result?.outcome === "created") created++; else refreshed++;
+      nudged.push(o.casa as string);
     }
-    await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ corte, rol_db: "agentes_ia_exec" })},${sql.json({ created, skipped, nudged, iso })},'ok')`;
-    return json({ ok: true, corte, created, skipped, nudged, iso });
+    const [reconciled] = await sql`select reconcile_agent_proposal_set(${agent.id},'nudge','remodej:nudge:',${seenKeys}::text[]) retired`;
+    retired = Number(reconciled?.retired || 0);
+    await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ corte, rol_db: "agentes_ia_exec" })},${sql.json({ created, refreshed, retired, skipped, nudged, iso })},'ok')`;
+    return json({ ok: true, corte, created, refreshed, retired, skipped, nudged, iso });
   } catch (e) { return json({ ok: false, error: String((e as Error).message || e) }, 500); }
   finally { if (sql) { try { await sql.end({ timeout: 5 }); } catch (_e) { /* noop */ } } }
 });
