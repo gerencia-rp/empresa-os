@@ -1392,3 +1392,102 @@ Revertir el commit `1fc3a5f` (es front puro, `os/inv-admin.js`). No hubo migraci
   movería números fuera del pedido; queda anotado por si se quiere unificar.
 - Cosmético: `iaMoney` formatea los negativos como `$-314` (no `−$314`). Es el formato que usa todo
   el admin desde antes; cambiarlo tocaría el resto de los números de la pantalla.
+
+---
+
+## 🔢 PASADA (27 Ago 2026 · 6) — PROPERTY MANAGEMENT AL 4% + ⓘ EN LOS SUBTOTALES · HECHO Y EN VIVO
+
+Dos ajustes pedidos por el CEO: bajar el Property Management de **5% a 4%**, y agregar un **ⓘ** en
+"Subtotales por categoría" que explique de dónde sale cada número y qué significa "P&L NO".
+
+### 1) 5% → 4%
+
+**Fue un `update` de una fila, sin backfill.** El ítem no se materializa: se **calcula** dentro de
+`inv_ledger` leyendo `ff_uw_config.inv_pm_fee_pct`. Al bajar el valor:
+
+- todos los meses **no editados se recalcularon solos** en la siguiente lectura del ledger;
+- la etiqueta se arma con ese mismo valor → pasó a **"Pago Property Management (4%)"** y la fuente a
+  `OS:pm_fee(auto 4% de la renta cobrada del mes)`;
+- los meses **editados a mano no se tocaron**: usan el monto del override, no el porcentaje.
+
+Renta del mes → 4%, verificado contra Supabase:
+
+| Casa | Mes | Renta | **Antes (5%)** | **Ahora (4%)** |
+|---|---|---:|---:|---:|
+| 4916 Barkbridge | ago-26 | 2,700.00 | 135.00 | **108.00** |
+| 4916 Barkbridge | jul-26 | 3,500.00 | 175.00 | **140.00** |
+| 4916 Barkbridge | jun-26 | 2,000.00 | 100.00 | **80.00** |
+| 4916 Barkbridge | may-26 | 1,300.00 | 65.00 | **52.00** |
+| 5003 Michelle | jun-26 / may-26 | 3,700.00 | 185.00 | **148.00** |
+| 5003 Michelle | ago-26 | 2,500.00 | 125.00 | **100.00** |
+| 5003 Michelle | **jul-26** | 3,700.00 | — | **— sigue sin generarse** (manual de $148) |
+| 902 Virginia | jul-26 / jun-26 | 5,100.00 | 255.00 | **204.00** |
+| 902 Virginia | ago-26 | 4,490.00 | 224.50 | **179.60** |
+| 902 Virginia | **may-26** | 0.00 | — | **— sin renta, sin ítem** |
+| 311 Bartlett | jul-26 | 850.00 | 42.50 | **34.00** |
+
+**Comprobación cruzada:** el saldo de caja histórico de Barkbridge pasó de **$4,085.81** a
+**$4,393.24**. La diferencia es **$307.43**, que es exactamente **el 1% de sus $30,743.47 de renta
+cobrada** — el punto porcentual que se bajó, ni un centavo más.
+
+⚠ Ojo para el futuro: `inv_pm_fee_pct` (Ledger) y `pm_fee_pct` (underwriting) **ahora valen los dos
+4**, pero son **claves distintas con significados distintos**. No consolidarlas: mover una movería
+números de la otra pantalla.
+
+### 2) ⓘ "¿de dónde sale?" en Subtotales por categoría
+
+En el **Ledger del admin**, en dos niveles (mismo estilo que la guía de clasificación que ya existía):
+
+- **ⓘ en el encabezado del recuadro** → despliega el desglose completo: qué conceptos suma cada
+  categoría, de qué tabla/fuente sale, y una nota final explicando **"P&L NO"**. Arranca cerrado.
+- **ⓘ por fila** → al pasar el mouse, la explicación de esa categoría.
+
+Los textos, en lenguaje simple:
+
+| Categoría | Qué dice el ⓘ |
+|---|---|
+| `ingreso · renta` | Renta cobrada a los inquilinos en el período. Fuente: **Rentas · pm_payments** (solo pagos con estado "pagado"). |
+| `gasto · operativo` | Utilities, aseo y podada, mantenimiento, HOA, seguro, limpieza, el **Pago Property Management (4% de la renta)** y el **servicio de deuda**. Fuentes: **pm_expenses** + el cálculo del PM (OS) + **ff_hml_payments**. RESTA del mes y baja el saldo. |
+| `gasto · operativo · servicio de deuda` | Solo el pago mensual del préstamo (interés HML o cuota refi 30a según el mes). Fuente: **ff_hml_payments** (espejo de Airtable "Pagos interes (HML & REFI)"). Se muestra aparte, pero **ya está contado una sola vez** dentro de los operativos. |
+| `gasto · inversion` | Compra, gastos de cierre y draws de remodelación. Fuentes: ff_deals, ff_hml_loans, ff_draws. **No baja el saldo.** |
+| `ingreso · financiero` | Desembolso del Hard Money y cash-out del refi: plata que entra por financiamiento, **no es ganancia**. |
+| `gasto · financiero` | Fee puntual del HML, aportes y movimientos de capital. **No bajan el saldo.** |
+| `gasto · distribucion` | Lo que ya se le pagó al inversionista. No es gasto de operar la casa. |
+| `tax` | Impuestos de la casa (predial, renta). |
+
+Y la explicación de la etiqueta: *«**"P&L NO"** quiere decir que ese movimiento **no entra al Estado
+de Resultados**: no es ganancia ni gasto del mes, es **capital o financiamiento** (un draw del HML, el
+cash-out del refi, un aporte, la compra de la casa o una distribución). Por eso **no mueve el saldo de
+caja** — solo se muestra para que el movimiento del dinero quede completo.»*
+
+Hay un **fallback** para categorías que no estén en el diccionario, así ninguna fila queda sin explicar
+si mañana aparece una nueva.
+
+**En el portal del inversionista** el recuadro equivalente es el desglose de **"Gastos operativos"**.
+Se le agregó el mismo ⓘ por línea (y otro en la itemización del servicio de deuda), con texto para
+inversionista, no para contador. De paso se corrigió un efecto secundario del ítem nuevo: el
+**Property Management caía dentro de "otros"** —su concepto no empieza con "Gasto", que es el patrón
+que trae Rentas— así que el inversionista veía un número sin nombre. Ahora se nombra
+**"Property Management"** con su explicación al pasar el mouse.
+
+### Verificación en el sitio en vivo (logueado, sin stubs)
+
+- `scripts/qa-ledger-filtro-anio.mjs`: **47 OK · 0 fallas** — incluye 6 checks nuevos del ⓘ (existe
+  el botón, arranca cerrado y abre, nombra `pm_payments`, explica el operativo con el PM al 4% y el
+  servicio de deuda, explica "P&L NO", y cada fila tiene su propio ⓘ).
+- `scripts/qa-flujo-portafolio-deuda.mjs`: **89 OK · 0 fallas** — PM $80 / $148 / $34 en las 3 casas,
+  y el neto del mes en pantalla igual al de `inv_dist_auto`:
+
+```
+Barkbridge jun-26  $2,000 · -$649 · -$1,580 · -$229   = {oper 649.35, deuda 1579.73, neto -229.08}
+Michelle   jun-26  $3,700 · -$148 · -$2,116 · $1,436  = {oper 148,    deuda 2116.13, neto 1435.87}
+Bartlett   jul-26    $850 ·  -$34 · -$3,060 · -$2,244 = {oper 34,     deuda 3060,    neto -2244}
+```
+
+**Build:** `npm run build` OK — bundle `assets/bundle.85b87596aaad.js`.
+**Deploy:** push a `main` → `version.json` en vivo = commit `09dafbe`.
+
+### Cómo revertir
+- El porcentaje: `update ff_uw_config set value = 5 where key = 'inv_pm_fee_pct';` (los meses no
+  editados se recalculan solos; **no tocar `pm_fee_pct`**, que es la del underwriting).
+- El ⓘ: revertir el commit `09dafbe` (front puro).
