@@ -110,7 +110,6 @@ async function lineageRunHandler(req, res) {
       con_linaje: num(b.con_linaje),
       sin_linaje: num(b.sin_linaje),
       nuevos_registrados: num(b.nuevos_registrados),
-      ok: num(b.sin_linaje) === 0,
       detalle: {
         modo: b.detalle && b.detalle.modo === 'register' ? 'register' : 'gate',
         base: String((b.detalle && b.detalle.base) || '').slice(0, 240),

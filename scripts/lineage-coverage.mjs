@@ -10,6 +10,7 @@
 //   tablas de registros no son métricas: su linaje es el de sus columnas, ya trazado.
 // Uso: SERVICE_KEY=sb_secret_... QA_BASE=http://localhost:5173/index.html node scripts/lineage-coverage.mjs --register
 import puppeteer from 'puppeteer-core';
+import { writeFileSync } from 'node:fs';
 import { PUBLIC_ANON_KEY } from '../api/_pm-report-data.mjs';
 
 const BASE = process.env.QA_BASE || 'http://localhost:5173/index.html';
@@ -234,11 +235,13 @@ async function main() {
   const sinFinal = MODE === 'register' ? 0 : sin.length;
   const porSys = {};
   vistos.forEach(v => { const k = v.emp + ' › ' + v.sys; porSys[k] = porSys[k] || { n: 0, sin: 0 }; porSys[k].n++; if (!v.hit) porSys[k].sin++; });
-  await persistCoverageRun({
+  const coverageRow = {
     pantallas: SCREENS.filter(s => !s.sys.startsWith('(')).length, numeros_vistos: vistos.length, con_linaje: conLinaje + (MODE === 'register' ? nuevos : 0),
     sin_linaje: sinFinal, nuevos_registrados: nuevos,
     detalle: { modo: MODE, base: BASE, sin: sin.slice(0, 120), por_pantalla: Object.entries(porSys).map(([k, v]) => ({ sys: k, ...v })) },
-  });
+  };
+  writeFileSync('/private/tmp/empresa-os-lineage-last.json', JSON.stringify(coverageRow, null, 2), { mode: 0o600 });
+  await persistCoverageRun(coverageRow);
   console.log('\n📈 ' + vistos.length + ' números vistos en ' + Object.keys(porSys).length + ' pantallas · ' + conLinaje + ' ya trazados · ' + sin.length + ' sin entrada' + (MODE === 'register' ? ' → ' + nuevos + ' registrados (pend, curar en /mapa)' : ''));
   if (MODE === 'gate' && sin.length) {
     console.error('⛔ GATE: números visibles SIN entrada en data_lineage:');
