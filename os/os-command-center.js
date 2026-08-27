@@ -13,7 +13,7 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.75,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
@@ -663,7 +663,7 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies] = await Promise.all([
+    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
@@ -678,6 +678,7 @@ async function jvLoad(force) {
       sb.from('v_ocupacion').select('unidades_rentables,ocupadas,disponibles,mantenimiento,reservadas,ocupacion_pct').maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar ocupación.' } })),
       sb.from('lineage_coverage_runs').select('run_at,pantallas,numeros_vistos,con_linaje,sin_linaje,ok').order('run_at', { ascending: false }).limit(1).maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar linaje.' } })),
       sb.from('agent_decision_policies').select('tipo_accion,categoria,rol_primario,rol_respaldo,rol_escalamiento,sla_hours,auto_execute,requiere_evidencia').then(r => r).catch(() => ({ data: null })),
+      sb.from('v_operational_role_coverage').select('role_code,role_name,area,criticality,primary_ready,backup_ready,verified_at').then(r => r).catch(() => ({ data: null })),
     ]);
     if (reg.error) throw reg.error;
     JV.agents = reg.data || [];
@@ -686,6 +687,7 @@ async function jvLoad(force) {
     JV.reports = reports.error ? [] : (reports.data || []);
     JV.memories = memories.error ? [] : (memories.data || []);
     JV.decisionPolicies = ((policies && policies.data) || []).reduce((out, row) => { out[row.tipo_accion] = row; return out; }, {});
+    JV.roleCoverage = (roleCoverage && roleCoverage.data) || [];
     JV.runsTotal = runs.count || 0;
     JV.crit = crit.error ? [] : (crit.data || []);
     JV.critImpact = JV.crit.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
@@ -1109,6 +1111,9 @@ function jvControlsPanel() {
   const lineAgeDays = l && l.run_at ? (Date.now() - new Date(l.run_at).getTime()) / 86400000 : null;
   const lineFresh = lineAgeDays != null && lineAgeDays <= 7;
   const lineOk = !!l && lineFresh && n(l.sin_linaje) === 0 && l.ok !== false;
+  const roles = JV.roleCoverage || [];
+  const coveredRoles = roles.filter(r => r.primary_ready && r.backup_ready).length;
+  const rolesOk = roles.length > 0 && coveredRoles === roles.length;
   const card = (icon, title, ok, value, detail, source) => '<article class="jv-control-card ' + (ok ? 'ok' : 'warn') + '"><div class="jv-control-icon">' + osIcon(icon, { size: 18 }) + '</div><div class="jv-control-copy"><div class="jv-control-title"><b>' + OS_E(title) + '</b><span>' + (ok ? 'control aprobado' : 'requiere revisión') + '</span></div><strong>' + OS_E(value) + '</strong><p>' + OS_E(detail) + '</p><small>Fuente: ' + OS_E(source) + '</small></div></article>';
   const occValue = o ? jvNum(o.ocupadas) + ' / ' + jvNum(o.unidades_rentables) + ' ocupadas' : 'Sin lectura disponible';
   const occDetail = o
@@ -1118,9 +1123,15 @@ function jvControlsPanel() {
   const lineDetail = l
     ? (lineOk ? 'Cobertura completa y corrida fresca: ' + jvFmtTs(l.run_at) + ' en ' + jvNum(l.pantallas) + ' pantallas.' : (n(l.sin_linaje) ? jvNum(l.sin_linaje) + ' métricas visibles todavía no tienen fuente definida.' : 'La última corrida tiene ' + Math.floor(lineAgeDays || 0) + ' días; debe renovarse para volver a aprobar el control.'))
     : (c.lineageError || 'No existe evidencia suficiente para certificar este control.');
+  const rolesValue = roles.length ? coveredRoles + ' / ' + roles.length + ' roles cubiertos' : 'Sin matriz disponible';
+  const rolesDetail = !roles.length
+    ? 'La matriz de responsabilidades todavía no está disponible.'
+    : rolesOk ? 'Cada rol crítico tiene titular, respaldo y permisos de área verificados.'
+      : (roles.length - coveredRoles) + ' rol(es) todavía no tienen titular y respaldo con permisos confirmados. Jarvis no los presenta como delegados.';
   return '<section class="jv-controls"><div class="jv-section-title">Controles de integridad <span>evidencia viva</span></div><div class="jv-controls-grid">'
     + card('home', 'Ocupación reconciliada', occOk, occValue, occDetail, 'v_ocupacion')
     + card('git-branch', 'Linaje de datos', lineOk, lineValue, lineDetail, 'lineage_coverage_runs')
+    + card('users', 'Cobertura humana', rolesOk, rolesValue, rolesDetail, 'v_operational_role_coverage')
     + '</div></section>';
 }
 
