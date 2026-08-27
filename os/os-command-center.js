@@ -50,6 +50,7 @@ function jvKey(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u0
 const JV_AUTOMATIONS = {
   'cerebro ejecutivo': { executor: 'cerebro', schedule: 'Directivas 07:45 y 08:45 · alertas cada 15 min' },
   'cerebro matutino': { executor: 'cerebro-reunion', schedule: 'Diario 07:35' },
+  'director de continuidad operativa': { executor: 'run_business_continuity_review()', schedule: 'Diario 06:50 · lunes 07:10 · día 1 07:10' },
   'arquitecto de agentes': { executor: 'run_agent_governance(architecture)', schedule: 'Lunes 08:35' },
   'auditor de agentes': { executor: 'run_agent_governance(audit)', schedule: 'Lunes 08:20' },
   'gerente de rentas': { executor: 'rentas-gerente', schedule: 'Diario 07:30' },
@@ -71,6 +72,7 @@ const JV_AUTOMATIONS = {
   'financiero fix & flip': { executor: 'ff-financiero', schedule: 'Lunes 08:00 · día 1 09:00 y 09:30' },
   'underwriting (fix & flip)': { executor: 'ff-underwriting', schedule: 'Lunes 08:15' },
   'capital & inversionistas (fix & flip)': { executor: 'ff-capital', schedule: 'Día 1 10:00' },
+  'gerente de exito estudiantil': { executor: 'run_student_success_review(daily)', schedule: 'Diario 07:05 · lunes 07:20' },
 };
 function jvAutomation(a) { return JV_AUTOMATIONS[jvKey(a && a.nombre)] || null; }
 function jvAgentLastRun(a) {
@@ -685,7 +687,24 @@ async function jvLoad(force) {
       lineage: lineage && lineage.data ? lineage.data : null,
       lineageError: lineage && lineage.error ? lineage.error.message : null,
     };
-    const evidenceRows = auditEvidence && !auditEvidence.error ? (auditEvidence.data || []) : JV.audit;
+    let evidenceRows = auditEvidence && !auditEvidence.error ? (auditEvidence.data || []) : JV.audit;
+    // Los agentes semanales/mensuales pueden quedar fuera de la ventana global cuando
+    // los pulsos diarios generan muchas filas. Recuperamos su evidencia en una sola
+    // consulta adicional (no N+1) para no marcarlos falsamente como desconectados.
+    const coveredIds = new Set(evidenceRows.map(row => row && row.agent_id).filter(Boolean));
+    const slowIds = JV.agents
+      .filter(a => !jvIsLegacy(a) && jvFreshnessDays(a) > 3 && !coveredIds.has(a.id))
+      .map(a => a.id);
+    if (slowIds.length) {
+      const slowCutoff = new Date(Date.now() - 45 * 86400000).toISOString();
+      const slowEvidence = await sb.from('agent_audit_log')
+        .select('id,agent_id,proposal_id,input,resultado,output,ts')
+        .in('agent_id', slowIds)
+        .gte('ts', slowCutoff)
+        .order('ts', { ascending: false })
+        .limit(600);
+      if (!slowEvidence.error && slowEvidence.data) evidenceRows = evidenceRows.concat(slowEvidence.data);
+    }
     const byAgent = evidenceRows.reduce((map, row) => {
       if (!row || !row.agent_id) return map;
       (map[row.agent_id] = map[row.agent_id] || []).push(row);

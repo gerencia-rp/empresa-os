@@ -69,7 +69,9 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   const defRows = await sql`select address, deficit_total, stage from ff_deals where deficit_total is not null and deficit_total > 0 order by deficit_total desc`;
   const defTot = defRows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.deficit_total || 0), 0);
 
-  // (2) Las 3 fotos ejecutivas de área (lo que produjeron los gerentes 07:30).
+  // (2) Las 3 fotos ejecutivas de área (lo que produjeron los gerentes 07:30)
+  // + la revisión previa de continuidad (06:50). Así la reunión no presume que
+  // el sistema está sano: recibe explícitamente fallos, fuentes viejas y huecos.
   const fotos = await sql`
     select tipo, corte::text corte, payload
     from pm_informes
@@ -77,6 +79,10 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       and archived_at is null
     order by tipo, corte desc`;
   const fotoDe = (t: string) => fotos.find((f: Record<string, unknown>) => f.tipo === t) as Record<string, unknown> | undefined;
+  const [continuidad] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='continuidad_operativa_diaria' and archived_at is null
+    order by corte desc limit 1`;
   const areaResumen = (t: string, label: string) => {
     const f = fotoDe(t);
     if (!f) return { area: label, foto: null, nota: "sin foto de hoy todavía" };
@@ -121,6 +127,16 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   const remFoto = fotoDe("foto_ejecutiva_remodelacion");
   const remAtras = remFoto ? Number(((remFoto.payload as Record<string, unknown>)?.resumen as Record<string, unknown>)?.obras_atrasadas ?? 0) : 0;
   if (remAtras > 0) decisiones.push({ prioridad: "medio", decision: `${remAtras} obras atrasadas`, requiere: "reprogramar o sumar recursos", fuente: "Gerente de Remodelación" });
+  const continuidadPayload = (continuidad?.payload || {}) as Record<string, unknown>;
+  const continuidadEx = (continuidadPayload.excepciones || {}) as Record<string, unknown>;
+  if (continuidadPayload.severidad === "critico" || continuidadPayload.severidad === "atencion") {
+    decisiones.unshift({
+      prioridad: continuidadPayload.severidad === "critico" ? "critico" : "medio",
+      decision: "Resolver excepciones de continuidad antes de abrir trabajo nuevo",
+      requiere: String(continuidadPayload.recomendacion || "revisar el informe de continuidad"),
+      fuente: "Director de Continuidad Operativa",
+    });
+  }
 
   const payload = {
     corte,
@@ -133,6 +149,12 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       ocupacion_pct: occPct, propuestas_en_cola: propuestasTotal,
     },
     areas: [areaResumen("foto_ejecutiva_ff", "Fix & Flip"), areaResumen("foto_ejecutiva_rentas", "Rentas"), areaResumen("foto_ejecutiva_remodelacion", "Remodelación")],
+    continuidad_operativa: continuidad ? {
+      corte: continuidad.corte,
+      severidad: continuidadPayload.severidad || "sin clasificar",
+      excepciones: continuidadEx,
+      recomendacion: continuidadPayload.recomendacion || null,
+    } : { estado: "sin revisión previa disponible" },
     fidelidad: "consolida las 3 fotos de área + números transversales; cada decisión cita su fuente; nada inventado, nada dropeado",
     regla: "el Cerebro SOLO LEE — la directiva es una recomendación; ejecutar/pagar siempre lo confirma un humano",
     origen: "cerebro-reunion (agentes_ia_exec)",
