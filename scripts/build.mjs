@@ -7,7 +7,7 @@
 
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import path from "node:path";
 import { transform } from "esbuild";
 
@@ -166,6 +166,17 @@ async function main() {
   // Limpiar dist
   await fs.rm(DIST, { recursive: true, force: true });
   await ensureDir(DIST);
+
+  // Tailwind se compila dentro del artefacto. El CDN oficial es solo para
+  // desarrollo y además introduce una dependencia de red en cada carga.
+  const tailwindOut = path.join(DIST, "ui/tailwind.css");
+  await ensureDir(path.dirname(tailwindOut));
+  execFileSync(path.join(ROOT, "node_modules/.bin/tailwindcss"), [
+    "-c", path.join(ROOT, "tailwind.config.cjs"),
+    "-i", path.join(ROOT, "ui/tailwind-input.css"),
+    "-o", tailwindOut,
+    "--minify"
+  ], { cwd: ROOT, stdio: "inherit" });
 
   // 1) Concatenar bundle JS
   const parts = [];
