@@ -1614,8 +1614,32 @@ function jvReportesView() {
   const areas = ['Todas'].concat([...new Set(informes.map(areaOf))]);
   const selected = JV.reportArea === 'Todas' ? informes : informes.filter(r => areaOf(r) === JV.reportArea);
   const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.reportArea === a ? 'on' : '') + '" onclick="jvReportArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? informes.length : informes.filter(r => areaOf(r) === a).length) + '</span></button>').join('') + '</div>';
-  const reportRows = payload => {
+  const reportRows = report => {
+    const payload = report && report.payload;
     const obj = payload && typeof payload === 'object' ? payload : {};
+    if (report && report.tipo === 'triage_excepciones_financieras') {
+      const kpis = obj.kpis || {};
+      const priorityRows = Array.isArray(obj.prioridades) ? obj.prioridades.map(item =>
+        '<div class="jv-simple-row"><div class="jv-av">' + OS_E(String(item.prioridad || '—')) + '</div><div class="body"><b>'
+        + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>'
+        + OS_E(jvHumanize(item.empresa || 'holding')) + ' · ' + jvMoney(item.impacto_usd) + ' · '
+        + jvNum(item.dias_abierto) + ' días abierto</span><span>Responsable: ' + OS_E(item.responsable || 'por asignar')
+        + ' · Fuente: ' + OS_E(item.fuente || 'no declarada') + '</span></div><span class="jv-badge b-wait">'
+        + OS_E(jvHumanize(item.severidad || 'revisión')) + '</span></div>'
+      ).join('') : '';
+      const fronts = Array.isArray(obj.hallazgos_por_frente) ? obj.hallazgos_por_frente.map(front =>
+        '<div class="jv-detail-row"><span>' + OS_E(front.categoria || 'Control financiero') + '<small style="display:block;margin-top:4px">'
+        + OS_E(front.siguiente_accion || '') + '</small></span><b>' + jvNum(front.criticos) + ' críticos · '
+        + jvMoney(front.impacto_usd) + '</b></div>'
+      ).join('') : '';
+      return '<div class="jv-review-summary"><b>' + OS_E(obj.resumen || 'Revisión financiera diaria') + '</b></div>'
+        + '<div class="jv-kpis"><div class="jv-kpi"><div class="n">' + jvNum(kpis.criticos) + '</div><div class="l">alertas críticas</div></div>'
+        + '<div class="jv-kpi"><div class="n">' + jvMoney(kpis.impacto_critico_usd) + '</div><div class="l">impacto señalado</div></div>'
+        + '<div class="jv-kpi"><div class="n">' + jvNum(kpis.antiguedad_max_dias) + ' días</div><div class="l">antigüedad máxima</div></div></div>'
+        + '<div class="jv-section-title" style="margin-top:18px">Frentes de trabajo</div><div class="jv-detail-list">' + fronts + '</div>'
+        + '<div class="jv-section-title" style="margin-top:18px">Prioridades verificadas</div><div class="jv-simple-list">' + priorityRows + '</div>'
+        + '<div class="jv-needs-info" style="margin-top:14px">' + OS_E(obj.limite || 'Solo observación; requiere soporte antes de corregir.') + '</div>';
+    }
     const preferred = ['resumen', 'estado', 'resultado', 'hallazgos', 'decisiones', 'top3', 'kpis', 'recomendaciones', 'fuentes'];
     const keys = preferred.filter(k => obj[k] != null).concat(Object.keys(obj).filter(k => !preferred.includes(k))).slice(0, 10);
     const readable = (v, depth) => {
@@ -1630,7 +1654,7 @@ function jvReportesView() {
   const groups = [...new Set(selected.map(areaOf))].map(area => {
     const rows = selected.filter(r => areaOf(r) === area).slice(0, 40).map(r => {
       const date = (r.corte || r.created_at) ? new Date((r.corte || r.created_at) + (r.corte ? 'T12:00:00' : '')).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Sin fecha';
-      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(r.titulo || jvHumanize(r.tipo)) + '</h3><div class="report-meta">' + OS_E(authorOf(r)) + ' · ' + OS_E(date) + ' · ' + OS_E(jvHumanize(r.estado)) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + (reportRows(r.payload) || 'Este reporte todavía no contiene información legible.') + (r.storage_path ? '<div class="jv-chip" style="margin-top:10px">PDF guardado</div>' : '') + '</div></details>';
+      return '<details class="jv-report-item"><summary><div><h3>' + OS_E(r.titulo || jvHumanize(r.tipo)) + '</h3><div class="report-meta">' + OS_E(authorOf(r)) + ' · ' + OS_E(date) + ' · ' + OS_E(jvHumanize(r.estado)) + '</div></div>' + osIcon('chevron-down', { size: 15 }) + '</summary><div class="jv-report-body">' + (reportRows(r) || 'Este reporte todavía no contiene información legible.') + (r.storage_path ? '<div class="jv-chip" style="margin-top:10px">PDF guardado</div>' : '') + '</div></details>';
     }).join('');
     return '<section class="jv-report-group"><div class="jv-section-title">' + OS_E(area) + ' <span>' + selected.filter(r => areaOf(r) === area).length + '</span></div><div class="jv-report-list">' + rows + '</div></section>';
   }).join('');
