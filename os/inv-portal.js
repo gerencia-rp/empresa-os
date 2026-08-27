@@ -531,15 +531,31 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
     + '<div class="sub">' + nProps + (nProps === 1 ? ' propiedad' : ' propiedades') + ' · capital aportado <b>' + $money(capTotal) + '</b> · distribuciones recibidas <b>' + $money(distTodas) + '</b> · próxima actualización de datos: <b>' + prox1.toISOString().slice(0, 10) + '</b> (1° de mes)</div>';
 
   // ── tus casas de un vistazo (v_portal_inversor) ──
+  // TOTAL DEL PORTAFOLIO: la suma del flujo del último mes de todas tus casas. `flujo_ult_mes`
+  // sale de inv_portal_resumen, que lo calcula con la MISMA cuenta del Ledger y de la pestaña
+  // Flujo Mensual: renta − gastos operativos − SERVICIO DE DEUDA (interés HML + cuota refi 30a).
+  // Antes se calculaba aparte (pm_payments − pm_expenses) y no restaba la deuda real → la tarjeta
+  // y la pestaña daban números distintos para la misma casa. Una definición, un número.
+  const conFlujo = (IP.resumen || []).filter(rc => rc.flujo_ult_mes != null);
+  const flujoTotal = conFlujo.reduce((s, rc) => s + (+rc.flujo_ult_mes || 0), 0);
+  const sinFlujo = (IP.resumen || []).length - conFlujo.length;
+  const totalLinea = conFlujo.length
+    ? '<div style="margin-top:10px;padding:10px 12px;border:1px solid ' + (flujoTotal >= 0 ? 'var(--pos)' : 'var(--neg)') + ';border-radius:10px;background:var(--glass);font-size:13px">'
+      + 'Flujo del último mes · <b>todas tus casas</b>: <b class="' + (flujoTotal >= 0 ? 'up' : 'down') + '" style="font-size:15px">' + $money(flujoTotal) + '</b>'
+      + '<div class="meta" style="font-size:11px;margin-top:3px">renta − gastos operativos − servicio de deuda (interés HML + cuota de la refi), sumando ' + conFlujo.length + (conFlujo.length === 1 ? ' casa' : ' casas') + ' con movimiento registrado'
+      + (sinFlujo ? ' · ' + sinFlujo + (sinFlujo === 1 ? ' casa todavía sin movimiento' : ' casas todavía sin movimiento') : '')
+      + ' · cada casa toma su último mes contable con movimiento, así que pueden no ser todas el mismo mes</div></div>'
+    : '';
   const resumenCards = (IP.resumen || []).length ? ''
     + '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">Tus casas de un vistazo</div><div class="k">tocá una tarjeta para ver el detalle completo</div></div>'
+    + totalLinea
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px;align-items:start">'
     + IP.resumen.map(rc => {
       const activa = rc.property_id === pid;
       const meses = rc.meses_invertido != null ? (rc.meses_invertido >= 12 ? Math.floor(rc.meses_invertido / 12) + ' a ' + (rc.meses_invertido % 12) + ' m' : rc.meses_invertido + ' meses') : null;
       const flujo = rc.flujo_ult_mes != null
         ? '<span style="color:' + (rc.flujo_ult_mes >= 0 ? 'var(--pos)' : 'var(--neg)') + ';font-weight:700">' + $money(rc.flujo_ult_mes) + '</span> <span class="meta">(' + esc(rc.flujo_ult_mes_ym || '') + ')</span>'
-        : '<span class="meta">sin rentas todavía</span>';
+        : '<span class="meta">sin movimiento registrado todavía</span>';
       const deficit = +rc.deficit > 0
         ? '<div style="margin-top:6px;font-size:12px;color:var(--neg)">Déficit acumulado: <b>' + $money(rc.deficit) + '</b> <span class="src" style="font-size:9px">Airtable</span>'
           + '<div class="meta" style="font-size:11px">caja atrapada de la operación — se recupera con el refi/venta' + (rc.fecha_estimada_pago ? ' · fecha estimada: <b>' + esc(rc.fecha_estimada_pago) + '</b>' : '') + '</div></div>'
@@ -552,7 +568,7 @@ function renderPortafolio(pid, P, holding, p, r, escenario, movsCasa, dir) {
         + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><b>' + esc(rc.casa || '—') + '</b><span class="src">' + esc((rc.etapa || '—').replace(/_/g, ' ')) + '</span></div>'
         + '<div class="meta" style="margin-top:4px">' + (rc.avance_planner != null ? 'obra ' + Math.round(rc.avance_planner) + '% · ' : '') + (rc.lider ? osIcon('hard-hat') + esc(String(rc.lider).split(',')[0]) : '') + '</div>'
         + '<div style="margin-top:8px;font-size:13px">Invertiste <b>' + $money(rc.invertido) + '</b>' + (meses ? ' <span class="meta">hace ' + meses + '</span>' : '') + '</div>'
-        + '<div style="margin-top:4px;font-size:12px">Flujo del último mes: ' + flujo + '</div>'
+        + '<div style="margin-top:4px;font-size:12px" title="renta cobrada − gastos operativos − servicio de deuda (interés HML + cuota de la refi a 30 años). Es la misma cuenta de la pestaña Flujo Mensual y de la distribución automática.">Flujo del último mes <span class="meta" style="font-size:10px">(ya con la deuda descontada)</span>: ' + flujo + '</div>'
         + deficit + dist + '</div>';
     }).join('')
     + '</div></div>' : '';
