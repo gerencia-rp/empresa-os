@@ -95,8 +95,11 @@ function jvIsRecent(a, days) {
 }
 function jvOperational(a) {
   const automation = jvAutomation(a);
+  const evidence = a && JV.lastEvidence[a.id];
+  const output = evidence && evidence.output && typeof evidence.output === 'object' ? evidence.output : {};
+  const provenLearningMode = a && a.estado === 'dry-run' && output.operational === true;
   return !!a && !jvIsLegacy(a) && !!automation && !!automation.executor
-    && ['activo', 'live', 'asistido'].includes(a.estado) && jvIsRecent(a);
+    && (['activo', 'live', 'asistido'].includes(a.estado) || provenLearningMode) && jvIsRecent(a);
 }
 function jvHumanState(a) {
   if (jvIsLegacy(a)) return { cls: 'b-idle', label: 'absorbido' };
@@ -830,8 +833,22 @@ function jvAgentInspector() {
     + '<div class="jv-ai-section"><div class="jv-ai-grid"><div class="jv-ai-metric"><span>Reporta a</span><b>' + OS_E(parent ? parent.nombre : 'Cerebro Ejecutivo') + '</b></div><div class="jv-ai-metric"><span>Decisiones</span><b>' + pending + ' pendientes</b></div><div class="jv-ai-metric"><span>Horario</span><b>' + OS_E(jvScheduleText(a)) + '</b></div><div class="jv-ai-metric"><span>Automatización</span><b>' + OS_E(automation && automation.executor ? automation.executor : 'Sin ejecutor') + '</b></div><div class="jv-ai-metric"><span>Modelo</span><b>' + OS_E(a.modelo || 'Configuración central') + '</b></div><div class="jv-ai-metric"><span>Riesgo</span><b>' + OS_E(a.nivel_riesgo || 'Sin clasificar') + '</b></div></div></div>'
     + (skills.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Skills</div><div class="jv-ai-tags">' + skills.slice(0, 10).map(s => '<span>' + OS_E(String(s)) + '</span>').join('') + '</div></div>' : '')
     + (tasks.length ? '<div class="jv-ai-section"><div class="jv-ai-label">Tareas asignadas</div><div class="jv-ai-copy">' + tasks.slice(0, 5).map(t => '• ' + OS_E(cleanTask(t))).join('<br>') + '</div></div>' : '')
+    + (automation && automation.executor === 'ff-optimizacion' ? '<button type="button" class="jv-ai-action" onclick="jvRunOperationalAgent(\'' + a.id + '\')"' + (JV.busyId === a.id ? ' disabled' : '') + '>' + (JV.busyId === a.id ? 'Revisando pipeline…' : 'Ejecutar revisión ahora') + '</button>' : '')
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button type="button" class="jv-ai-action" onclick="jvWorkAgent(\'' + a.id + '\')">Ver trabajo →</button><button type="button" class="jv-ai-action" onclick="jvInspectOpenArea(\'' + OS_E(a.linea || '').replace(/'/g, "\\'") + '\')">Ficha completa →</button></div></div></aside>';
 }
+async function jvRunOperationalAgent(id) {
+  const a = jvAgent(id); const automation = jvAutomation(a);
+  if (!a || !automation || automation.executor !== 'ff-optimizacion' || JV.busyId) return;
+  JV.busyId = id; if (window.osRender) osRender();
+  try {
+    const { data, error } = await sb.functions.invoke('ff-optimizacion', { body: { mode: 'revision', source: 'jarvis-agent-card' } });
+    if (error) throw error;
+    if (!data || data.ok !== true) throw new Error((data && data.error) || 'La revisión no devolvió confirmación.');
+    await jvLoad(true);
+  } catch (e) { alert('No se pudo ejecutar la revisión: ' + (e.message || e)); }
+  finally { JV.busyId = null; if (window.osRender) osRender(); }
+}
+window.jvRunOperationalAgent = jvRunOperationalAgent;
 function jvInspectAgent(id) { JV.inspectAgentId = id || null; if (window.osRender) osRender(); }
 function jvInspectOpenArea(linea) { JV.inspectAgentId = null; JV.filterLinea = linea || null; JV.tab = 'network'; if (window.osRender) osRender(); }
 window.jvInspectAgent = jvInspectAgent;
