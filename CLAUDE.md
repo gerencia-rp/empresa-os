@@ -892,6 +892,10 @@ En la raíz del repo:
 
 ## 🛰️ JARVIS · ficha operativa + cola de trabajo (26 Ago 2026) — FASES 1–2 EN PRODUCCIÓN
 
+- Rediseño cinematográfico local (26 Ago 2026, pendiente de aprobación y deploy): `/jarvis` adopta un lenguaje visual de centro de operaciones — negro/navy, esmeralda/cian restringidos, títulos editoriales, bordes técnicos finos y alta densidad legible— sin copiar marcas ni datos ficticios de las referencias.
+- Las cinco vistas principales quedan como un sistema único: **Centro de mando** (directiva, KPIs y salud), **Equipo** (organigrama completo + inspector), **Trabajo** (cola + evidencia), **Horarios** (ritmo por área + última ejecución) y **Memoria compartida** (grafo inspeccionable + aprendizajes reales de `pm_brain_memory`).
+- La semejanza visual nunca autoriza actividad simulada: números, estados, horarios, conexiones, decisiones y aprendizajes se derivan exclusivamente de fuentes existentes; una ausencia se declara de forma explícita.
+
 - La vista completa de `/jarvis` conserva las cuatro áreas alrededor del Cerebro Ejecutivo, pero cada nombre de agente ahora funciona como nodo inspeccionable sin abandonar el organigrama.
 - La ficha lateral traduce datos reales ya disponibles: responsabilidad, estado humano derivado de evidencia, última actividad en `agent_audit_log`, horario declarado, jefe según `parent_id`, decisiones pendientes, riesgo, skills y tareas.
 - Si no hay corrida visible, la ficha lo declara; nunca inventa actividad. El botón final abre el área y la ficha ampliada existente para administración.
