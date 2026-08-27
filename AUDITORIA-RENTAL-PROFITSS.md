@@ -1311,3 +1311,84 @@ todo lo programado a futuro). En los meses cerrados no cambia nada.
 restaba *"un PM fee del 4% MODELADO que no es un gasto real de pm_expenses"*. Este ítem es distinto y
 es una decisión explícita del CEO: es **visible, trazable, editable y auditado**, no un descuento
 invisible dentro de una fórmula.
+
+---
+
+## 📆 PASADA (27 Ago 2026 · 5) — FILTRO DEL LEDGER CON NIVEL DE AÑO · HECHO Y EN VIVO
+
+**Pedido del CEO:** el desplegable de al lado del selector de propiedad solo dejaba "Todos los
+meses" o un mes suelto. Agregarle nivel de **AÑO**: "Todos los años", un **año completo**, o un
+**mes dentro de ese año** — con los totales de arriba recalculándose según lo elegido.
+
+### Qué quedó
+
+Un **solo `<select>`** (mismo look, sin agregar controles) con los tres niveles, agrupado por año
+con `<optgroup>`:
+
+```
+Todos los años
+── 2026 ──   Todo 2026 · Agosto 2026 · Julio 2026 · … · Enero 2026
+── 2025 ──   Todo 2025 · Diciembre 2025 · … 
+```
+
+- Los años y los meses se arman **dinámicamente de las fechas reales de los movimientos de esa
+  casa**. No hay listas fijas: si mañana hay 2027 aparece solo, y **no se listan períodos sin datos**
+  (verificado: en Barkbridge los únicos grupos son 2025 y 2026).
+- El **valor** de cada opción es el **prefijo de la fecha** (`"2026"` o `"2026-06"`), así el filtro
+  sigue siendo el mismo `startsWith` que ya existía: **no se tocó ninguna cuenta ni categoría**,
+  solo el rango que se muestra y que se suma.
+- **El recálculo salió gratis y es correcto por construcción**: el Saldo de caja, el Servicio de
+  deuda, los Subtotales por categoría, las Fuentes y la tabla ya derivaban todos de la misma
+  variable `vis` (los movimientos visibles). Al cambiar el filtro, cambian los cinco.
+- Para que se vea qué está elegido, los dos totales del encabezado ahora llevan el período:
+  `Saldo de caja (P&L) ⓘ · año 2025: $2,568` · `Servicio de deuda ⓘ · Junio 2026: $1,580`.
+
+### Verificación — 4916 Barkbridge (el Ledger del admin agrupa por FECHA)
+
+| Período | Saldo de caja | Servicio de deuda | Movimientos |
+|---|---:|---:|---:|
+| Todos los años | **$4,085.81** | **$20,832.38** | **117** |
+| Todo 2025 | **$2,568.04** | **$9,774.27** | **59** |
+| Todo 2026 | **$1,517.77** | **$11,058.11** | **58** |
+| Junio 2026 | **−$314.42** | **$1,579.73** | **9** |
+
+**Los dos años suman exacto el total** — el filtro parte el período, no pierde ni duplica:
+`2,568.04 + 1,517.77 = 4,085.81` · `9,774.27 + 11,058.11 = 20,832.38` · `59 + 58 = 117`.
+Y "Todos los años" da lo mismo que antes del cambio (comportamiento actual intacto).
+
+### Verificación en el sitio en vivo (logueado, sin stubs)
+
+`scripts/qa-ledger-filtro-anio.mjs` sobre `https://empresa-os.vercel.app` — login por formulario,
+navegación normal a `/inversionistas`, pestaña Ledger y casa elegida por el `<select>` real:
+**41 OK · 0 fallas · 0 pageerrors · 0 errores de consola.**
+
+```
+[todos]   todos los años -> saldo $4,086 · deuda $20,832 · 117 movs (tabla: 117)
+[2025]    año 2025       -> saldo $2,568 · deuda  $9,774 ·  59 movs (tabla:  59)
+[2026]    año 2026       -> saldo $1,518 · deuda $11,058 ·  58 movs (tabla:  58)
+[2026-06] Junio 2026     -> saldo  $-314 · deuda  $1,580 ·   9 movs (tabla:   9)
+
+el desplegable tiene "Todos los años"                        OK
+hay un grupo por AÑO con datos (2025 y 2026)                 OK
+cada año ofrece "Todo <año>"                                 OK
+hay meses dentro del año (2026-01 .. 2026-08)                OK
+NO se listan años sin datos                                  OK
+el encabezado dice el período elegido, en los 4 casos        OK
+los Subtotales por categoría se recalculan (14 / 14 / 7 / 7) OK
+```
+
+Regresión: la suite del portal (`qa-flujo-portafolio-deuda.mjs`) sigue en **89 OK · 0 fallas**.
+
+**Build:** `npm run build` OK — bundle `assets/bundle.766dd1f55bdd.js`.
+**Deploy:** push a `main` → `version.json` en vivo = commit `1fc3a5f`.
+
+### Cómo revertir
+Revertir el commit `1fc3a5f` (es front puro, `os/inv-admin.js`). No hubo migración ni cambio de datos.
+
+### Notas declaradas
+- El Ledger del **admin** agrupa por `fecha`, mientras el Flujo Mensual del **portal** agrupa por
+  `mes` (el mes CONTABLE, `billing_ym`). Es una divergencia **pre-existente**, no introducida acá:
+  una renta de junio cobrada en julio cae en meses distintos según la pantalla. No se tocó porque
+  movería números fuera del pedido; queda anotado por si se quiere unificar.
+- Cosmético: `iaMoney` formatea los negativos como `$-314` (no `−$314`). Es el formato que usa todo
+  el admin desde antes; cambiarlo tocaría el resto de los números de la pantalla.
