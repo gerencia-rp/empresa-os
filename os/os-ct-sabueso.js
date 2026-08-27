@@ -216,20 +216,30 @@ function ctRunChecks() {
       'El snapshot de QBO tiene ' + dias + ' días (' + ctFmtD(qf) + ') — refrescar antes de conciliar', 0, 'critica', 'QBO', { fetched_at: qf, dias });
   }
 
-  // ══ C4 · COBRANZA / AR (por casa, mes de renta con aging 3 meses) ══
+  // ══ C4 · COBRANZA / AR (cartera canónica neta por inquilino) ══
+  // v_cartera_inquilino ya separa vencido, mes en curso y saldo a favor.
+  // No reconstruir mora desde renta esperada - pagos: esa aproximación duplicaba
+  // deuda, ignoraba adelantos y marcaba como moroso a quien tenía saldo a favor.
   const minDeuda = ctNum('c4_deuda_min_usd', 200);
   const mb0 = osMonthBounds();
-  const ym = k => osYmShift(mb0.from.slice(0, 7), -k);
-  (OS.props || []).forEach(p => {
-    const occRent = (OS.units || []).filter(u => u.property_id === p.id && osUnitState(u) === 'ocupada').reduce((s, u) => s + (+u.target_rent || 0), 0);
-    if (occRent <= 0) return;
-    const cobradoYm = k => (OS.pay || []).filter(x => x.property_id === p.id && osBillYm(x) === ym(k)).reduce((s, x) => s + (+x.amount || 0), 0);
-    const b = [0, 1, 2].map(k => Math.max(0, occRent - cobradoYm(k)));
-    const total = b[0] + b[1] + b[2];
-    if (total <= minDeuda) return;
-    add('C4', 'rentas', 'ar-' + (p.name || p.id).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20),
-      'Por cobrar · ' + (p.name || '').split(',')[0] + ': ' + OS_M(total) + ' (0-30: ' + OS_M(b[0]) + ' · 30-60: ' + OS_M(b[1]) + ' · 60+: ' + OS_M(b[2]) + ')',
-      total, b[2] > minDeuda ? 'critica' : 'media', 'OS', { casa: p.name, aging: b, esperado_mes: occRent });
+  (CT.cartera || []).forEach(c => {
+    const neto = Math.max(0, +(c.vencido_neto != null ? c.vencido_neto : (+c.vencido_bruto || 0) - (+c.a_favor || 0)) || 0);
+    if (neto <= minDeuda) return;
+    const identidad = String(c.tenant_id || c.inquilino || c.casa || 'sin-id');
+    // Mantener exactamente la misma clave que el reconciliador programado.
+    const clave = identidad.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const etiqueta = c.inquilino || c.casa || 'Inquilino sin nombre';
+    add('C4', 'rentas', 'ar-neto-' + clave,
+      'Mora neta · ' + etiqueta + ': ' + OS_M(neto)
+        + ' (vencido ' + OS_M(+c.vencido_bruto || 0) + ' − saldo a favor ' + OS_M(+c.a_favor || 0) + ')',
+      neto, neto >= ctNum('c4_critico_usd', 3000) ? 'critica' : 'media', 'v_cartera_inquilino', {
+        tenant_id: c.tenant_id || null,
+        inquilino: c.inquilino || null,
+        casa: c.casa || null,
+        vencido_bruto: +c.vencido_bruto || 0,
+        a_favor: +c.a_favor || 0,
+        vencido_neto: neto,
+      });
   });
 
   // ══ C7 · ANOMALÍA POR CASA ══
