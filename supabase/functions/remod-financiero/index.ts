@@ -74,16 +74,16 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
-    let created = 0, skipped = 0;
+    let created = 0, refreshed = 0, skipped = 0;
     const detail: Record<string, unknown> = {};
+    const recordProposal = async (tipo: string, payload: Record<string, unknown>, evidence: Record<string, unknown>) => {
+      const [result] = await sql!`select outcome from record_agent_proposal(${agent.id},${tipo},${sql!.json(payload)},${sql!.json(evidence)})`;
+      if (result?.outcome === "created") created++; else refreshed++;
+    };
 
     if (mode === "material") {
       // RF3 doble-pago (>=200) + RF5 sin categoría
       const k1 = "remodf:matdup:" + corte, k2 = "remodf:sincat:" + corte;
-      if (keys.has(k1)) { skipped++; detail.doble_pago = "dedup"; }
-      else {
         const dup = await sql`with d as (select property_id, categoria, fecha, precio::numeric precio, count(*) c
             from remodel_material_payments where active is not false and precio is not null
             group by 1,2,3,4 having count(*)>1)
@@ -93,24 +93,18 @@ Deno.serve(async (req) => {
         if (Number(g.grupos) > 0) {
           const payload = { requiere_aprobacion: true, accion: "revisar_doble_pago_material", dedup_key: k1, monto_en_riesgo: Number(g.monto), severidad: "alto" };
           const evid = { tipo: "descuadre_material", regla: "RF3 doble-pago", grupos_alto_precio: Number(g.grupos), monto_en_riesgo: Number(g.monto), grupos_ruido_ignorados: Number(g.ruido), hallazgo: `${g.grupos} grupos de material con misma casa+categoria+fecha+precio (>=$200), ${money(Number(g.monto))} en riesgo. ${g.ruido} grupos <$200 NO marcados (anti-ruido).`, fuente: "remodel_material_payments", origen: "ejecutor remod-financiero" };
-          await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-          created++; detail.doble_pago = `${g.grupos} grupos / ${money(Number(g.monto))}`;
+          await recordProposal("conciliacion", payload, evid);
+          detail.doble_pago = `${g.grupos} grupos / ${money(Number(g.monto))}`;
         } else { detail.doble_pago = "sin hallazgos"; }
-      }
-      if (keys.has(k2)) { skipped++; detail.sin_categoria = "dedup"; }
-      else {
         const [sc] = await sql`select count(*)::int n from remodel_material_payments where active is not false and (categoria is null or btrim(categoria)='')`;
         if (Number(sc.n) > 0) {
           const payload = { requiere_aprobacion: true, accion: "categorizar_gastos", dedup_key: k2, severidad: "medio" };
           const evid = { tipo: "higiene", regla: "RF5 sin categoría", pagos_sin_categoria: Number(sc.n), hallazgo: `${sc.n} pagos de material sin categoría — taggear en Airtable (no inventar).`, fuente: "remodel_material_payments", origen: "ejecutor remod-financiero" };
-          await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-          created++; detail.sin_categoria = Number(sc.n);
+          await recordProposal("conciliacion", payload, evid);
+          detail.sin_categoria = Number(sc.n);
         } else { detail.sin_categoria = "sin hallazgos"; }
-      }
     } else if (mode === "nomina") {
       const k = "remodf:nomina:" + quincena;
-      if (keys.has(k)) { skipped++; detail.nomina = "dedup"; }
-      else {
         // horas sin rate en la quincena (nómina mal calculada) — NO inventa rate
         const [wh] = await sql`select count(*)::int filas, count(distinct worker)::int workers, round(coalesce(sum(horas),0)) horas
           from remodel_worker_hours where rate_hora is null and fecha >= (case when extract(day from current_date)<=15 then date_trunc('month',current_date) else date_trunc('month',current_date)+interval '15 day' end)`;
@@ -119,13 +113,10 @@ Deno.serve(async (req) => {
           from remodel_worker_hours where rate_hora is not null and fecha >= (case when extract(day from current_date)<=15 then date_trunc('month',current_date) else date_trunc('month',current_date)+interval '15 day' end)`;
         const payload = { requiere_aprobacion: true, accion: "armar_nomina_quincena", dedup_key: k, bruto: Number(tot.bruto), severidad: Number(wh.filas) > 0 ? "alto" : "info" };
         const evid = { tipo: "nomina", regla: "RF4", quincena, bruto_calculado: Number(tot.bruto), workers: Number(tot.workers), filas_sin_rate: Number(wh.filas), workers_sin_rate: Number(wh.workers), horas_sin_rate: Number(wh.horas), hallazgo: Number(wh.filas) > 0 ? `${wh.filas} filas sin rate (${wh.workers} trabajadores) — deuda mal calculada; cargar la tarifa en Personal en Campo antes de pagar. No se inventa rate.` : "0 horas sin rate: nómina lista para revisión.", nota: "ejecutar el pago = aprueba humano", fuente: "remodel_worker_hours + remodel_crew_rates", origen: "ejecutor remod-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'nomina', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.nomina = `bruto ${money(Number(tot.bruto))}, ${wh.filas} sin rate`;
-      }
+        await recordProposal("nomina", payload, evid);
+        detail.nomina = `bruto ${money(Number(tot.bruto))}, ${wh.filas} sin rate`;
     } else if (mode === "anomalias") {
       const k = "remodf:anomalias:" + corte;
-      if (keys.has(k)) { skipped++; detail.anomalias = "dedup"; }
-      else {
         // RF1 clase Capps: monto cargado alto con gastos placeholder redondos (>=50000 exactos), Finalizado
         const capps = await sql`select address, monto_real::numeric mr, gasto_materiales::numeric gm, gasto_trabajadores::numeric gt
           from remodel_at_properties where active is not false and proceso='Finalizado'
@@ -138,15 +129,14 @@ Deno.serve(async (req) => {
         // obras finalizadas en pérdida (utilidad limpia < -50)
         const perd = await sql`select address, round(utilidad_remodelacion::numeric) u from remodel_at_properties where active is not false and proceso='Finalizado' and utilidad_remodelacion::numeric < -50 order by 2`;
         const evid = { tipo: "anomalias_carga", regla: "RF1/RF2/RF7", corte, carga_placeholder_capps_class: capps.map((r: Record<string, unknown>) => ({ casa: r.address, monto_real: Number(r.mr), gastos_placeholder: `${money(Number(r.gm))}/${money(Number(r.gt))}` })), utilidad_inflada_en_curso: infl.map((r: Record<string, unknown>) => r.address), utilidad_signo_opuesto: conf.map((r: Record<string, unknown>) => r.address), obras_en_perdida_real: perd.map((r: Record<string, unknown>) => ({ casa: r.address, utilidad: Number(r.u) })), nota: "plata real, no contrato; depósitos/draws != utilidad; obra en curso NO se marca por costo total (RF7)", fuente: "remodel_at_properties", origen: "ejecutor remod-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json({ requiere_aprobacion: true, accion: "revisar_anomalias_carga", dedup_key: k })}, ${sql.json(evid)})`;
-        created++; detail.anomalias = { placeholder: capps.length, en_curso_inflada: infl.length, signo_opuesto: conf.length, en_perdida: perd.length };
-      }
+        await recordProposal("conciliacion", { requiere_aprobacion: true, accion: "revisar_anomalias_carga", dedup_key: k }, evid);
+        detail.anomalias = { placeholder: capps.length, en_curso_inflada: infl.length, signo_opuesto: conf.length, en_perdida: perd.length };
     } else {
       return json({ ok: false, error: "modo inválido: " + mode }, 400);
     }
 
-    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte, quincena, rol_db: "agentes_ia_exec" })}, ${sql.json({ created, skipped, detail, isolation_test: iso })}, 'ok')`;
-    return json({ ok: true, mode, corte, created, skipped, detail, isolation_test: iso });
+    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte, quincena, rol_db: "agentes_ia_exec" })}, ${sql.json({ created, refreshed, skipped, detail, isolation_test: iso })}, 'ok')`;
+    return json({ ok: true, mode, corte, created, refreshed, skipped, detail, isolation_test: iso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error).message || e) }, 500);
   } finally {

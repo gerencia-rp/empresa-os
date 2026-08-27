@@ -100,19 +100,24 @@ Deno.serve(async (req) => {
       if (p.tipo_accion === "informe" && e.tipo === "resumen_cobranza_diario") resKeys.add((e.corte as string) || "");
     }
 
-    let created = 0, skipped = 0;
+    let created = 0, refreshed = 0, skipped = 0;
     const detail: Record<string, unknown> = { cobros_new: 0, cobros_skip: 0, descuadres_new: 0, descuadres_skip: 0, resumen_new: 0, resumen_skip: 0 };
+    const recordProposal = async (tipo: string, payload: Record<string, unknown>, evidence: Record<string, unknown>) => {
+      const [result] = await sql!`select outcome from record_agent_proposal(${agent.id},${tipo},${sql!.json(payload)},${sql!.json(evidence)})`;
+      if (result?.outcome === "created") created++; else refreshed++;
+      return result?.outcome;
+    };
 
     if (mode === "cobros") {
       // (a) COBROS — morosos con vencido neto > 0
       const morosos = await sql`select tenant_id, inquilino, casa, vencido_neto, mes_mas_viejo, aging from v_cartera_inquilino where vencido_neto > 0 order by vencido_neto desc`;
       for (const m of morosos) {
         const key = (m.casa || "") + "|" + (m.inquilino || "");
-        if (cobroKeys.has(key)) { skipped++; (detail.cobros_skip as number)++; continue; }
         const payload = { canal: "whatsapp/email", monto: m.vencido_neto, requiere_aprobacion: true, accion: "enviar_recordatorio", dedup_key: "cobro:" + key };
         const evid = { tipo: "recordatorio_cobro", inquilino: m.inquilino, casa: m.casa, monto_vencido_neto: m.vencido_neto, aging: m.aging, borrador: `Hola ${firstName(m.inquilino)}, te escribimos de Rental Profits por la renta pendiente de ${m.casa}. Saldo vencido: ${money(m.vencido_neto)}. ¿Coordinamos el pago o un plan? Gracias.`, nota: "DRY-RUN: NO enviar, aprueba Nicolás", fuente: "v_cartera_inquilino", origen: "ejecutor rentas-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'recordatorio_cobro', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; (detail.cobros_new as number)++; cobroKeys.add(key);
+        const outcome = await recordProposal("recordatorio_cobro", payload, evid);
+        if (outcome === "created") (detail.cobros_new as number)++; else (detail.cobros_skip as number)++;
+        cobroKeys.add(key);
       }
 
       // (b) DESCUADRES — mismo inquilino + mismo mes con >1 fila (fractura/carga cruzada), excluye plataformas
@@ -123,22 +128,20 @@ Deno.serve(async (req) => {
         where t.full_name !~* 'pad ?s?split'
         group by 1,2 order by 3 desc`;
       for (const d of frac) {
-        if (descKeys.has(d.casa)) { skipped++; (detail.descuadres_skip as number)++; continue; }
         const payload = { requiere_aprobacion: true, accion: "consolidar_filas_airtable", dedup_key: "descuadre:" + d.casa };
         const evid = { tipo: "descuadre", casa: d.casa, inquilino: d.inquilino, filas_extra: Number(d.filas_extra), meses: Number(d.meses), hallazgo: `Renta de ${d.inquilino} fracturada en ${d.filas_extra} filas extra a lo largo de ${d.meses} mes(es) — carga cruzada/doble-conteo. renta_pactada inconsistente entre filas.`, accion_propuesta: "Consolidar las filas por mes y normalizar renta_pactada en Airtable.", fuente: "pm_payments", origen: "ejecutor rentas-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; (detail.descuadres_new as number)++; descKeys.add(d.casa);
+        const outcome = await recordProposal("conciliacion", payload, evid);
+        if (outcome === "created") (detail.descuadres_new as number)++; else (detail.descuadres_skip as number)++;
+        descKeys.add(d.casa);
       }
 
       // (c) RESUMEN DE COBRANZA DEL DÍA (dedup por corte)
       const corte = todayCT();
-      if (!resKeys.has(corte)) {
         const [kpi] = await sql`select * from v_cartera_kpi`;
         const buckets = await sql`select case when mes_mas_viejo>='2026-07' then '0-30' when mes_mas_viejo='2026-06' then '31-60' when mes_mas_viejo<'2026-06' then '60+' else 's/d' end b, count(*) n, coalesce(sum(vencido_neto),0) v from v_cartera_inquilino where vencido_neto>0 group by 1`;
         const evid = { tipo: "resumen_cobranza_diario", corte, vencido_neto_total: kpi?.vencido_neto, pendiente_neto_total: kpi?.pendiente_neto_total, morosos_reales: kpi?.morosos_reales, aging: buckets, nota: "resumen automático del ejecutor (dry-run)", origen: "ejecutor rentas-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'informe', 'propuesta', ${sql.json({ tipo: "resumen_cobranza_diario", corte })}, ${sql.json(evid)})`;
-        created++; (detail.resumen_new as number)++;
-      } else { skipped++; (detail.resumen_skip as number)++; }
+        const summaryOutcome = await recordProposal("informe", { tipo: "resumen_cobranza_diario", corte, dedup_key: "resumen_cobranza:" + corte }, evid);
+        if (summaryOutcome === "created") (detail.resumen_new as number)++; else (detail.resumen_skip as number)++;
     } else if (mode === "servicios") {
       // Dedup: claves de descuadres de servicio abiertos (casa|servicio|mes|subtipo)
       const svcKeys = new Set<string>();
@@ -173,10 +176,9 @@ Deno.serve(async (req) => {
       for (const f of found) {
         const key = [f.casa, f.servicio, f.mes, f.subtipo].join("|");
         (detail.por_tipo as Record<string, number>)[f.subtipo as string] = ((detail.por_tipo as Record<string, number>)[f.subtipo as string] || 0) + 1;
-        if (svcKeys.has(key)) { skipped++; continue; }
         const evid = { tipo: "descuadre_servicio", casa: f.casa, servicio: f.servicio, mes: f.mes, subtipo: f.subtipo, monto: f.monto ?? null, esperado: f.esperado ?? null, hallazgo: f.detalle, accion_propuesta: "Revisar en Airtable/QB y corregir el registro del servicio.", fuente: "pm_expenses", origen: "ejecutor rentas-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json({ requiere_aprobacion: true, dedup_key: "svc:" + key })}, ${sql.json(evid)})`;
-        created++; svcKeys.add(key);
+        await recordProposal("conciliacion", { requiere_aprobacion: true, dedup_key: "svc:" + key }, evid);
+        svcKeys.add(key);
       }
     } else if (mode === "cierre") {
       // Cierra el MES ANTERIOR (corteYm). Dedup: un borrador por tipo+corte.
@@ -211,9 +213,9 @@ Deno.serve(async (req) => {
     }
 
     // ── BITÁCORA de la corrida ──
-    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte: todayCT(), rol_db: "agentes_ia_exec" })}, ${sql.json({ created, skipped, detail, isolation_test: iso })}, 'ok')`;
+    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte: todayCT(), rol_db: "agentes_ia_exec" })}, ${sql.json({ created, refreshed, skipped, detail, isolation_test: iso })}, 'ok')`;
 
-    return json({ ok: true, mode, created, skipped, detail, isolation_test: iso });
+    return json({ ok: true, mode, created, refreshed, skipped, detail, isolation_test: iso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error).message || e) }, 500);
   } finally {
