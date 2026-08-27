@@ -122,7 +122,14 @@ async function lineageRunHandler(req, res) {
     };
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     if (!serviceKey) { res.status(503).json({ ok: false, error: 'Servicio de auditoría no configurado.' }); return; }
-    const created = await sbREST('lineage_coverage_runs', { method: 'POST', body: row, bearer: serviceKey, prefer: 'return=representation' });
+    const supa = process.env.SUPABASE_URL || 'https://nezbaljfhhyznhltpjnk.supabase.co';
+    const write = await fetchWithTimeout(`${supa}/rest/v1/lineage_coverage_runs`, {
+      method: 'POST',
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(row),
+    }, 10000);
+    const created = await write.json().catch(() => null);
+    if (!write.ok) throw new Error(`No se pudo registrar el control (${write.status}).`);
     res.status(200).json({ ok: true, run: Array.isArray(created) ? created[0] : created });
   } catch (e) { res.status(500).json({ ok: false, error: e.message || String(e) }); }
 }
