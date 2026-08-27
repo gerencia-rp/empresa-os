@@ -49,3 +49,20 @@ if (failures.length) {
   console.error(JSON.stringify(failures, null, 2));
   process.exit(1);
 }
+
+const requiredControls = [
+  'run_business_continuity_review',
+  'run_operational_role_review',
+  'run_decision_sla_review',
+  'run_absence_readiness_review',
+  'run_data_integrity_review',
+  'run_financial_exception_triage',
+];
+const missingControls = requiredControls.filter(control =>
+  !new RegExp(`function\\s+public\\.${control}\\s*\\(`, 'i').test(migrations)
+);
+if (missingControls.length) {
+  console.error(`Faltan controles ejecutivos versionados: ${missingControls.join(', ')}`);
+  process.exit(1);
+}
+console.log(`${requiredControls.length}/${requiredControls.length} controles ejecutivos de continuidad e integridad están versionados.`);
