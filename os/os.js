@@ -625,8 +625,18 @@ function osNoAccess(what) {
 // RENDER
 // ════════════════════════════════════════════════════════════════
 function osDestroyCharts() { OS._charts.forEach(c => { try { c.destroy(); } catch (e) {} }); OS._charts = []; }
+function osSyncLegacyShellIsolation() {
+  const legacy = document.getElementById('app');
+  if (!legacy) return;
+  const isolated = !!(OS.route && OS.route.view === 'jarvis');
+  legacy.style.display = isolated ? 'none' : '';
+  legacy.inert = isolated;
+  if (isolated) legacy.setAttribute('aria-hidden', 'true');
+  else legacy.removeAttribute('aria-hidden');
+}
 function osRender() {
   const root = document.getElementById('os-root'); if (!root) return;
+  osSyncLegacyShellIsolation();
   posApplyTheme(root); osDestroyCharts();
   if (OS.loadErr) { root.innerHTML = osShell(`<div class="empty"><div style="font-size:40px">${osIcon('alert')}</div><div class="down" style="margin-top:10px">${OS_E(OS.loadErr)}</div></div>`); return; }
   if (!OS.loaded) { root.innerHTML = osShell('<div class="ui-loading"><div class="ui-spinner"></div><div>Cargando datos del holding…</div></div>'); return; }
@@ -708,7 +718,12 @@ function osHoyLabel() {
   const d = new Date(); const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   return `${d.getDate()} ${M[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-function osOpenAdmin() { const root = document.getElementById('os-root'); if (root) root.style.display = 'none'; if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 }); }
+function osOpenAdmin() {
+  const root = document.getElementById('os-root'); if (root) root.style.display = 'none';
+  const legacy = document.getElementById('app');
+  if (legacy) { legacy.style.display = ''; legacy.inert = false; legacy.removeAttribute('aria-hidden'); }
+  if (window.toast) toast('Panel clásico (sistemas/áreas). Volvé al OS con el logo de la esquina o recargando /', 'info', { duration: 4000 });
+}
 window.osOpenAdmin = osOpenAdmin;
 
 // ─── NIVEL 1 · GLOBAL (macro del holding) ───
