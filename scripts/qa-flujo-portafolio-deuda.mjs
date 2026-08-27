@@ -115,6 +115,19 @@ for (const c of CASAS) {
     const heads = [...document.querySelectorAll('table thead tr')].map(tr => [...tr.children].map(t => t.innerText.trim()).join(' | '));
     const filas = [...document.querySelectorAll('table tbody tr')].map(tr => [...tr.children].map(t => t.innerText.trim()));
     const deudaRows = filas.filter(f => /servicio de deuda/i.test(f.join(' ')));
+    // "Todos los movimientos": Fecha | Concepto | Categoría | Monto | Saldo | Fuente,
+    // ordenado del más nuevo al más viejo → la fila de ABAJO tiene el saldo anterior.
+    const movs = filas.filter(f => f.length >= 6);
+    const n = t => { const v = parseFloat(String(t || '').replace(/[^0-9.\-]/g, '')); return isNaN(v) ? null : v; };
+    const saldoMueve = re => {
+      for (let i = 0; i < movs.length - 1; i++) {
+        if (!re.test(movs[i][1] || '')) continue;
+        const a = n(movs[i][4]), b = n(movs[i + 1][4]);
+        if (a == null || b == null) continue;
+        return { concepto: movs[i][1], saldo: movs[i][4], saldoPrevio: movs[i + 1][4], cambia: a !== b, pnlNo: /P&L NO/.test(movs[i][1] || '') };
+      }
+      return null;
+    };
     return {
       txt: document.body.innerText,
       heads,
@@ -122,6 +135,9 @@ for (const c of CASAS) {
       nDeuda: deudaRows.length,
       // concepto + monto de cada movimiento de deuda, tal cual se ve en "Todos los movimientos"
       deudaTxt: deudaRows.map(f => (f[1] || '') + ' ' + (f[3] || '')).join(' || '),
+      // ¿el pago de deuda BAJA el saldo? ¿el draw/cash-out lo deja igual?
+      movDeuda: saldoMueve(/servicio de deuda/i),
+      movCapital: saldoMueve(/Desembolso Hard Money|Cash-out|Draw|Distribuci/i),
     };
   }, c.mes);
 
@@ -141,6 +157,16 @@ for (const c of CASAS) {
     d.deudaTxt.includes(cc), d.deudaTxt.slice(0, 220)));
   (c.prohibidos || []).forEach(rx => chk(c.nombre + ' · NO aparece ' + rx,
     !rx.test(d.deudaTxt), d.deudaTxt.slice(0, 220)));
+  // ── el ajuste del 27-ago: el servicio de deuda RESTA y MUEVE EL SALDO ──
+  chk(c.nombre + ' · la columna del Ledger es "Saldo de caja"', /Saldo de caja/i.test(d.heads.join(' | ')), d.heads.find(h => /Saldo/.test(h)));
+  chk(c.nombre + ' · el pago de deuda BAJA el saldo del Ledger',
+    !!(d.movDeuda && d.movDeuda.cambia), JSON.stringify(d.movDeuda));
+  chk(c.nombre + ' · el pago de deuda YA NO lleva la etiqueta "P&L NO"',
+    !!(d.movDeuda && !d.movDeuda.pnlNo), JSON.stringify(d.movDeuda));
+  if (d.movCapital) {
+    chk(c.nombre + ' · draw / cash-out / distribución NO mueve el saldo (sigue P&L NO)',
+      d.movCapital.cambia === false, JSON.stringify(d.movCapital));
+  }
 
   // coherencia con la distribución automática: mismo mes, mismo neto
   const rpc = await page.evaluate(async ([pid, mes]) => {

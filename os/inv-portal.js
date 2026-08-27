@@ -255,7 +255,10 @@ function ipMetrics(pid, p, r, holding) {
       const desde = new Date(new Date(maxF + 'T00:00:00').getTime() - 365 * 86400000).toISOString().slice(0, 10);
       const w = pasado.filter(m => m.fecha >= desde);
       const rw = w.filter(m => m.categoria === 'renta').reduce((s, m) => s + +m.monto, 0);
-      const ow = w.filter(m => m.categoria === 'operativo').reduce((s, m) => s + +m.monto, 0);
+      // ANTI DOBLE CONTEO: desde el 27-ago-2026 el servicio de deuda es categoria 'operativo'
+      // (resta del mes y mueve el saldo). Acá se lo EXCLUYE del bucket de operativos porque
+      // `dw` lo resta aparte — si no, flujoCasa lo restaría dos veces.
+      const ow = w.filter(m => m.categoria === 'operativo' && !ipEsDeuda(m)).reduce((s, m) => s + +m.monto, 0);
       const dw = w.filter(ipEsDeuda).reduce((s, m) => s + +m.monto, 0);
       const nMeses = [...new Set(w.filter(m => m.categoria === 'renta').map(m => String(m.fecha).slice(0, 7)))].length || 1;
       real = { renta: rw, oper: ow, deuda: dw, nMeses, flujoCasa: rw - ow - dw, desde };
@@ -375,7 +378,7 @@ function renderGlosario() {
     + '1️⃣ <b>Tu inversión</b>: cuánto pusiste y qué % de la casa es tuyo.<br>'
     + '2️⃣ <b>Indicadores de retorno</b>: TVPI = la foto completa (recibido + papel). TIR = a qué ritmo anual crece. LTV = cuánta deuda tiene la casa.<br>'
     + '3️⃣ <b>Info del deal</b>: la estrategia, el préstamo (HML) y el plan de salida — cómo y cuándo vuelve tu plata.<br>'
-    + '4️⃣ <b>Flujo Mensual</b>: la operación real (renta − gastos). Los draws y la deuda aparecen aparte como [P&L NO] — informativos.<br>'
+    + '4️⃣ <b>Flujo Mensual</b>: la operación real del mes — renta − gastos operativos − servicio de deuda (interés HML / cuota de la refi), que resta como cualquier otro gasto. Los draws, el cash-out y las distribuciones aparecen aparte como [P&L NO]: son capital, no gasto del mes.<br>'
     + '5️⃣ <b>Distribuciones</b>: la plata que YA te pagamos, con comprobante y K-1.<br>'
     + 'Tocá cualquier <b>ⓘ</b> para ver qué es, para qué sirve y TU caso con tus números.</div></div>';
   return '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('book') + ' Aprende — glosario del inversionista</div><div class="k">todo término del portal, explicado sin jerga</div></div>'
@@ -1120,7 +1123,10 @@ function renderFlujo(pid, inv) {
   // E1: la OPERACIÓN = solo movimientos P&L SÍ (regla única invEngine.pnlSi);
   // la deuda (financiero) NO entra al balance — se declara informativa
   const rentas = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'ingreso');
-  const oper = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'gasto');
+  // ANTI DOBLE CONTEO: el servicio de deuda ya es categoria 'operativo' (P&L SÍ, resta y mueve
+  // el saldo). Se lo EXCLUYE de `oper` porque `deuda` lo suma aparte; si no, el flujo neto lo
+  // restaría dos veces. `oper` = gastos operativos SIN deuda (eso es el NOI).
+  const oper = w.filter(m => invEngine.pnlSi(m.categoria) && m.tipo === 'gasto' && !ipEsDeuda(m));
   const deuda = w.filter(ipEsDeuda);
   const tRenta = rentas.reduce((s, m) => s + +m.monto, 0);
   const tOper = oper.reduce((s, m) => s + +m.monto, 0);
@@ -1144,7 +1150,7 @@ function renderFlujo(pid, inv) {
     + box('Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
     + box('Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
     + box('Servicio de deuda', tDeuda ? '−' + $money(tDeuda) : $money(0), 'interés del HML + cuota de la refi a 30 años pagados en el período <span class="src">FF:ff_hml_payments</span>', 'down', '<div style="margin-top:8px">' + (deuRows || '<div class="meta">sin pagos de deuda en el período</div>') + '</div>')
-    + box('Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos (solo P&L SÍ) · <span title="el servicio de deuda es financiero · P&L NO: no entra en el NOI, pero sí se resta abajo para saber cuánto queda de verdad.">no incluye el servicio de deuda</span>', balanceOp >= 0 ? 'up' : 'down')
+    + box('Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos, SIN el servicio de deuda · <span title="el NOI mide cómo rinde la casa como negocio, antes de pagarle al banco. El servicio de deuda SÍ resta del flujo del mes y SÍ baja el saldo del Ledger — pero se muestra aparte para no mezclarlo con el NOI.">así se compara contra otras casas</span>', balanceOp >= 0 ? 'up' : 'down')
     + '</div>'
     // el número que importa: lo que queda DESPUÉS de pagarle al banco / al hard money
     + '<div class="card" style="margin-top:14px;border-color:' + (balanceTot >= 0 ? 'var(--pos)' : 'var(--neg)') + '">'
@@ -1198,16 +1204,17 @@ function renderFlujo(pid, inv) {
     + sel('tipo', [['todos', 'Todos'], ['ingreso', '↑ Ingresos'], ['gasto', '↓ Gastos']], LF.tipo)
     + sel('mes', [['todos', 'Todos los meses']].concat(mesesAll.map(m => [m, invEngine.mesEs(m)])), LF.mes)
     + '</div></div>'
-    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">Saldo operativo</th><th>Fuente</th></tr></thead><tbody>'
-    // las filas de SERVICIO DE DEUDA se ven a plena luz (son plata que sale de la casa), aunque
-    // sean P&L NO para el saldo operativo — el resto de lo financiero/inversión queda en tenue
+    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right" title="acumulado de la caja de la casa: renta − gastos operativos − servicio de deuda. El pago del HML/refi SÍ lo baja; draws, cash-out y distribuciones no lo mueven (son capital).">Saldo de caja ⓘ</th><th>Fuente</th></tr></thead><tbody>'
+    // las filas de SERVICIO DE DEUDA se ven a plena luz y desde el 27-ago-2026 BAJAN el saldo
+    // (categoria 'operativo'). En tenue queda solo lo que NO es gasto del mes: draws, cash-out,
+    // aportes de capital, distribuciones y la compra (P&L NO).
     + rows.slice().reverse().map(m => '<tr' + (m.pnl || m.deu ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
       + '<td>' + esc(m.concepto)
-      + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — se resta del flujo neto del mes, no del NOI">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
+      + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — resta del mes y baja el saldo, igual que un utility. Se muestra aparte del NOI, que mide la casa antes de la deuda.">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
       + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">' + osIcon('paperclip') + '</a>' : '') + '</td>'
       + '<td>' + esc(m.categoria) + '</td>'
       + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
-      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO: repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO (capital, no gasto del mes): repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
       + '<td>' + srcTag(m.fuente) + '</td></tr>').join('')
     + '</tbody></table></div>'
     + '<div class="meta" style="margin-top:10px">Cada movimiento declara su fuente (FF = Fix &amp; Flip · Rentas = property management · OS = registro del holding). El detalle es de la casa completa; tu parte de la utilidad es el ' + $pct(inv) + '. Los draws vienen agregados (la fuente no fecha draw por draw).</div>'
