@@ -15,7 +15,7 @@ const JV = {
   tab: 'network',
   agents: [], props: [], audit: [], reports: [], memories: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
-  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.9,
+  vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.75,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
   decisionPreview: null,
@@ -763,17 +763,17 @@ function jvMapaOverview(current, activos, pendientes) {
   const commandHTML = commandAgents.length ? '<div class="jv-org-command">' + commandAgents.map(a => jvOrgNode(a, { subtitle: 'Comando ejecutivo' })).join('') + '</div>' : '';
   const inspector = jvAgentInspector() || '<aside class="jv-org-empty-inspector">Seleccioná un agente para ver sus tareas, horario, actividad y evidencia real.</aside>';
   return '<div class="jv-org-layout"><section class="jv-org-canvas"><div class="jv-org-toolbar"><div><div class="jv-eyebrow">JARVIS · ORGANIGRAMA OPERATIVO</div><h1>Tu empresa digital, en una sola vista.</h1><p>Del Cerebro Ejecutivo a cada especialista. Seleccioná cualquier nodo para ver qué hace ahora.</p></div><div class="jv-org-counts"><span><b>' + current.length + '</b> agentes</span><span><b>4</b> áreas</span><span><b>' + activos + '</b> funcionando</span><span><b>' + pendientes + '</b> atención</span></div></div>'
-    + '<div class="jv-org-tree" style="zoom:' + Number(JV.orgZoom || 0.9).toFixed(2) + '"><div class="jv-org-root">' + rootHTML + commandHTML + '</div><div class="jv-org-depts">' + areaHTML + '</div></div>'
-    + '<div class="jv-org-zoom"><button type="button" onclick="jvOrgZoom(-.1)" aria-label="Alejar">−</button><button type="button" onclick="jvOrgZoom(.1)" aria-label="Acercar">+</button><button type="button" onclick="jvOrgFit()">' + Math.round((JV.orgZoom || .9) * 100) + '% · Acomodar</button></div></section>' + inspector + '</div>';
+    + '<div class="jv-org-tree" style="zoom:' + Number(JV.orgZoom || 0.75).toFixed(2) + '"><div class="jv-org-root">' + rootHTML + commandHTML + '</div><div class="jv-org-depts">' + areaHTML + '</div></div>'
+    + '<div class="jv-org-zoom"><button type="button" onclick="jvOrgZoom(-.1)" aria-label="Alejar">−</button><button type="button" onclick="jvOrgZoom(.1)" aria-label="Acercar">+</button><button type="button" onclick="jvOrgFit()">' + Math.round((JV.orgZoom || .75) * 100) + '% · Acomodar</button></div></section>' + inspector + '</div>';
 }
 
 function jvOrgZoom(delta) {
-  JV.orgZoom = Math.max(.7, Math.min(1.1, Number((JV.orgZoom + delta).toFixed(2))));
+  JV.orgZoom = Math.max(.65, Math.min(1.1, Number((JV.orgZoom + delta).toFixed(2))));
   if (window.osRender) osRender();
 }
 function jvOrgFit() {
   const canvas = document.querySelector('#os-root .jv-org-canvas');
-  JV.orgZoom = canvas && canvas.clientWidth < 760 ? .78 : .9;
+  JV.orgZoom = canvas && canvas.clientWidth < 760 ? .7 : .75;
   if (window.osRender) osRender();
 }
 window.jvOrgZoom = jvOrgZoom;
