@@ -667,7 +667,7 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage] = await Promise.all([
+    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
@@ -683,6 +683,7 @@ async function jvLoad(force) {
       sb.from('lineage_coverage_runs').select('run_at,pantallas,numeros_vistos,con_linaje,sin_linaje,ok').order('run_at', { ascending: false }).limit(1).maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar linaje.' } })),
       sb.from('agent_decision_policies').select('tipo_accion,categoria,rol_primario,rol_respaldo,rol_escalamiento,sla_hours,auto_execute,requiere_evidencia').then(r => r).catch(() => ({ data: null })),
       sb.from('v_operational_role_coverage').select('role_code,role_name,area,criticality,primary_ready,backup_ready,verified_at').then(r => r).catch(() => ({ data: null })),
+      sb.from('v_operational_role_candidates').select('role_code,role_name,profile_id,candidate_name,email,suitability_score,access_evidence').order('suitability_score', { ascending: false }).then(r => r).catch(() => ({ data: null })),
     ]);
     if (reg.error) throw reg.error;
     JV.agents = reg.data || [];
@@ -692,6 +693,7 @@ async function jvLoad(force) {
     JV.memories = memories.error ? [] : (memories.data || []);
     JV.decisionPolicies = ((policies && policies.data) || []).reduce((out, row) => { out[row.tipo_accion] = row; return out; }, {});
     JV.roleCoverage = (roleCoverage && roleCoverage.data) || [];
+    JV.roleCandidates = (roleCandidates && roleCandidates.data) || [];
     JV.runsTotal = runs.count || 0;
     JV.crit = crit.error ? [] : (crit.data || []);
     JV.critImpact = JV.crit.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
@@ -1137,6 +1139,12 @@ function jvControlsPanel() {
     ? 'La matriz de responsabilidades todavía no está disponible.'
     : rolesOk ? 'Cada rol crítico tiene titular, respaldo y permisos de área verificados.'
       : (roles.length - coveredRoles) + ' rol(es) todavía no tienen titular y respaldo con permisos confirmados. Jarvis no los presenta como delegados.';
+  const candidateRows = roles.filter(r => !r.primary_ready || !r.backup_ready).map(r => {
+    const candidates = (JV.roleCandidates || []).filter(c => c.role_code === r.role_code).slice(0, 3);
+    return '<div class="jv-detail-row"><span><b>' + OS_E(r.role_name) + '</b><small>Requiere titular y respaldo confirmados</small></span><strong>'
+      + (candidates.length ? candidates.map(c => OS_E(c.candidate_name) + ' · ' + OS_E(c.access_evidence)).join('<br>') : 'Sin candidato con acceso compatible')
+      + '</strong></div>';
+  }).join('');
   const absenceValue = absence ? absencePassed + ' / ' + absenceTotal + ' compuertas' : 'Sin certificación disponible';
   const absenceDetail = absence ? (absenceOk ? 'Los controles de continuidad están verificados para una ausencia prolongada.' : String(absence.bloqueo_principal || 'Hay compuertas pendientes.')) : 'Todavía no existe una corrida de preparación para ausencia prolongada.';
   return '<section class="jv-controls"><div class="jv-section-title">Controles de integridad <span>evidencia viva</span></div><div class="jv-controls-grid">'
@@ -1144,7 +1152,7 @@ function jvControlsPanel() {
     + card('git-branch', 'Linaje de datos', lineOk, lineValue, lineDetail, 'lineage_coverage_runs')
     + card('users', 'Cobertura humana', rolesOk, rolesValue, rolesDetail, 'v_operational_role_coverage')
     + card('shield-check', 'Ausencia de 6 meses', absenceOk, absenceValue, absenceDetail, 'continuidad_ausencia_6_meses')
-    + '</div></section>';
+    + '</div>' + (!rolesOk ? '<details class="jv-decision-more" style="margin-top:12px"><summary>Ver candidatos por acceso vigente</summary><div class="jv-detail-list">' + candidateRows + '</div><div class="jv-needs-info">Estos nombres son candidatos técnicos por permisos. Un administrador debe confirmar experiencia, disponibilidad, aceptación y respaldo antes de asignarlos.</div></details>' : '') + '</section>';
 }
 
 // ════════════════════════════════════════════════════════════════
