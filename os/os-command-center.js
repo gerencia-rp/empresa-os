@@ -16,7 +16,7 @@ const JV = {
   agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.75,
-  busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', reportArea: 'Todas',
+  busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', decisionLimit: 40, reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
   workSelectedId: null, scheduleAgentId: null,
   decisionPreview: null,
@@ -1405,12 +1405,15 @@ function jvLanesHTML() {
   const overdueCount = pending.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) / 3600000 > Number(jvDecisionPolicy(p).sla_hours || 24)).length;
   const history = lanes.aprobada.concat(lanes.ejecutada).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
   return filters + '<div class="jv-status-strip"><span>' + pending.length + ' asuntos agrupados</span><span>' + overdueCount + ' fuera de plazo</span><span>Orden: riesgo financiero y comunicación primero</span></div><div class="jv-decisions-layout"><section><div class="jv-section-title">Pendientes <span>' + pending.length + '</span></div>'
-    + (pending.length ? pending.slice(0, 40).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>') + '</section>'
+    + (pending.length ? pending.slice(0, JV.decisionLimit).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>')
+    + (pending.length > JV.decisionLimit ? '<button class="jv-btn ghost" style="width:100%;justify-content:center" onclick="jvMoreDecisions()">Ver ' + Math.min(40, pending.length - JV.decisionLimit) + ' decisiones más · faltan ' + (pending.length - JV.decisionLimit) + '</button>' : '') + '</section>'
     + '<aside><div class="jv-section-title">Resueltas recientemente</div>'
     + (history.length ? history.slice(0, 8).map(p => card(p, false, false)).join('') : '<div class="jv-empty">Todavía no hay historial.</div>') + '</aside></div>';
 }
-function jvDecisionArea(area) { JV.decisionArea = area; if (window.osRender) osRender(); }
+function jvDecisionArea(area) { JV.decisionArea = area; JV.decisionLimit = 40; if (window.osRender) osRender(); }
 window.jvDecisionArea = jvDecisionArea;
+function jvMoreDecisions() { JV.decisionLimit += 40; if (window.osRender) osRender(); }
+window.jvMoreDecisions = jvMoreDecisions;
 function jvFeedHTML() {
   if (!JV.audit.length) return '<div class="jv-feed"><div class="jv-empty" style="padding:12px">Sin registros de bitácora.</div></div>';
   return '<div class="jv-feed">' + JV.audit.map(r => {
