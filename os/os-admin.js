@@ -175,14 +175,16 @@ function osaOperationalRolesCard() {
   const roles = OSA.operationalRoles || [];
   if (!roles.length) return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">' + osIcon('users') + ' Continuidad operativa</div></div><div class="meta">La matriz de responsables todavía no está disponible.</div></div>';
   const activeUsers = OSA.users.filter(u => u.active !== false);
-  const options = selected => '<option value="">Sin asignar</option>' + activeUsers.map(u =>
+  const options = (selected, requiredAreas) => '<option value="">Sin asignar</option>' + activeUsers.filter(u =>
+    u.role === 'admin' || (requiredAreas || []).every(a => (u.allowed_areas || []).includes(a))
+  ).map(u =>
     '<option value="' + u.id + '" ' + (u.id === selected ? 'selected' : '') + '>' + OS_E(u.full_name || u.email) + '</option>'
   ).join('');
   const rows = roles.map(r => {
     const complete = !!r.primary_profile_id && !!r.backup_profile_id && r.primary_profile_id !== r.backup_profile_id;
     return '<tr><td><b>' + OS_E(r.role_name) + '</b><div class="meta">' + OS_E(r.area) + ' · ' + OS_E(r.criticality) + '</div></td>'
-      + '<td><select class="osa-in" id="osa-role-primary-' + r.role_code + '">' + options(r.primary_profile_id) + '</select></td>'
-      + '<td><select class="osa-in" id="osa-role-backup-' + r.role_code + '">' + options(r.backup_profile_id) + '</select></td>'
+      + '<td><select class="osa-in" id="osa-role-primary-' + r.role_code + '">' + options(r.primary_profile_id, r.required_areas) + '</select></td>'
+      + '<td><select class="osa-in" id="osa-role-backup-' + r.role_code + '">' + options(r.backup_profile_id, r.required_areas) + '</select></td>'
       + '<td>' + (complete ? '<span class="badge b-ok">cubierto</span>' : '<span class="badge b-warn">pendiente</span>') + '</td>'
       + '<td style="text-align:right"><button class="osa-ghost" onclick="osaSaveOperationalRole(\'' + r.role_code + '\')">Guardar</button></td></tr>';
   }).join('');
