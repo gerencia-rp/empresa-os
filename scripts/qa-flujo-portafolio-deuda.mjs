@@ -17,21 +17,35 @@ const EMAIL = process.env.QA_EMAIL || 'qa-admin-test@rentalprofitss.com';
 const PASS = process.env.QA_PASS;
 if (!PASS) { console.error('Falta QA_PASS'); process.exit(1); }
 
-// casas a verificar en la pestaña Flujo Mensual (esperados = datos reales de Supabase)
+// casas a verificar en la pestaña Flujo Mensual (esperados = datos reales de Supabase,
+// espejo de Airtable "Pagos interes (HML & REFI)" tras el sync del 27-ago).
+// `conceptos` / `prohibidos` verifican que HML y Refi 30 se distingan por su nombre real.
 const CASAS = [
   {
-    nombre: '4916 Barkbridge Trl',
+    nombre: '4916 Barkbridge Trl (refinanciada oct-2025)',
     inv: 'rec8MhKDmkdD6Ouyr',
     pid: '6fa5ad93-31a7-462e-b48b-444491dd2b65',
-    // jun-26: renta 2,000 · operativos 569.35 · deuda 1,600 · neto −169.35
-    mes: 'Junio 2026', ing: /2,000/, gas: /569/, deu: /1,600/, neto: /−\$169|-\$169/,
+    // jun-26: renta 2,000 · operativos 569.35 · REFI 30 1,579.73 · neto −149.08
+    mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /569/, deu: /1,580/, neto: /−\$149|-\$149/,
+    // HML hasta sep-2025, Refi 30 desde oct-2025: los DOS conceptos tienen que aparecer
+    conceptos: ['Pago Refi 30 años', 'Pago interés HML'], prohibidos: [/Pago interés HML.*1,600|1,600/],
   },
   {
-    nombre: '5003 Michelle Ct',
+    nombre: '5003 Michelle Ct (refinanciada jul-2026)',
     inv: 'recRZUim6SaOnNmm5',
     pid: 'efad086f-3008-49fd-96da-dbeaaba650f2',
-    // jun-26: renta 3,700 · operativos 0 · deuda 2,116.13 · neto 1,583.87
-    mes: 'Junio 2026', ing: /3,700/, gas: /\$0/, deu: /2,116/, neto: /1,584/,
+    // jun-26 todavía HML: renta 3,700 · operativos 0 · deuda 2,116.13 · neto 1,583.87
+    mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /\$0/, deu: /2,116/, neto: /1,584/,
+    conceptos: ['Pago interés HML', 'Pago Refi 30 años'], prohibidos: [],
+  },
+  {
+    nombre: '311 Bartlett St (NO refinanciada)',
+    inv: 'reclmX5mhMW6zrkaP',
+    pid: '565c8ef9-f019-4acb-8b54-4c57d1056e01',
+    // jul-26: renta 850 · operativos 0 · interés HML 3,060 · neto −2,210
+    mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /\$0/, deu: /3,060/, neto: /−\$2,210|-\$2,210/,
+    // sin refi: NINGÚN movimiento puede decir "Refi 30"
+    conceptos: ['Pago interés HML'], prohibidos: [/Refi 30/],
   },
 ];
 // inversionista con 4 casas → sirve para el TOTAL del portafolio
@@ -100,11 +114,14 @@ for (const c of CASAS) {
   const d = await page.evaluate(mes => {
     const heads = [...document.querySelectorAll('table thead tr')].map(tr => [...tr.children].map(t => t.innerText.trim()).join(' | '));
     const filas = [...document.querySelectorAll('table tbody tr')].map(tr => [...tr.children].map(t => t.innerText.trim()));
+    const deudaRows = filas.filter(f => /servicio de deuda/i.test(f.join(' ')));
     return {
       txt: document.body.innerText,
       heads,
       fila: filas.find(f => new RegExp(mes, 'i').test(f[0] || '')) || null,
-      nDeuda: filas.filter(f => /servicio de deuda/i.test(f.join(' '))).length,
+      nDeuda: deudaRows.length,
+      // concepto + monto de cada movimiento de deuda, tal cual se ve en "Todos los movimientos"
+      deudaTxt: deudaRows.map(f => (f[1] || '') + ' ' + (f[3] || '')).join(' || '),
     };
   }, c.mes);
 
@@ -119,14 +136,19 @@ for (const c of CASAS) {
   chk(c.nombre + ' · ' + c.mes + ' SERVICIO DE DEUDA', c.deu.test(f[3] || ''), JSON.stringify(f));
   chk(c.nombre + ' · ' + c.mes + ' FLUJO NETO ya con la deuda restada', c.neto.test(f[4] || ''), JSON.stringify(f));
   chk(c.nombre + ' · filas 🏦 servicio de deuda en "Todos los movimientos"', d.nDeuda > 0, d.nDeuda + ' filas');
+  // CONCEPTO real: HML y Refi 30 tienen que distinguirse por nombre, no ser todos "HML"
+  (c.conceptos || []).forEach(cc => chk(c.nombre + ' · concepto "' + cc + '" presente',
+    d.deudaTxt.includes(cc), d.deudaTxt.slice(0, 220)));
+  (c.prohibidos || []).forEach(rx => chk(c.nombre + ' · NO aparece ' + rx,
+    !rx.test(d.deudaTxt), d.deudaTxt.slice(0, 220)));
 
   // coherencia con la distribución automática: mismo mes, mismo neto
-  const rpc = await page.evaluate(async pid => {
+  const rpc = await page.evaluate(async ([pid, mes]) => {
     const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-    const r = await sb.rpc('inv_dist_auto', { p_property_id: pid, p_billing_ym: '2026-06' });
+    const r = await sb.rpc('inv_dist_auto', { p_property_id: pid, p_billing_ym: mes });
     return r.error ? { err: r.error.message } : { renta: r.data.renta, oper: r.data.operativos, deuda: r.data.deuda, neto: r.data.neto };
-  }, c.pid);
-  chk(c.nombre + ' · el neto del portal = el neto de inv_dist_auto (jun-26)',
+  }, [c.pid, c.ym]);
+  chk(c.nombre + ' · el neto del portal = el neto de inv_dist_auto (' + c.ym + ')',
     rpc && rpc.neto != null && (f[4] || '') === money(rpc.neto), (f[4] || '') + ' vs ' + JSON.stringify(rpc));
   console.log('\n' + c.nombre + ' · ' + c.mes + ': ' + JSON.stringify(d.fila) + '  | inv_dist_auto: ' + JSON.stringify(rpc));
 }

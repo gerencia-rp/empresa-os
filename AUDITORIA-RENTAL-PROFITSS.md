@@ -927,3 +927,144 @@ QA_PASS=<pass del usuario QA> node scripts/qa-flujo-portafolio-deuda.mjs
 inversionista real usa **`ff_deals.deficit_total`** (decisión CEO de agosto). **Consecuencia: el admin
 puede estar viendo un déficit distinto al del inversionista en la misma casa.** No se corrigió acá porque
 cambiaría un número fuera del pedido. Recomendación: unificar las dos copias en una sola definición.
+
+---
+
+## 🏦 PASADA (27 Ago 2026 · 2) — HML vs REFI 30 BIEN DISTINGUIDOS (monto, fecha y concepto reales) · HECHO Y EN VIVO
+
+**Pedido del CEO:** el pago mensual de deuda debe traer **HML vs Refi 30** correctamente distinguidos,
+con el **monto, la fecha y el concepto reales** de Airtable → base "Flipping Rentals matriz" → tabla
+**"Pagos interes (HML & REFI)"**. Caso testigo: 4916 Barkbridge, junio-2026 mostraba
+`Pago interés HML −$1,600` cuando el pago real es **Refi 30 = $1,579.73**.
+
+### De dónde salía el $1,600 (la pregunta directa del CEO)
+
+**No salía de un valor modelado ni hardcodeado.** Salía de `ff_hml_payments.pago_hml`, el espejo de la
+columna **"Pago HML"** de Airtable — con el valor que esa columna tenía **antes de la edición del CEO de
+hoy**. La plataforma estaba espejando fielmente una fuente que todavía no tenía separado HML de Refi 30.
+
+Descartado explícitamente: `ff_deals.hml_payment` = **0** y `ff_deals.ref30_payment` = **1,579.73**
+para Barkbridge (los valores "modelados" de la tabla Propiedades ya estaban bien). El 1,600 no existe
+hoy en ninguna columna de Airtable.
+
+### El sync NO era el bug — pero sí había una causa raíz operativa
+
+Se auditó `sync-ff-airtable` contra el esquema real de Airtable (`tblV4wNA8hNs5Mmk8`). **Mapea los 6
+campos correctos, ambos bloques**:
+
+| Campo Airtable | Field ID | Columna Supabase |
+|---|---|---|
+| Fecha de Pago - HML | `fld7y5uQLeJlCHgno` | `ff_hml_payments.fecha` |
+| Pago HML | `fldDe1BDW4fP5s3WR` | `ff_hml_payments.pago_hml` |
+| Fee Adicional | `fldrSE3aeiMqkfpHE` | `ff_hml_payments.fee` |
+| **Pago Ref 30** | `fldWACGPEKKhLp206` | `ff_hml_payments.ref30` |
+| **Fecha de pago Ref 30** | `fldlDpPWUnYhIsETm` | `ff_hml_payments.fecha_ref30` |
+| Check de pago | `fldOOSgpzzdfw8ABA` | `ff_hml_payments.pagado` |
+
+Prueba adicional de que el mapeo funcionaba: **ya había 18 filas con `ref30 > 0`** en el espejo antes de
+tocar nada.
+
+🔴 **La causa raíz real: NO existía cron para `sync-ff-airtable`.** Rentas sincroniza cada 15 min,
+Remodelación cada 30, ClickUp cada hora — Fix & Flip no tenía ninguno. El espejo estaba del **26-ago
+23:54** mientras Airtable se editó el **27-ago ~16:00**: el CEO editaba y no lo veía.
+
+### Qué se hizo
+
+1. **Sync forzado** (`select cron_invoke_function('sync-ff-airtable')` — usa la service key del Vault).
+   Espejo al día: 166 filas, `last_synced_at` 27-ago 17:36. Barkbridge quedó **1:1 con Airtable** (16 filas).
+2. **Cron nuevo `sync-ff-airtable-hourly`** (jobid 119, `20 * * * *` — a los :20 para no pisar
+   Rentas :00/:15/:30/:45, Remodelación :30, workers :05, ClickUp :00). Se quita con
+   `select cron.unschedule('sync-ff-airtable-hourly')`.
+3. **Migración `20260827140000_ledger_hml_vs_refi30.sql`** (`create or replace`, sin drop):
+   - Concepto del pago del banco: `Pago refi 30 años (banco)` → **`Pago Refi 30 años`** (el texto que pidió el CEO).
+   - **Fin del descarte silencioso**: antes un pago con monto > 0 pero sin *su* fecha propia se caía del
+     ledger sin avisar. Ahora la fecha cae a la otra columna del mismo registro (`coalesce`) y solo se
+     descarta si el registro no tiene ninguna de las dos. Hoy **0 filas** dependen del fallback
+     (`ref30 > 0` sin `fecha_ref30` = 0), así que **no mueve ningún número actual**: es un seguro.
+
+La **regla por mes ya estaba bien implementada** y se conservó: `Pago HML > 0` → "Pago interés HML" con
+"Fecha de Pago - HML"; `Pago Ref 30 > 0` → "Pago Refi 30 años" con "Fecha de pago Ref 30"; ambos con
+`subcategoria = 'servicio_deuda'`, categoría `financiero` → P&L NO (no entran al NOI, se restan después).
+**El monto siempre sale de `ff_hml_payments`; ningún valor modelado.**
+
+### Antes → después · 4916 Barkbridge (concepto y monto)
+
+| Mes | ANTES (espejo viejo) | DESPUÉS (Airtable real) |
+|---|---|---|
+| abr-2025 | *(la fila no existía en el espejo)* | Pago interés HML **$719.33** |
+| may-2025 | Pago interés HML $1,019.13 | Pago interés HML **$935.21** |
+| jun-2025 | Pago interés HML $1,600.00 | Pago interés HML **$1,019.13** |
+| jul-2025 | Pago interés HML $1,600.00 | Pago interés HML **$1,020.00** |
+| ago-2025 | Pago interés HML $1,600.00 | Pago interés HML **$1,020.00** |
+| sep-2025 | Pago interés HML $1,600.00 | Pago interés HML **$321.41** |
+| oct-2025 → jun-2026 | Pago interés HML $1,600.00 | **Pago Refi 30 años $1,579.73** |
+| jul-2026 | *(sin pago registrado)* | **Pago Refi 30 años $1,579.73** |
+
+Impacto en el flujo mensual (2026):
+
+| Mes 2026 | Deuda antes | Deuda ahora | Neto antes | Neto ahora |
+|---|---:|---:|---:|---:|
+| Enero | 1,600.00 | 1,579.73 | 230.00 | **250.27** |
+| Febrero | 1,600.00 | 1,579.73 | −1,578.90 | **−1,558.63** |
+| Marzo | 1,600.00 | 1,579.73 | 891.96 | **912.23** |
+| Abril | 1,600.00 | 1,579.73 | −735.77 | **−715.50** |
+| Mayo | 1,600.00 | 1,579.73 | −725.39 | **−705.12** |
+| **Junio** | **1,600.00 (HML)** | **1,579.73 (Refi 30)** | **−169.35** | **−149.08** |
+| Julio | 0.00 | 1,579.73 | 3,211.43 | **1,631.70** |
+| Agosto | 0.00 | 0.00 | 2,700.00 | 2,700.00 |
+| **Año 2026** | 9,600.00 | **11,058.11** (todo Refi 30) | 3,823.98 | **2,365.87** |
+
+### Las otras dos casas verificadas
+
+- **5003 Michelle Ct** — refinanciada en **julio-2026**, y la transición se ve: jun-26 `Pago interés HML
+  $2,116.13` (neto 1,583.87) · jul/ago-26 `Pago Refi 30 años $3,032.26`. Año 2026: HML $12,696.78 + Refi
+  $6,064.52, neto **$8,790.70**. Sus montos **no cambiaron** (ya eran los reales).
+- **311 Bartlett St — NO refinanciada** (0 filas con "Pago Ref 30"): sus **14 movimientos salen todos
+  como "Pago interés HML"**, con montos reales y variables ($252 · $630 · $864.47 · $1,170.21 ·
+  $1,445.42 · $1,530 · $3,060). Año 2026: ingresos 7,400 − gastos 0 − HML 10,710 = **−$3,310.00**.
+  **Cero apariciones de "Refi 30"**, como corresponde.
+
+### Verificación en el sitio en vivo (logueado, sin stubs)
+
+`scripts/qa-flujo-portafolio-deuda.mjs` sobre `https://empresa-os.vercel.app`:
+**53 OK · 0 fallas · 0 pageerrors · 0 errores de consola.** Leído de la pantalla real:
+
+```
+4916 Barkbridge Trl · Junio 2026: ["Junio 2026","$2,000","-$569","-$1,580","-$149"]
+   concepto en movimientos: "Pago Refi 30 anos"  (y "Pago interes HML" en los meses 2025)
+   ningun "1,600" en ninguna fila
+   inv_dist_auto -> {"renta":2000,"oper":569.35,"deuda":1579.73,"neto":-149.08}   OK mismo numero
+
+5003 Michelle Ct  · Junio 2026: ["Junio 2026","$3,700","-$0","-$2,116","$1,584"]
+   conceptos: "Pago interes HML" (jun) + "Pago Refi 30 anos" (jul/ago)
+
+311 Bartlett St   · Julio 2026: ["Julio 2026","$850","-$0","-$3,060","-$2,210"]
+   14 movimientos, TODOS "Pago interes HML", 0 con "Refi 30"
+
+Portafolio (4 casas) · total en pantalla -$6,023 = suma de las tarjetas  (el fix anterior intacto)
+```
+
+**Build:** `npm run build` OK — bundle `assets/bundle.98171e9c9e75.js`, 32 estáticos.
+El hash **no cambia y es correcto que no cambie**: este arreglo es 100% datos + SQL (sync, cron y
+`inv_ledger`); el front no necesitó ni una línea. Lo verificado en vivo es el **render sobre el bundle
+desplegado**, con los datos ya corregidos.
+
+### Cómo revertir
+- `inv_ledger` → reaplicar `20260806110000_inv_dist_auto_ledger.sql`
+- cron → `select cron.unschedule('sync-ff-airtable-hourly')`
+- el espejo se re-sincroniza solo desde Airtable (no se borró ni editó ningún dato de la fuente)
+
+### 🔴 Hallazgos abiertos (declarados, NO tocados)
+
+1. **1100 Echo lane, fila del 2026-06-02 tiene los DOS pagos**: `Pago HML $2,770` **y**
+   `Pago Ref 30 $3,084.34`, ambos con fecha 2026-06-02 (Airtable `recXfemsSvrIpoMo3`). Es la única fila
+   así en las 166. Contra la regla que dio el CEO ("un mes tiene UNO u OTRO"), pero puede ser legítima:
+   es el mes de transición del refi. Hoy el ledger muestra **los dos movimientos** ($5,854.34 de deuda en
+   junio). **No se tocó el dato.** Si el mes de transición debe llevar uno solo, se corrige en Airtable.
+2. **`v_pnl_casa.interes_hml_real` suma SOLO `pago_hml`, ignora `ref30`.** Para casas refinanciadas
+   reporta únicamente el interés del HML, no la cuota del banco → `utilidad_neta_post_interes` queda
+   optimista en esas casas. Ese número alimenta el desglose informativo del déficit, no el flujo que se
+   acaba de arreglar. Cambiarlo mueve números fuera del pedido: **queda para decisión del CEO.**
+3. **Sigue faltando cargar en Airtable los pagos de deuda de agosto-2026** de varias casas (Barkbridge
+   entre ellas): mientras no estén, agosto muestra el flujo sin deuda. Ahora que el cron corre cada hora,
+   apenas se carguen aparecen solos.
