@@ -43,6 +43,13 @@ function jvEvidObj(p) {
   if (typeof e === 'string') { try { return JSON.parse(e); } catch (_) { return { detalle: e }; } }
   return {};
 }
+function jvProposalEvidenceStatus(p) {
+  const sensitive = ['conciliacion', 'recordatorio_cobro', 'nomina', 'correccion_dato', 'precio_dinamico', 'plan_ocupacion'].includes(String((p && p.tipo_accion) || ''));
+  const ts = p && (p.last_validated_at || p.created_at);
+  const ageHours = ts ? Math.max(0, (Date.now() - new Date(ts).getTime()) / 3600000) : Infinity;
+  const maxHours = sensitive ? 48 : 168;
+  return { fresh: Number.isFinite(ageHours) && ageHours <= maxHours, sensitive, ageHours, maxHours, ts };
+}
 function jvIsLegacy(a) { return String((a && a.linea) || '').toLowerCase().indexOf('transversal') === 0; }
 function jvKey(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 // Ejecutores y horarios que existen en las migraciones versionadas. Una ficha o
@@ -669,7 +676,7 @@ async function jvLoad(force) {
   try {
     const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
-      sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
+      sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at,last_validated_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(2000),
       sb.from('pm_informes').select('id,tipo,corte,titulo,estado,origen,payload,storage_path,generado_por,emitido_at,created_at').is('archived_at', null).order('corte', { ascending: false }).limit(120),
@@ -1396,18 +1403,19 @@ function jvLanesHTML() {
     const detail = jvProposalDetails(p);
     const busy = JV.busyId === p.id;
     const policy = jvDecisionPolicy(p);
+    const evidence = jvProposalEvidenceStatus(p);
     const ageHours = p.created_at ? Math.max(0, (Date.now() - new Date(p.created_at).getTime()) / 3600000) : 0;
     const overdue = p.estado === 'propuesta' && ageHours > Number(policy.sla_hours || 24);
     const escalated = p.estado === 'propuesta' && ageHours > Number(policy.sla_hours || 24) * 2;
     const currentOwner = escalated ? policy.rol_escalamiento : overdue ? policy.rol_respaldo : policy.rol_primario;
     const ownerStage = escalated ? 'Escalamiento final' : overdue ? 'Turno del respaldo' : 'Responsable actual';
     const meta = [jvProposalArea(p), jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
-    return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span>' + (overdue ? '<span class="badge b-red">SLA vencido · ' + Math.floor(ageHours) + ' h</span>' : '') + '</div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
+    return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span>' + (overdue ? '<span class="badge b-red">SLA vencido · ' + Math.floor(ageHours) + ' h</span>' : '') + (evidence.fresh ? '<span class="badge b-green">evidencia vigente</span>' : '<span class="badge b-red">evidencia vencida · requiere nueva corrida</span>') + '</div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
       + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
       + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
-      + '<div class="jv-detail-list"><div class="jv-detail-row"><span>' + OS_E(ownerStage) + '</span><b>' + OS_E(currentOwner) + '</b></div><div class="jv-detail-row"><span>Ruta de reemplazo</span><b>' + OS_E(policy.rol_primario) + ' → ' + OS_E(policy.rol_respaldo) + ' → ' + OS_E(policy.rol_escalamiento) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas' + (overdue ? ' · vencido hace ' + Math.max(0, Math.floor(ageHours - Number(policy.sla_hours || 24))) + ' h' : '') + '</b></div></div>'
+      + '<div class="jv-detail-list"><div class="jv-detail-row"><span>' + OS_E(ownerStage) + '</span><b>' + OS_E(currentOwner) + '</b></div><div class="jv-detail-row"><span>Ruta de reemplazo</span><b>' + OS_E(policy.rol_primario) + ' → ' + OS_E(policy.rol_respaldo) + ' → ' + OS_E(policy.rol_escalamiento) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas' + (overdue ? ' · vencido hace ' + Math.max(0, Math.floor(ageHours - Number(policy.sla_hours || 24))) + ' h' : '') + '</b></div><div class="jv-detail-row"><span>Evidencia verificada</span><b>' + OS_E(evidence.ts ? jvFmtTs(evidence.ts) : 'sin verificación') + ' · máximo ' + evidence.maxHours + ' h</b></div></div>'
       + '<div class="who">' + OS_E(meta) + '</div>'
-      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (detail.sufficient ? 'Revisar y aprobar' : 'Falta información')) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>Revisar y no aplicar</button></div>' : '') + '</article>';
+      + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient || !evidence.fresh ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (!evidence.fresh ? 'Esperando nueva corrida' : (detail.sufficient ? 'Revisar y aprobar' : 'Falta información'))) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>Revisar y no aplicar</button></div>' : '') + '</article>';
   };
   const allPending = lanes.alerta.concat(lanes.propuesta);
   const areas = ['Todas'].concat([...new Set(allPending.map(jvProposalArea))]);
@@ -1693,6 +1701,7 @@ function jvDecisionPreviewHTML() {
   if (!p) return '';
   const info = jvProposalInfo(p), detail = jvProposalDetails(p);
   const approving = preview.estado === 'aprobada';
+  const evidence = jvProposalEvidenceStatus(p);
   const clickupExecutable = ['archivar_tarea', 'refechar_tarea', 'reasignar_tarea'].includes(p.tipo_accion);
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
   const effect = approving
@@ -1705,15 +1714,20 @@ function jvDecisionPreviewHTML() {
     + '<div class="jv-review-body"><div class="jv-review-agent">' + OS_E(jvAgentName(p.agent_id)) + ' · ' + OS_E(jvProposalArea(p)) + '</div><h3>' + OS_E(info.title) + '</h3><p>' + OS_E(info.summary) + '</p>'
     + '<div class="jv-review-impact"><b>Qué cambiará</b><span>' + OS_E(effect) + '</span></div>'
     + (detail.html ? '<div class="jv-detail-list">' + detail.html + '</div>' : '<div class="jv-needs-info">No hay suficiente detalle para aprobar esta propuesta.</div>')
-    + '<div class="jv-review-source"><b>Fuente</b><span>' + OS_E(info.source || 'agent_proposals') + (info.cut ? ' · corte ' + OS_E(info.cut) : '') + '</span></div>'
+    + '<div class="jv-review-source"><b>Fuente</b><span>' + OS_E(info.source || 'agent_proposals') + (info.cut ? ' · corte ' + OS_E(info.cut) : '') + ' · verificada ' + OS_E(evidence.ts ? jvFmtTs(evidence.ts) : 'nunca') + '</span></div>'
+    + (!evidence.fresh && approving ? '<div class="jv-needs-info">La evidencia venció. Jarvis debe volver a ejecutar este control antes de permitir la aprobación.</div>' : '')
     + (groupIds.length > 1 ? '<div class="jv-needs-info">Esta decisión consolidará ' + groupIds.length + ' actualizaciones del mismo control y conservará su trazabilidad.</div>' : '') + '</div>'
-    + '<div class="jv-review-actions"><button class="cancel" onclick="jvDecisionCancel()">Volver sin cambiar nada</button><button class="confirm ' + (approving ? 'ok' : 'no') + '" onclick="jvCommitDecision()"' + (!detail.sufficient && approving ? ' disabled' : '') + '>' + (approving ? 'Sí, aprobar' : 'Sí, no aplicar') + '</button></div></section></div>';
+    + '<div class="jv-review-actions"><button class="cancel" onclick="jvDecisionCancel()">Volver sin cambiar nada</button><button class="confirm ' + (approving ? 'ok' : 'no') + '" onclick="jvCommitDecision()"' + ((!detail.sufficient || !evidence.fresh) && approving ? ' disabled' : '') + '>' + (approving ? 'Sí, aprobar' : 'Sí, no aplicar') + '</button></div></section></div>';
 }
 async function jvCommitDecision() {
   const preview = JV.decisionPreview;
   if (!preview) return;
   const p = JV.props.find(x => x.id === preview.id); if (!p || JV.busyId) return;
   const estado = preview.estado;
+  if (estado === 'aprobada' && !jvProposalEvidenceStatus(p).fresh) {
+    alert('La evidencia de esta propuesta venció. Espera la nueva corrida del agente antes de aprobarla.');
+    return;
+  }
   const clickupExecutable = estado === 'aprobada' && ['archivar_tarea', 'refechar_tarea', 'reasignar_tarea'].includes(p.tipo_accion);
   const me = jvMe(); const verb = estado === 'aprobada' ? 'Aprobar' : 'Rechazar';
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);

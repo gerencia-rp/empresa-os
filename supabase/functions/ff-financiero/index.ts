@@ -76,17 +76,17 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
-    let created = 0, skipped = 0;
+    let created = 0, refreshed = 0, skipped = 0;
     const detail: Record<string, unknown> = {};
+    const recordProposal = async (tipo: string, payload: Record<string, unknown>, evidence: Record<string, unknown>) => {
+      const [result] = await sql!`select outcome from record_agent_proposal(${agent.id},${tipo},${sql!.json(payload)},${sql!.json(evidence)})`;
+      if (result?.outcome === "created") created++; else refreshed++;
+    };
 
     if (mode === "interes") {
       // FF1 · reconciliación de interés HML (esperado vs pagado). Anti-inventar: si el
       // schedule del espejo es incompleto, lo declara; no fuerza un total falso.
       const k = "fff:interes:" + mes;
-      if (keys.has(k)) { skipped++; detail.interes = "dedup"; }
-      else {
         const [rec] = await sql`
           with loans as (
             select address_norm, monto_hml::numeric monto, tasa_pct::numeric tasa,
@@ -112,14 +112,11 @@ Deno.serve(async (req) => {
         const g = rec;
         const payload = { requiere_aprobacion: true, accion: "conciliar_interes_hml", dedup_key: k, gap_estimado: Number(g.gap), severidad: "alto" };
         const evid = { tipo: "interes_hml", regla: "FF1 gap ~$46k", mes, interes_pagado_total: Number(g.pagado_total), interes_esperado_estimado: Number(g.esperado), gap_estimado: Number(g.gap), prestamos: Number(g.loans), divergentes: div.map((r: Record<string, unknown>) => ({ casa: r.address, esperado: Number(r.esperado), pagado: Number(r.pagado), gap: Number(r.gap) })), nota: "Estimación con el schedule del espejo (fecha_inicio→salida). Reconciliar contra el corte manual conocido (~$46k). No se asume un total exacto si faltan cuotas.", fuente: "ff_hml_loans + ff_hml_payments", origen: "ejecutor ff-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.interes = `pagado ${money(Number(g.pagado_total))}, ${div.length} divergentes`;
-      }
+        await recordProposal("conciliacion", payload, evid);
+        detail.interes = `pagado ${money(Number(g.pagado_total))}, ${div.length} divergentes`;
     } else if (mode === "underwriting") {
       // FF7 all-in >75% ARV + FF3 appraisals en 0 + FF2 gemelos Marlin + FF4 direcciones
       const k = "fff:uw:" + corte;
-      if (keys.has(k)) { skipped++; detail.underwriting = "dedup"; }
-      else {
         // Normaliza: ff_uw_config tiene all_in_max_pct=0.75 (fracción) y allin_max_pct=75 (%). Si >1, /100.
         const [{ tope }] = await sql`select (case when v>1 then v/100.0 else v end) tope from (select coalesce((select value::numeric from ff_uw_config where key='all_in_max_pct'), (select value::numeric from ff_uw_config where key='arv_factor'), 0.75) v) q`;
         const viol = await sql`
@@ -144,14 +141,11 @@ Deno.serve(async (req) => {
           gemelos_de_carga: gemelos.map((r: Record<string, unknown>) => ({ casa_a: r.a1, casa_b: r.b1, remodel: Number(r.rc), net_total: Number(r.nt) })),
           direcciones_sin_normalizar: dirty.map((r: Record<string, unknown>) => r.address),
           nota: "all-in = compra + remodel real; appraisal=0 se LISTA (no se asume ARV); gemelos byte-idénticos entre 2 casas = revisar carga.", fuente: "ff_deals + ff_draws + ff_investors + ff_uw_config", origen: "ejecutor ff-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.underwriting = { violaciones: viol.length, appraisal_0: appr0.length, gemelos: gemelos.length, direcciones: dirty.length };
-      }
+        await recordProposal("conciliacion", payload, evid);
+        detail.underwriting = { violaciones: viol.length, appraisal_0: appr0.length, gemelos: gemelos.length, direcciones: dirty.length };
     } else if (mode === "captable") {
       // FF5 mora + FF6 higiene de CRM (dupes por teléfono, capital_pagado null, has_partner inconsistente)
       const k = "fff:captable:" + mes;
-      if (keys.has(k)) { skipped++; detail.captable = "dedup"; }
-      else {
         const mora = await sql`
           select address, deficit_total::numeric def, rentabilidad_prometida::numeric prom, capital_inversionista::numeric cap
           from ff_deals where active is not false and coalesce(deficit_total,0)>0 and utilidad_entregada is null and coalesce(rentabilidad_prometida,0)>0
@@ -172,15 +166,14 @@ Deno.serve(async (req) => {
           registros_de_prueba: prueba.map((r: Record<string, unknown>) => r.name),
           guard_falso_positivo: "nombres parecidos NO se fusionan (Yeison Vargas != Yeisson Garcia)",
           nota: "PII: se reporta que dos registros comparten teléfono (últimos 4), nunca el número completo. capital_pagado null = cap table sin tracking de pagos.", fuente: "ff_investors + ff_deals", origen: "ejecutor ff-financiero" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.captable = { mora: mora.length, tel_colision: telcol.length, sin_pago: Number(sinpago), inconsistentes: inconsist.length, prueba: prueba.length };
-      }
+        await recordProposal("conciliacion", payload, evid);
+        detail.captable = { mora: mora.length, tel_colision: telcol.length, sin_pago: Number(sinpago), inconsistentes: inconsist.length, prueba: prueba.length };
     } else {
       return json({ ok: false, error: "modo inválido: " + mode }, 400);
     }
 
-    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte, mes, rol_db: "agentes_ia_exec" })}, ${sql.json({ created, skipped, detail, isolation_test: iso })}, 'ok')`;
-    return json({ ok: true, mode, corte, created, skipped, detail, isolation_test: iso });
+    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte, mes, rol_db: "agentes_ia_exec" })}, ${sql.json({ created, refreshed, skipped, detail, isolation_test: iso })}, 'ok')`;
+    return json({ ok: true, mode, corte, created, refreshed, skipped, detail, isolation_test: iso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error).message || e) }, 500);
   } finally {
