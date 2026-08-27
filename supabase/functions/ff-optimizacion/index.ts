@@ -44,9 +44,28 @@ Deno.serve(async (req) => {
     const [coverage] = await sql`select count(*)::int intervals,count(distinct deal_id)::int deals,count(distinct stage)::int stages from v_ff_stage_duration`;
     const ready = Number(coverage.intervals) >= 3 && Number(coverage.deals) >= 2 && Number(coverage.stages) >= 2;
     if (!ready) {
-      const evidence = { ready: false, intervals: Number(coverage.intervals), deals: Number(coverage.deals), stages: Number(coverage.stages), minimum: { intervals: 3, deals: 2, stages: 2 }, reason: "Solo cuentan intervalos observados completos; baselines y fechas reconstruidas quedan excluidos.", source: "v_ff_stage_duration", isolation };
-      await sql`insert into agent_audit_log(agent_id,input,output,resultado) values(${agent.id},${sql.json({ mode: "readiness", tipo: "control_precondicion" })},${sql.json(evidence)},'skipped')`;
-      return json({ ok: true, ready: false, evidence });
+      // Modo útil desde el día uno: observa la salud del pipeline sin fingir
+      // duraciones históricas. Cuando la cobertura alcance el mínimo, la misma
+      // función pasa automáticamente al análisis estadístico de cuellos.
+      const [snapshot] = await sql`select count(*)::int total,
+        count(*) filter(where nullif(btrim(coalesce(stage,'')),'') is null)::int missing_stage,
+        count(*) filter(where last_synced_at is null or last_synced_at < now()-interval '2 days')::int stale,
+        max(last_synced_at) last_sync
+        from ff_deals where active is not false`;
+      const issues = Number(snapshot.missing_stage) + Number(snapshot.stale);
+      const week = (await sql`select date_trunc('week',now() at time zone 'America/Chicago')::date::text week`)[0].week;
+      const dedup = `ffopt-observability:${week}`;
+      let proposalCreated = false;
+      if (issues > 0) {
+        const [existing] = await sql`select id from agent_proposals where agent_id=${agent.id} and deleted_at is null and payload->>'dedup_key'=${dedup} limit 1`;
+        if (!existing) {
+          await sql`insert into agent_proposals(agent_id,tipo_accion,estado,payload,evidencia) values(${agent.id},'higiene_pipeline','propuesta',${sql.json({ dedup_key: dedup, requiere_aprobacion: true, accion: "revisar_salud_pipeline_fix_flip" })},${sql.json({ titulo: "Salud del pipeline Fix & Flip", resumen: `${issues} registros requieren revisión de etapa o sincronización`, propiedades_activas: Number(snapshot.total), sin_etapa: Number(snapshot.missing_stage), desactualizadas: Number(snapshot.stale), ultima_sincronizacion: snapshot.last_sync, fuente: "ff_deals", regla: "observabilidad real; no calcula duraciones hasta tener transiciones completas" })})`;
+          proposalCreated = true;
+        }
+      }
+      const evidence = { operational: true, mode: "observability", ready_for_stage_statistics: false, intervals: Number(coverage.intervals), deals: Number(coverage.deals), stages: Number(coverage.stages), minimum: { intervals: 3, deals: 2, stages: 2 }, snapshot: { total: Number(snapshot.total), missing_stage: Number(snapshot.missing_stage), stale: Number(snapshot.stale), last_sync: snapshot.last_sync }, issues, proposal_created: proposalCreated, reason: "Supervisa salud y frescura del pipeline. Solo activa medianas con intervalos observados completos; baselines y fechas reconstruidas quedan excluidos.", source: "ff_deals + v_ff_stage_duration", isolation };
+      await sql`insert into agent_audit_log(agent_id,input,output,resultado) values(${agent.id},${sql.json({ mode: "observability", tipo: "ejecucion_negocio" })},${sql.json(evidence)},'ok')`;
+      return json({ ok: true, operational: true, ready_for_stage_statistics: false, evidence });
     }
 
     const medians = await sql`select stage,count(*)::int samples,round(percentile_cont(0.5) within group(order by duration_days)::numeric,2) median_days from v_ff_stage_duration group by stage order by median_days desc`;
