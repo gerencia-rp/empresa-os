@@ -7,7 +7,7 @@
 // SOFT-DELETE SIEMPRE: desactivar = active=false + archived_at. NUNCA borrar.
 // ════════════════════════════════════════════════════════════════
 
-const OSA = { users: [], loaded: false, loading: false, err: null, editId: null };
+const OSA = { users: [], operationalRoles: [], loaded: false, loading: false, err: null, editId: null };
 window.OSA = OSA;
 
 // Las 6 secciones REALES del OS (slugs canónicos — mismos que usa el gating del shell).
@@ -61,9 +61,13 @@ async function osaLoad(force) {
   if (OSA.loaded && !force) return;
   OSA.loading = true; OSA.err = null;
   try {
-    const { data, error } = await sb.rpc('admin_users_overview');
-    if (error) throw error;
-    OSA.users = data || [];
+    const [users, roles] = await Promise.all([
+      sb.rpc('admin_users_overview'),
+      sb.from('operational_role_assignments').select('role_code,role_name,area,criticality,primary_profile_id,backup_profile_id,required_areas,verified_at,notes').eq('active', true).order('criticality').order('role_name'),
+    ]);
+    if (users.error) throw users.error;
+    OSA.users = users.data || [];
+    OSA.operationalRoles = roles.error ? [] : (roles.data || []);
     OSA.loaded = true;
   } catch (e) { OSA.err = e.message || String(e); }
   OSA.loading = false;
@@ -93,6 +97,7 @@ function osAdminView() {
     + kpi('Inactivos', us.length - act.length, 'acceso bloqueado (reversible)')
     + '</div>'
     + osaInviteCard()
+    + osaOperationalRolesCard()
     + osaUsersCard(us);
 }
 window.osAdminView = osAdminView;
@@ -166,6 +171,27 @@ function osaUsersCard(us) {
     + rows + '</tbody></table></div></div>';
 }
 
+function osaOperationalRolesCard() {
+  const roles = OSA.operationalRoles || [];
+  if (!roles.length) return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">' + osIcon('users') + ' Continuidad operativa</div></div><div class="meta">La matriz de responsables todavía no está disponible.</div></div>';
+  const activeUsers = OSA.users.filter(u => u.active !== false);
+  const options = selected => '<option value="">Sin asignar</option>' + activeUsers.map(u =>
+    '<option value="' + u.id + '" ' + (u.id === selected ? 'selected' : '') + '>' + OS_E(u.full_name || u.email) + '</option>'
+  ).join('');
+  const rows = roles.map(r => {
+    const complete = !!r.primary_profile_id && !!r.backup_profile_id && r.primary_profile_id !== r.backup_profile_id;
+    return '<tr><td><b>' + OS_E(r.role_name) + '</b><div class="meta">' + OS_E(r.area) + ' · ' + OS_E(r.criticality) + '</div></td>'
+      + '<td><select class="osa-in" id="osa-role-primary-' + r.role_code + '">' + options(r.primary_profile_id) + '</select></td>'
+      + '<td><select class="osa-in" id="osa-role-backup-' + r.role_code + '">' + options(r.backup_profile_id) + '</select></td>'
+      + '<td>' + (complete ? '<span class="badge b-ok">cubierto</span>' : '<span class="badge b-warn">pendiente</span>') + '</td>'
+      + '<td style="text-align:right"><button class="osa-ghost" onclick="osaSaveOperationalRole(\'' + r.role_code + '\')">Guardar</button></td></tr>';
+  }).join('');
+  const covered = roles.filter(r => r.primary_profile_id && r.backup_profile_id && r.primary_profile_id !== r.backup_profile_id).length;
+  return '<div class="card" style="margin-top:16px"><div class="chart-h"><div class="t">' + osIcon('users') + ' Continuidad operativa (' + covered + '/' + roles.length + ')</div><div class="k">cada función crítica necesita titular y reemplazo</div></div>'
+    + '<div class="meta" style="margin-bottom:12px">Jarvis también verifica que ambos estén activos y tengan acceso al área. No uses la misma persona en los dos campos.</div>'
+    + '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th>Responsabilidad</th><th>Titular</th><th>Respaldo</th><th>Estado</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+}
+
 function osaEditor(u) {
   const me = u.id === osaMyId();
   const roleOpts = OSA_ROLES.map(r => '<option value="' + r.k + '" ' + (u.role === r.k ? 'selected' : '') + '>' + r.name + ' — ' + r.desc + '</option>').join('');
@@ -232,6 +258,24 @@ async function osaSave(id) {
   await osaLoad(true);
 }
 window.osaSave = osaSave;
+
+async function osaSaveOperationalRole(code) {
+  const primary = document.getElementById('osa-role-primary-' + code);
+  const backup = document.getElementById('osa-role-backup-' + code);
+  const primaryId = primary && primary.value ? primary.value : null;
+  const backupId = backup && backup.value ? backup.value : null;
+  if (primaryId && backupId && primaryId === backupId) return alert('El titular y el respaldo deben ser personas diferentes.');
+  const { error } = await sb.from('operational_role_assignments').update({
+    primary_profile_id: primaryId,
+    backup_profile_id: backupId,
+    verified_at: primaryId && backupId ? new Date().toISOString() : null,
+    verified_by: osaMyId(),
+    updated_at: new Date().toISOString(),
+  }).eq('role_code', code);
+  if (error) return alert('No se pudo guardar: ' + error.message);
+  await osaLoad(true);
+}
+window.osaSaveOperationalRole = osaSaveOperationalRole;
 
 async function osaDeactivate(id, email) {
   if (!confirm('¿Desactivar a ' + email + '?\n\nNo se borra nada: queda inactivo y no puede entrar. Se puede reactivar cuando quieras.')) return;
