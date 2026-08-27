@@ -1390,11 +1390,14 @@ function jvLanesHTML() {
     const policy = jvDecisionPolicy(p);
     const ageHours = p.created_at ? Math.max(0, (Date.now() - new Date(p.created_at).getTime()) / 3600000) : 0;
     const overdue = p.estado === 'propuesta' && ageHours > Number(policy.sla_hours || 24);
+    const escalated = p.estado === 'propuesta' && ageHours > Number(policy.sla_hours || 24) * 2;
+    const currentOwner = escalated ? policy.rol_escalamiento : overdue ? policy.rol_respaldo : policy.rol_primario;
+    const ownerStage = escalated ? 'Escalamiento final' : overdue ? 'Turno del respaldo' : 'Responsable actual';
     const meta = [jvProposalArea(p), jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
     return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span>' + (overdue ? '<span class="badge b-red">SLA vencido · ' + Math.floor(ageHours) + ' h</span>' : '') + '</div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
       + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
       + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
-      + '<div class="jv-detail-list"><div class="jv-detail-row"><span>Responsable</span><b>' + OS_E(policy.rol_primario) + '</b></div><div class="jv-detail-row"><span>Respaldo</span><b>' + OS_E(policy.rol_respaldo) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas · escala a ' + OS_E(policy.rol_escalamiento) + '</b></div></div>'
+      + '<div class="jv-detail-list"><div class="jv-detail-row"><span>' + OS_E(ownerStage) + '</span><b>' + OS_E(currentOwner) + '</b></div><div class="jv-detail-row"><span>Ruta de reemplazo</span><b>' + OS_E(policy.rol_primario) + ' → ' + OS_E(policy.rol_respaldo) + ' → ' + OS_E(policy.rol_escalamiento) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas' + (overdue ? ' · vencido hace ' + Math.max(0, Math.floor(ageHours - Number(policy.sla_hours || 24))) + ' h' : '') + '</b></div></div>'
       + '<div class="who">' + OS_E(meta) + '</div>'
       + (actions ? '<div class="jv-appr"><button class="ok" onclick="jvDecide(\'' + p.id + '\',\'aprobada\')"' + (busy || !detail.sufficient ? ' disabled' : '') + '>' + (busy ? 'Procesando…' : (detail.sufficient ? 'Revisar y aprobar' : 'Falta información')) + '</button><button class="no" onclick="jvDecide(\'' + p.id + '\',\'rechazada\')"' + (busy ? ' disabled' : '') + '>Revisar y no aplicar</button></div>' : '') + '</article>';
   };
