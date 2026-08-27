@@ -1693,9 +1693,12 @@ function jvDecisionPreviewHTML() {
   if (!p) return '';
   const info = jvProposalInfo(p), detail = jvProposalDetails(p);
   const approving = preview.estado === 'aprobada';
+  const clickupExecutable = ['archivar_tarea', 'refechar_tarea', 'reasignar_tarea'].includes(p.tipo_accion);
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
   const effect = approving
-    ? 'La propuesta quedará aprobada y asignada al responsable para ejecución. Aprobar no confirma que el trabajo se realizó: deberá cerrar con evidencia y fecha. No se ejecuta ninguna migración, pago, mensaje, deploy ni cambio de producción desde esta pantalla.'
+    ? (clickupExecutable
+      ? 'Esta confirmación ejecutará la acción indicada en ClickUp y solo mostrará “ejecución confirmada” si ClickUp responde correctamente. No borra la tarea: cerrar una duplicada cambia su estado; reprogramar o reasignar usa los valores visibles de la propuesta.'
+      : 'La propuesta quedará aprobada y asignada al responsable para ejecución. Aprobar no confirma que el trabajo se realizó: deberá cerrar con evidencia y fecha. No se ejecuta ninguna migración, pago, mensaje, deploy ni cambio de producción desde esta pantalla.')
     : 'La propuesta quedará cerrada como no aplicada. La evidencia original seguirá disponible en el historial.';
   return '<div class="jv-review-backdrop" role="presentation" onclick="if(event.target===this)jvDecisionCancel()"><section class="jv-review" role="dialog" aria-modal="true" aria-labelledby="jv-review-title">'
     + '<div class="jv-review-head"><div><span>Confirmación humana</span><h2 id="jv-review-title">' + (approving ? 'Aprobar propuesta' : 'No aplicar propuesta') + '</h2></div><button onclick="jvDecisionCancel()" aria-label="Cerrar">×</button></div>'
@@ -1711,6 +1714,7 @@ async function jvCommitDecision() {
   if (!preview) return;
   const p = JV.props.find(x => x.id === preview.id); if (!p || JV.busyId) return;
   const estado = preview.estado;
+  const clickupExecutable = estado === 'aprobada' && ['archivar_tarea', 'refechar_tarea', 'reasignar_tarea'].includes(p.tipo_accion);
   const me = jvMe(); const verb = estado === 'aprobada' ? 'Aprobar' : 'Rechazar';
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
   JV.busyId = p.id; JV.decisionPreview = null; if (window.osRender) osRender();
@@ -1725,10 +1729,24 @@ async function jvCommitDecision() {
         const { error: supersedeError } = await sb.from('agent_proposals').update({ estado: 'rechazada', approved_by: me, approved_at: decidedAt }).in('id', olderIds);
         if (supersedeError) throw supersedeError;
       }
-      const { error: approveError } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: decidedAt }).eq('id', p.id);
-      if (approveError) throw approveError;
+      if (clickupExecutable) {
+        const session = await sb.auth.getSession();
+        const token = session && session.data && session.data.session ? session.data.session.access_token : null;
+        if (!token) throw new Error('Tu sesión venció. Volvé a iniciar sesión antes de ejecutar la tarea.');
+        const response = await fetch(window.SUPABASE_URL + '/functions/v1/clickup-writeback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ proposal_id: p.id, decision: 'aprobar', decidido_por: me })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result.ok) throw new Error(result.error || 'ClickUp no confirmó la ejecución.');
+      } else {
+        const { error: approveError } = await sb.from('agent_proposals').update({ estado: estado, approved_by: me, approved_at: decidedAt }).eq('id', p.id);
+        if (approveError) throw approveError;
+      }
     }
-    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: p.id, input: { accion: estado, por: me, tipo: p.tipo_accion, actualizaciones_agrupadas: groupIds.length }, output: { estado: estado, por: me, accion: verb + ' desde Command Center', actualizaciones_anteriores_cerradas: olderIds.length }, resultado: 'ok' });
+    const finalState = clickupExecutable ? 'ejecutada' : estado;
+    const { error: e2 } = await sb.from('agent_audit_log').insert({ agent_id: p.agent_id, proposal_id: p.id, input: { accion: estado, por: me, tipo: p.tipo_accion, actualizaciones_agrupadas: groupIds.length }, output: { estado: finalState, por: me, accion: (clickupExecutable ? 'Ejecutar en ClickUp' : verb) + ' desde Command Center', actualizaciones_anteriores_cerradas: olderIds.length }, resultado: 'ok' });
     if (e2) console.warn('audit_log insert:', e2.message);
   } catch (e) { alert('No se pudo ' + verb.toLowerCase() + ': ' + (e.message || e)); }
   JV.busyId = null; await jvLoad(true);
