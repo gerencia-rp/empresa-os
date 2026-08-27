@@ -113,6 +113,7 @@ Deno.serve(async (req) => {
         const payload = { requiere_aprobacion: true, accion: "conciliar_interes_hml", dedup_key: k, gap_estimado: Number(g.gap), severidad: "alto" };
         const evid = { tipo: "interes_hml", regla: "FF1 gap ~$46k", mes, interes_pagado_total: Number(g.pagado_total), interes_esperado_estimado: Number(g.esperado), gap_estimado: Number(g.gap), prestamos: Number(g.loans), divergentes: div.map((r: Record<string, unknown>) => ({ casa: r.address, esperado: Number(r.esperado), pagado: Number(r.pagado), gap: Number(r.gap) })), nota: "Estimación con el schedule del espejo (fecha_inicio→salida). Reconciliar contra el corte manual conocido (~$46k). No se asume un total exacto si faltan cuotas.", fuente: "ff_hml_loans + ff_hml_payments", origen: "ejecutor ff-financiero" };
         await recordProposal("conciliacion", payload, evid);
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','fff:interes:',${[k]}::text[])`;
         detail.interes = `pagado ${money(Number(g.pagado_total))}, ${div.length} divergentes`;
     } else if (mode === "underwriting") {
       // FF7 all-in >75% ARV + FF3 appraisals en 0 + FF2 gemelos Marlin + FF4 direcciones
@@ -142,6 +143,7 @@ Deno.serve(async (req) => {
           direcciones_sin_normalizar: dirty.map((r: Record<string, unknown>) => r.address),
           nota: "all-in = compra + remodel real; appraisal=0 se LISTA (no se asume ARV); gemelos byte-idénticos entre 2 casas = revisar carga.", fuente: "ff_deals + ff_draws + ff_investors + ff_uw_config", origen: "ejecutor ff-financiero" };
         await recordProposal("conciliacion", payload, evid);
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','fff:uw:',${[k]}::text[])`;
         detail.underwriting = { violaciones: viol.length, appraisal_0: appr0.length, gemelos: gemelos.length, direcciones: dirty.length };
     } else if (mode === "captable") {
       // FF5 mora + FF6 higiene de CRM (dupes por teléfono, capital_pagado null, has_partner inconsistente)
@@ -167,6 +169,7 @@ Deno.serve(async (req) => {
           guard_falso_positivo: "nombres parecidos NO se fusionan (Yeison Vargas != Yeisson Garcia)",
           nota: "PII: se reporta que dos registros comparten teléfono (últimos 4), nunca el número completo. capital_pagado null = cap table sin tracking de pagos.", fuente: "ff_investors + ff_deals", origen: "ejecutor ff-financiero" };
         await recordProposal("conciliacion", payload, evid);
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','fff:captable:',${[k]}::text[])`;
         detail.captable = { mora: mora.length, tel_colision: telcol.length, sin_pago: Number(sinpago), inconsistentes: inconsist.length, prueba: prueba.length };
     } else {
       return json({ ok: false, error: "modo inválido: " + mode }, 400);

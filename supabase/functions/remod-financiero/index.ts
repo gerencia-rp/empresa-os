@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
     if (mode === "material") {
       // RF3 doble-pago (>=200) + RF5 sin categoría
       const k1 = "remodf:matdup:" + corte, k2 = "remodf:sincat:" + corte;
+        const materialSeen: string[] = [];
         const dup = await sql`with d as (select property_id, categoria, fecha, precio::numeric precio, count(*) c
             from remodel_material_payments where active is not false and precio is not null
             group by 1,2,3,4 having count(*)>1)
@@ -94,6 +95,7 @@ Deno.serve(async (req) => {
           const payload = { requiere_aprobacion: true, accion: "revisar_doble_pago_material", dedup_key: k1, monto_en_riesgo: Number(g.monto), severidad: "alto" };
           const evid = { tipo: "descuadre_material", regla: "RF3 doble-pago", grupos_alto_precio: Number(g.grupos), monto_en_riesgo: Number(g.monto), grupos_ruido_ignorados: Number(g.ruido), hallazgo: `${g.grupos} grupos de material con misma casa+categoria+fecha+precio (>=$200), ${money(Number(g.monto))} en riesgo. ${g.ruido} grupos <$200 NO marcados (anti-ruido).`, fuente: "remodel_material_payments", origen: "ejecutor remod-financiero" };
           await recordProposal("conciliacion", payload, evid);
+          materialSeen.push(k1);
           detail.doble_pago = `${g.grupos} grupos / ${money(Number(g.monto))}`;
         } else { detail.doble_pago = "sin hallazgos"; }
         const [sc] = await sql`select count(*)::int n from remodel_material_payments where active is not false and (categoria is null or btrim(categoria)='')`;
@@ -101,8 +103,11 @@ Deno.serve(async (req) => {
           const payload = { requiere_aprobacion: true, accion: "categorizar_gastos", dedup_key: k2, severidad: "medio" };
           const evid = { tipo: "higiene", regla: "RF5 sin categoría", pagos_sin_categoria: Number(sc.n), hallazgo: `${sc.n} pagos de material sin categoría — taggear en Airtable (no inventar).`, fuente: "remodel_material_payments", origen: "ejecutor remod-financiero" };
           await recordProposal("conciliacion", payload, evid);
+          materialSeen.push(k2);
           detail.sin_categoria = Number(sc.n);
         } else { detail.sin_categoria = "sin hallazgos"; }
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','remodf:matdup:',${materialSeen.filter(x => x === k1)}::text[])`;
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','remodf:sincat:',${materialSeen.filter(x => x === k2)}::text[])`;
     } else if (mode === "nomina") {
       const k = "remodf:nomina:" + quincena;
         // horas sin rate en la quincena (nómina mal calculada) — NO inventa rate
@@ -114,6 +119,7 @@ Deno.serve(async (req) => {
         const payload = { requiere_aprobacion: true, accion: "armar_nomina_quincena", dedup_key: k, bruto: Number(tot.bruto), severidad: Number(wh.filas) > 0 ? "alto" : "info" };
         const evid = { tipo: "nomina", regla: "RF4", quincena, bruto_calculado: Number(tot.bruto), workers: Number(tot.workers), filas_sin_rate: Number(wh.filas), workers_sin_rate: Number(wh.workers), horas_sin_rate: Number(wh.horas), hallazgo: Number(wh.filas) > 0 ? `${wh.filas} filas sin rate (${wh.workers} trabajadores) — deuda mal calculada; cargar la tarifa en Personal en Campo antes de pagar. No se inventa rate.` : "0 horas sin rate: nómina lista para revisión.", nota: "ejecutar el pago = aprueba humano", fuente: "remodel_worker_hours + remodel_crew_rates", origen: "ejecutor remod-financiero" };
         await recordProposal("nomina", payload, evid);
+        await sql`select reconcile_agent_proposal_set(${agent.id},'nomina','remodf:nomina:',${[k]}::text[])`;
         detail.nomina = `bruto ${money(Number(tot.bruto))}, ${wh.filas} sin rate`;
     } else if (mode === "anomalias") {
       const k = "remodf:anomalias:" + corte;
@@ -130,6 +136,7 @@ Deno.serve(async (req) => {
         const perd = await sql`select address, round(utilidad_remodelacion::numeric) u from remodel_at_properties where active is not false and proceso='Finalizado' and utilidad_remodelacion::numeric < -50 order by 2`;
         const evid = { tipo: "anomalias_carga", regla: "RF1/RF2/RF7", corte, carga_placeholder_capps_class: capps.map((r: Record<string, unknown>) => ({ casa: r.address, monto_real: Number(r.mr), gastos_placeholder: `${money(Number(r.gm))}/${money(Number(r.gt))}` })), utilidad_inflada_en_curso: infl.map((r: Record<string, unknown>) => r.address), utilidad_signo_opuesto: conf.map((r: Record<string, unknown>) => r.address), obras_en_perdida_real: perd.map((r: Record<string, unknown>) => ({ casa: r.address, utilidad: Number(r.u) })), nota: "plata real, no contrato; depósitos/draws != utilidad; obra en curso NO se marca por costo total (RF7)", fuente: "remodel_at_properties", origen: "ejecutor remod-financiero" };
         await recordProposal("conciliacion", { requiere_aprobacion: true, accion: "revisar_anomalias_carga", dedup_key: k }, evid);
+        await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','remodf:anomalias:',${[k]}::text[])`;
         detail.anomalias = { placeholder: capps.length, en_curso_inflada: infl.length, signo_opuesto: conf.length, en_perdida: perd.length };
     } else {
       return json({ ok: false, error: "modo inválido: " + mode }, 400);
