@@ -1196,3 +1196,118 @@ Este cambio es del **Ledger del inversionista** (`inv_ledger` y sus consumidores
 `v_pnl_casa`, el motor de proyección (`inv-engine`), los indicadores ni las vistas contables: ahí el
 servicio de deuda se sigue tratando con sus propias definiciones. Sigue abierto el hallazgo de la
 pasada anterior: `v_pnl_casa.interes_hml_real` suma solo `pago_hml` e ignora `ref30`.
+
+---
+
+## 🧾 PASADA (27 Ago 2026 · 4) — ÍTEM AUTOMÁTICO "Pago Property Management (5%)" · HECHO Y EN VIVO
+
+**Pedido del CEO:** un movimiento automático por casa y por mes en "Modelo & movimientos", con el
+**5% del total de renta cobrada del mes**, categoría **OPERATIVO** (resta del mes, del neto y del
+saldo), fecha al **último día real del mes**, concepto **"Pago Property Management (5%)"**,
+**editable** (a diferencia del resto de los automáticos) y **sin duplicar** un PM ya cargado a mano.
+
+### Cómo está hecho (y por qué así)
+
+El ítem **no se materializa** como filas en una tabla: se **calcula dentro de `inv_ledger`** sobre
+`pm_payments`. Así la regla 4 ("recalcula si cambia la renta del mes") sale gratis y nunca queda una
+fila vieja contradiciendo a la fuente. Lo único que se persiste son las **ediciones manuales**, en la
+tabla nueva **`inv_pm_fee_overrides`** (una por casa+mes, con audit trigger, RLS de `fix-flip` e
+índice único parcial sobre las activas) — el mismo patrón que ya usa `inv_param_overrides`.
+
+Trazabilidad: `subcategoria='pm_fee'` y fuente `OS:pm_fee(auto 5% de la renta cobrada del mes)` o
+`OS:pm_fee(manual)`. **No mueve plata**: es un movimiento contable interno, no dispara ningún pago.
+
+### 🐛 El bug que cazó la verificación a mano (vale la pena registrarlo)
+
+El primer intento guardó el porcentaje en la key **`pm_fee_pct`** de `ff_uw_config`… que **ya existía
+con value = 4**: es el PM fee del **underwriting**. Y esa tabla guarda los porcentajes como **enteros**
+(`lender_fee_pct=2`, `wholesale_fee_pct=3`). Resultado del primer cálculo:
+
+```
+"Pago Property Management (400%)"   Barkbridge jun-26: renta 2,000 -> $8,000
+```
+
+Reusar esa key habría además movido números del underwriting. Se corrigió con una **clave propia
+`inv_pm_fee_pct = 5`** (sin tocar `pm_fee_pct`) más una **normalización defensiva**: si el valor es
+> 1 se divide por 100, así `5` y `0.05` dan lo mismo y un tipeo no multiplica la renta por 100.
+
+### Verificación: renta del mes → 5% calculado (datos reales de Supabase)
+
+| Casa | Mes | Renta cobrada | **PM 5%** | Fecha | Otros oper. | Deuda | Neto ANTES del PM | **Neto AHORA** |
+|---|---|---:|---:|---|---:|---:|---:|---:|
+| 4916 Barkbridge | 2026-08 | 2,700.00 | **135.00** | 31-ago | 0.00 | 0.00 | 2,700.00 | **2,565.00** |
+| 4916 Barkbridge | 2026-07 | 3,500.00 | **175.00** | 31-jul | 288.57 | 1,579.73 | 1,631.70 | **1,456.70** |
+| 4916 Barkbridge | 2026-06 | 2,000.00 | **100.00** | 30-jun | 569.35 | 1,579.73 | −149.08 | **−249.08** |
+| 4916 Barkbridge | 2026-05 | 1,300.00 | **65.00** | 31-may | 425.39 | 1,579.73 | −705.12 | **−770.12** |
+| 5003 Michelle | 2026-08 | 2,500.00 | **125.00** | 31-ago | 0.00 | 3,032.26 | −532.26 | **−657.26** |
+| 5003 Michelle | 2026-07 | 3,700.00 | **— (regla 3)** | — | 148.00 | 3,032.26 | 519.74 | **519.74** |
+| 5003 Michelle | 2026-06 | 3,700.00 | **185.00** | 30-jun | 0.00 | 2,116.13 | 1,583.87 | **1,398.87** |
+| 5003 Michelle | 2026-05 | 3,700.00 | **185.00** | 31-may | 0.00 | 2,116.13 | 1,583.87 | **1,398.87** |
+| 311 Bartlett | 2026-07 | 850.00 | **42.50** | 31-jul | 0.00 | 3,060.00 | −2,210.00 | **−2,252.50** |
+| 311 Bartlett | 2026-06 | 1,000.00 | **50.00** | 30-jun | 0.00 | 0.00 | 1,000.00 | **950.00** |
+| 902 Virginia | 2026-08 | 4,490.00 | **224.50** | 31-ago | 379.99 | 2,958.95 | 1,151.06 | **926.56** |
+| 902 Virginia | 2026-07 | 5,100.00 | **255.00** | 31-jul | 779.27 | 2,985.51 | 1,335.22 | **1,080.22** |
+| 902 Virginia | 2026-05 | **0.00** | **— (regla 1)** | — | 411.26 | 2,985.00 | −3,396.26 | **−3,396.26** |
+
+Las 4 reglas, cada una con su caso probado:
+
+1. **Sin renta no se genera** → 902 Virginia may-2026 (renta $0): no hay ítem. ✅
+2. **Editable y el manual persiste** → se editó Barkbridge jun-2026 a **$120 / 28-jun** (el
+   automático daba $100 / 30-jun). El ledger pasó a `Pago Property Management (editado a mano)`,
+   fuente `OS:pm_fee(manual)`, monto $120, y **los demás meses siguieron automáticos**; el neto del
+   mes pasó a −269.08 (operativos 569.35 + 120, **sin doblar**). Después se usó **↩ volver al
+   automático** y jun-2026 volvió solo a **$100 / 30-jun**. ✅ *(La edición de prueba quedó revertida:
+   `active=false`, con su historia y su audit — no se dejó un número inventado en producción.)*
+3. **No duplicar** → 5003 Michelle jul-2026 ya tenía un "Pago Property Management" de **$148**
+   cargado a mano en `inv_cashflow_real`: el automático **no se generó** (habría sido $185). El
+   guard mira `pm_expenses` **y** `inv_cashflow_real`. ✅
+4. **Recalcula con la renta** → el ítem se calcula en cada lectura del ledger; no hay estado que
+   envejezca. Solo un override activo lo congela, y a propósito. ✅
+
+### En la pantalla
+
+En "Modelo & movimientos", la fila del PM aparece en **Auto-importados** con badge
+`auto · calculado` (o `editado a mano`) y, **solo ella**, con **✎ editar**, **🗑 quitar** y
+**↩ volver al automático**. El form inline pide monto y fecha de ese mes y avisa: *"se calcula solo
+como % de la renta cobrada del mes. Si lo editás, tu valor manda y el recálculo NO lo pisa."*
+La guía de clasificación ahora lista el ítem dentro de **Operativo (RESTA del mes)**.
+
+### Verificación en el sitio en vivo (logueado, sin stubs)
+
+`scripts/qa-flujo-portafolio-deuda.mjs` sobre `https://empresa-os.vercel.app`:
+**89 OK · 0 fallas · 0 pageerrors · 0 errores de consola.** 24 checks nuevos del PM, en 3 casas:
+
+```
+PM: hay item en la fecha esperada                        OK x3
+PM: concepto "Pago Property Management (5%)"             OK x3
+PM: monto = renta del mes x 5%   ($100 / $185 / $43)     OK x3
+PM: categoria operativo (resta del mes)                  OK x3
+PM: fecha = fin de mes                                   OK x3
+PM: BAJA el saldo del Ledger                             OK x3
+PM: TODAS las fechas son fin de mes (15 / 9 / 8 meses)   OK x3
+PM: un solo item por mes (sin duplicados)                OK x3
+
+Y el neto del mes en pantalla = el de inv_dist_auto, en las 3 casas:
+  Barkbridge jun-26  $2,000 · -$669 · -$1,580 · -$249   = {oper 669.35, deuda 1579.73, neto -249.08}
+  Michelle   jun-26  $3,700 · -$185 · -$2,116 · $1,399  = {oper 185,    deuda 2116.13, neto 1398.87}
+  Bartlett   jul-26    $850 ·  -$43 · -$3,060 · -$2,252 = {oper 42.5,   deuda 3060,    neto -2252.5}
+```
+
+**Build:** `npm run build` OK — bundle `assets/bundle.13dd28024954.js`.
+**Deploy:** push a `main` → `version.json` en vivo = commit `5eb30db`.
+
+### Cómo revertir
+1. Reaplicar `20260827150000` (deja `inv_ledger` sin la rama de property management).
+2. `drop table public.inv_pm_fee_overrides;` — solo si se descarta la funcionalidad.
+3. `delete from public.ff_uw_config where key = 'inv_pm_fee_pct';` — **no tocar `pm_fee_pct`**,
+   que es la del underwriting.
+
+### Nota declarada
+La fecha es el **último día del mes**, como se pidió. Efecto: el ítem del **mes en curso** entra al
+flujo recién cuando llega ese día, porque la operación se corta a HOY (misma regla que ya rige para
+todo lo programado a futuro). En los meses cerrados no cambia nada.
+
+⚠ Contexto para no confundirse con el historial: en jul-2026 se **deprecó** `inv_dist_calc` porque
+restaba *"un PM fee del 4% MODELADO que no es un gasto real de pm_expenses"*. Este ítem es distinto y
+es una decisión explícita del CEO: es **visible, trazable, editable y auditado**, no un descuento
+invisible dentro de una fórmula.

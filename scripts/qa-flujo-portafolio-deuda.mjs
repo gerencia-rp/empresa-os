@@ -25,10 +25,11 @@ const CASAS = [
     nombre: '4916 Barkbridge Trl (refinanciada oct-2025)',
     inv: 'rec8MhKDmkdD6Ouyr',
     pid: '6fa5ad93-31a7-462e-b48b-444491dd2b65',
-    // jun-26: renta 2,000 · operativos 569.35 · REFI 30 1,579.73 · neto −149.08
-    mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /569/, deu: /1,580/, neto: /−\$149|-\$149/,
-    // Property Management: jun-26 fue EDITADO a mano ($120 en vez del 5% = $100) -> el manual manda
-    pm: { concepto: 'Pago Property Management (editado a mano)', monto: '$120', fecha: '2026-06-28' },
+    // jun-26: renta 2,000 · operativos 669.35 (569.35 + PM 100) · REFI 30 1,579.73 · neto −249.08
+    mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /669/, deu: /1,580/, neto: /−\$249|-\$249/,
+    // Property Management: renta 2,000 x 5% = 100, al ultimo dia del mes.
+    // (se probo editarlo a mano a $120/28-jun: el ledger lo respeto; despues se volvio al automatico con ↩)
+    pm: { concepto: 'Pago Property Management (5%)', monto: '$100', fecha: '2026-06-30' },
     // HML hasta sep-2025, Refi 30 desde oct-2025: los DOS conceptos tienen que aparecer
     conceptos: ['Pago Refi 30 años', 'Pago interés HML'], prohibidos: [/Pago interés HML.*1,600|1,600/],
   },
@@ -36,8 +37,8 @@ const CASAS = [
     nombre: '5003 Michelle Ct (refinanciada jul-2026)',
     inv: 'recRZUim6SaOnNmm5',
     pid: 'efad086f-3008-49fd-96da-dbeaaba650f2',
-    // jun-26 todavía HML: renta 3,700 · operativos 0 · deuda 2,116.13 · neto 1,583.87
-    mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /\$0/, deu: /2,116/, neto: /1,584/,
+    // jun-26 todavía HML: renta 3,700 · operativos 185 (solo el PM) · deuda 2,116.13 · neto 1,398.87
+    mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /185/, deu: /2,116/, neto: /1,399/,
     // renta 3,700 x 5% = 185, al ultimo dia del mes. En jul-26 NO debe existir (hay uno manual de $148)
     pm: { concepto: 'Pago Property Management (5%)', monto: '$185', fecha: '2026-06-30' },
     conceptos: ['Pago interés HML', 'Pago Refi 30 años'], prohibidos: [],
@@ -46,8 +47,8 @@ const CASAS = [
     nombre: '311 Bartlett St (NO refinanciada)',
     inv: 'reclmX5mhMW6zrkaP',
     pid: '565c8ef9-f019-4acb-8b54-4c57d1056e01',
-    // jul-26: renta 850 · operativos 0 · interés HML 3,060 · neto −2,210
-    mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /\$0/, deu: /3,060/, neto: /−\$2,210|-\$2,210/,
+    // jul-26: renta 850 · operativos 42.50 (solo el PM) · interés HML 3,060 · neto −2,252.50
+    mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /43/, deu: /3,060/, neto: /−\$2,252|-\$2,252/,
     // renta 850 x 5% = 42.50 -> se muestra redondeado a $43
     pm: { concepto: 'Pago Property Management (5%)', monto: '$43', fecha: '2026-07-31' },
     // sin refi: NINGÚN movimiento puede decir "Refi 30"
