@@ -87,6 +87,18 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     select corte::text corte, payload from pm_informes
     where tipo='sla_decisiones' and archived_at is null
     order by corte desc limit 1`;
+  const [financialTriage] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='triage_excepciones_financieras' and archived_at is null
+    order by corte desc limit 1`;
+  const [integrationHealth] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='salud_integraciones' and archived_at is null
+    order by corte desc limit 1`;
+  const [absenceReadiness] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='continuidad_ausencia_6_meses' and archived_at is null
+    order by corte desc limit 1`;
   const areaResumen = (t: string, label: string) => {
     const f = fotoDe(t);
     if (!f) return { area: label, foto: null, nota: "sin foto de hoy todavía" };
@@ -150,6 +162,37 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       fuente: "Director de Continuidad Operativa · SLA de decisiones",
     });
   }
+  const financialPayload = (financialTriage?.payload || {}) as Record<string, unknown>;
+  const financialKpis = (financialPayload.kpis || {}) as Record<string, unknown>;
+  if (Number(financialKpis.criticos || 0) > 0) {
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Conciliar ${Number(financialKpis.criticos)} alertas financieras críticas (${money(Number(financialKpis.impacto_critico_usd || 0))} señalado)`,
+      requiere: "trabajar el informe Priorización financiera con responsable y soporte por hallazgo",
+      fuente: "Auditor de Integridad Financiera y Datos",
+    });
+  }
+  const integrationsPayload = (integrationHealth?.payload || {}) as Record<string, unknown>;
+  const integrationKpis = (integrationsPayload.kpis || {}) as Record<string, unknown>;
+  const integrationsOk = Number(integrationKpis.integraciones_saludables || 0);
+  const integrationsTotal = Number(integrationKpis.integraciones_vigiladas || 0);
+  if (integrationsTotal > 0 && integrationsOk < integrationsTotal) {
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Recuperar ${integrationsTotal - integrationsOk} integraciones sin evidencia vigente`,
+      requiere: "corregir conexión o fuente antes de usar sus datos en decisiones",
+      fuente: "Director de Continuidad Operativa · Salud de integraciones",
+    });
+  }
+  const readinessPayload = (absenceReadiness?.payload || {}) as Record<string, unknown>;
+  if (readinessPayload.estado && readinessPayload.estado !== "listo") {
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Continuidad prolongada no certificada (${Number(readinessPayload.compuertas_aprobadas || 0)}/${Number(readinessPayload.compuertas_totales || 10)} compuertas)`,
+      requiere: String(readinessPayload.bloqueo_principal || "resolver las compuertas pendientes"),
+      fuente: "Director de Continuidad Operativa · Certificación de ausencia",
+    });
+  }
 
   const payload = {
     corte,
@@ -169,6 +212,9 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       recomendacion: continuidadPayload.recomendacion || null,
     } : { estado: "sin revisión previa disponible" },
     sla_decisiones: decisionSla ? decisionSlaPayload : { estado: "sin revisión previa disponible" },
+    integridad_financiera: financialTriage ? financialPayload : { estado: "sin revisión previa disponible" },
+    salud_integraciones: integrationHealth ? integrationsPayload : { estado: "sin revisión previa disponible" },
+    continuidad_ausencia: absenceReadiness ? readinessPayload : { estado: "sin revisión previa disponible" },
     fidelidad: "consolida las 3 fotos de área + números transversales; cada decisión cita su fuente; nada inventado, nada dropeado",
     regla: "el Cerebro SOLO LEE — la directiva es una recomendación; ejecutar/pagar siempre lo confirma un humano",
     origen: "cerebro-reunion (agentes_ia_exec)",
