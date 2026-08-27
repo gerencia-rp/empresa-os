@@ -85,9 +85,6 @@ Deno.serve(async (req) => {
     }
 
     // DEDUP: propuestas abiertas del agente por dedup_key
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
-
     let created = 0, skipped = 0;
     const detail: Record<string, unknown> = {};
     const preview: Record<string, unknown> = {};
@@ -132,30 +129,35 @@ Deno.serve(async (req) => {
     if (mode === "diaria") {
       // (a) PLAN DE OCUPACIÓN (dedup por semana)
       const ok = "opt:ocup:" + corte;
-      if (keys.has(ok)) { skipped++; detail.ocupacion = "dedup"; }
-      else {
+      {
         const po = await planOcupacion();
         const payload = { requiere_aprobacion: true, accion: "plan_ocupacion", dedup_key: ok, ocupacion_actual_pct: Number(po.tot?.ocupacion_pct), meta_pct: 96, recuperacion_potencial_mes: po.recuperable };
         const evid = { tipo: "plan_ocupacion", corte, fuente: "v_ocupacion + pm_units + pm_informes(Reportes)", unidades_no_ocupadas: po.vac_n, plan_por_casa: po.plan, impacto: `llenar las vacantes reales recupera ${money(po.recuperable)}/mes potencial`, nota: "DRY-RUN: nada aplicado", origen: "ejecutor rentas-optimizacion" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'plan_ocupacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.ocupacion = "creada"; preview.ocupacion = { pct: payload.ocupacion_actual_pct, recuperable: po.recuperable, casas: po.plan.length };
+        const [r] = await sql`select outcome from record_agent_proposal(${agent.id},'plan_ocupacion',${sql.json(payload)},${sql.json(evid)})`;
+        if (r.outcome === "created") created++; else skipped++;
+        const [ret] = await sql`select reconcile_agent_proposal_set(${agent.id},'plan_ocupacion','opt:ocup:',${[ok]}::text[]) retired`;
+        detail.ocupacion = r.outcome; detail.ocupacion_retiradas = Number(ret.retired || 0); preview.ocupacion = { pct: payload.ocupacion_actual_pct, recuperable: po.recuperable, casas: po.plan.length };
       }
       // (b) CUELLOS (dedup por semana)
       const ck = "opt:cuello:" + corte;
-      if (keys.has(ck)) { skipped++; detail.cuellos = "dedup"; }
-      else {
+      const [sync] = await sql`select error,synced_at from clickup_sync_log order by synced_at desc limit 1`;
+      const clickupOk = !sync?.error && sync?.synced_at && (Date.now() - new Date(sync.synced_at).getTime()) < 2 * 3600 * 1000;
+      if (clickupOk) {
         const hall = await cuellos();
         const [kpi] = await sql`select vencido_neto, morosos_reales from v_cartera_kpi`;
         const payload = { requiere_aprobacion: true, accion: "rebalanceo_operativo", dedup_key: ck };
         const evid = { tipo: "cuello_botella", corte, fuente: "clickup_tasks_mirror", hallazgos: hall, contexto_cobranza: { vencido_neto: Number(kpi?.vencido_neto), morosos_reales: Number(kpi?.morosos_reales), fuente: "v_cartera_kpi (Financiero)" }, nota: "DRY-RUN: señalamiento, nada movido", origen: "ejecutor rentas-optimizacion" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'cuello_botella', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.cuellos = "creada"; preview.cuellos = hall.length;
+        const [r] = await sql`select outcome from record_agent_proposal(${agent.id},'cuello_botella',${sql.json(payload)},${sql.json(evid)})`;
+        if (r.outcome === "created") created++; else skipped++;
+        const [ret] = await sql`select reconcile_agent_proposal_set(${agent.id},'cuello_botella','opt:cuello:',${[ck]}::text[]) retired`;
+        detail.cuellos = r.outcome; detail.cuellos_retirados = Number(ret.retired || 0); preview.cuellos = hall.length;
+      } else {
+        skipped++; detail.cuellos = "suspendido: ClickUp no tiene una sincronización válida y reciente";
       }
     } else if (mode === "semanal") {
       // PRECIO DINÁMICO — mediana por SUBMERCADO + exclusión de plataforma
       const pk = "opt:precio:" + corte;
-      if (keys.has(pk)) { skipped++; detail.precio = "dedup"; }
-      else {
+      {
         const SUB = sql`(case when pp.name ~* 'Marlin' then 'Marlin' when pp.name ~* 'Round Rock' then 'Round Rock' else 'Austin' end)`;
         const rows = await sql`
           with anch as (
@@ -191,8 +193,10 @@ Deno.serve(async (req) => {
         }
         const payload = { requiere_aprobacion: true, accion: "revisar_precio", dedup_key: pk, propuestas_n: propuestas.length, rechazados_n: rechazados.length };
         const evid = { tipo: "precio_dinamico", corte, metodo: "mediana por SUBMERCADO (ciudad) + exclusión de plataformas (Airbnb/PadSplit). Nunca promedio blended.", propuestas, falsos_positivos_rechazados: rechazados, nota: "DRY-RUN: nada aplicado; los cambios de precio los confirma un humano", origen: "ejecutor rentas-optimizacion" };
-        await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'precio_dinamico', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-        created++; detail.precio = "creada"; preview.precio = { propuestas: propuestas.length, rechazados: rechazados.length };
+        const [r] = await sql`select outcome from record_agent_proposal(${agent.id},'precio_dinamico',${sql.json(payload)},${sql.json(evid)})`;
+        if (r.outcome === "created") created++; else skipped++;
+        const [ret] = await sql`select reconcile_agent_proposal_set(${agent.id},'precio_dinamico','opt:precio:',${[pk]}::text[]) retired`;
+        detail.precio = r.outcome; detail.precio_retiradas = Number(ret.retired || 0); preview.precio = { propuestas: propuestas.length, rechazados: rechazados.length };
       }
     } else if (mode === "mensual") {
       // INFORME DE MEJORA (borrador a pm_informes, dedup por mes)
