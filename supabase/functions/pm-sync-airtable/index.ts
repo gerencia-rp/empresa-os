@@ -381,7 +381,6 @@ Deno.serve(async (req) => {
     // 1) CASAS → pm_properties
     // ════════════════════════════════════════════════════════════
     const casas = await fetchAllRecords(base_id, TABLE_IDS.casas, airtable_token);
-    srcCounts.pm_properties = casas.length;
 
     // Existentes: mapa por recId de Casa y por address_normalized (conserva id / no duplica).
     const { data: existingProps0 } = await supabase.from("pm_properties").select("id, address, address_normalized, airtable_address_id, archived_manual");
@@ -421,6 +420,11 @@ Deno.serve(async (req) => {
         updated_at: nowISO
       };
     });
+    // El espejo activo excluye propiedades vendidas/inactivas. La paridad debe
+    // comparar el mismo universo, no todas las filas históricas de Airtable.
+    srcCounts.pm_properties = propsArr.filter((p: any) => p.active && !(existingProps0 || []).some((x: any) =>
+      x.archived_manual && (x.airtable_address_id === p._rec || (x.address_normalized || normKey(x.address)) === p.address_normalized)
+    )).length;
 
     // INSERT/UPDATE explícito: pm_properties no tiene constraint único usable para ON CONFLICT
     // (airtable_address_id sin unique; address_normalized es índice PARCIAL). Conserva el id
