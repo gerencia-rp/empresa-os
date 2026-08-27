@@ -7,13 +7,13 @@ const command = readFileSync(join(root, 'os/os-command-center.js'), 'utf8');
 const migrations = readFileSync(join(root, 'supabase/migrations/20260827010000_business_continuity_agent.sql'), 'utf8');
 
 const coverage = [
-  ['Líder Contable & Datos', 'Director de Continuidad Operativa', 'partial'],
-  ['Auditor de Datos', 'Auditor de Agentes', 'partial'],
+  ['Líder Contable & Datos', 'Auditor de Integridad Financiera y Datos', 'covered'],
+  ['Auditor de Datos', 'Auditor de Integridad Financiera y Datos', 'covered'],
   ['Datos & Conciliación', 'Financiero Fix & Flip', 'covered'],
   ['Datos & Conciliación', 'Financiero Remodelación', 'covered'],
   ['Datos & Conciliación', 'Financiero Rentas', 'covered'],
   ['Analista de Cobranza', 'Financiero Rentas', 'covered'],
-  ['Sabueso Contable', 'Director de Continuidad Operativa', 'partial'],
+  ['Sabueso Contable', 'Auditor de Integridad Financiera y Datos', 'covered'],
   ['Ops · Auditor', 'Auditor de Agentes', 'covered'],
   ['Ops · Líder', 'Director de Continuidad Operativa', 'covered'],
   ['Ops · Coordinador', 'Ejecución Rentas', 'covered'],

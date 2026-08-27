@@ -53,6 +53,7 @@ const JV_AUTOMATIONS = {
   'director de continuidad operativa': { executor: 'run_business_continuity_review()', schedule: 'Diario 06:50 · lunes 07:10 · día 1 07:10' },
   'arquitecto de agentes': { executor: 'run_agent_governance(architecture)', schedule: 'Lunes 08:35' },
   'auditor de agentes': { executor: 'run_agent_governance(audit)', schedule: 'Lunes 08:20' },
+  'auditor de integridad financiera y datos': { executor: 'run_data_integrity_review()', schedule: 'Diario 06:30 · lunes 06:35' },
   'gerente de rentas': { executor: 'rentas-gerente', schedule: 'Diario 07:30' },
   'ejecucion rentas': { executor: 'rentas-ejecucion', schedule: 'Diario 07:00 · 12:30 · 17:30' },
   'optimizacion rentas': { executor: 'rentas-optimizacion', schedule: 'Diario 08:15 · jueves 08:15 · día 1 09:00' },
