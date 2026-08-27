@@ -34,12 +34,9 @@ Deno.serve(async (req) => {
     try { await sql`select 1 from pm_credentials limit 1`; iso.pm_credentials = "LEAK"; } catch (e) { iso.pm_credentials = /permission denied/i.test(String((e as Error).message || e)) ? "PASS" : "ERR"; }
     try { await sql`select document_id from pm_tenants limit 1`; iso.document_id = "LEAK"; } catch (e) { iso.document_id = /permission denied/i.test(String((e as Error).message || e)) ? "PASS" : "ERR"; }
     if (iso.pm_credentials !== "PASS" || iso.document_id !== "PASS") { await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ accion: "abort" })},${sql.json({ iso })},'ABORT')`; return json({ ok: false, aborted: true, iso }, 500); }
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
     const k = "remodopt:tiempos:" + corte;
-    let created = 0, skipped = 0; const detail: Record<string, unknown> = {};
-    if (keys.has(k)) { skipped++; detail.estado = "dedup"; }
-    else {
+    const detail: Record<string, unknown> = {};
+    {
       // por obra: vencidas + estado real
       const rows = await sql`
         select wa.property_name casa, ap.proceso, count(*) filter (where wa.status<>'done' and wa.date < current_date)::int vencidas
@@ -58,11 +55,12 @@ Deno.serve(async (req) => {
       const hig = await sql`select count(*)::int variantes from (select lower(btrim(stage)) s, count(distinct stage) c from remodel_stage_deviation group by 1 having count(distinct stage)>1) d`;
       const payload = { requiere_aprobacion: true, accion: "revisar_tiempos_obra", dedup_key: k };
       const evid = { tipo: "tiempos_obra", corte, obras_estancadas: estancadas, retrasos_absurdos_excluidos: absurdos, higiene_etapas_duplicadas: Number(hig[0]?.variantes || 0), nota: "Excluye Finalizado (planner sin cerrar = artefacto, el bug del Retraso en Días absurdo) y Pre-construcción; slip mediana ~0-2d (sano)", fuente: "weekly_activities + remodel_at_properties + remodel_stage_deviation", origen: "ejecutor remod-optimizacion" };
-      await sql`insert into agent_proposals (agent_id,tipo_accion,estado,payload,evidencia) values (${agent.id},'conciliacion','propuesta',${sql.json(payload)},${sql.json(evid)})`;
-      created++; detail.estancadas = estancadas.length; detail.absurdos_excluidos = absurdos.length; detail.etapas_duplicadas = Number(hig[0]?.variantes || 0);
+      const [recorded] = await sql`select outcome from record_agent_proposal(${agent.id},'conciliacion',${sql.json(payload)},${sql.json(evid)})`;
+      const [reconciled] = await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','remodopt:tiempos:',${[k]}::text[]) retired`;
+      detail.outcome = recorded.outcome; detail.retired = Number(reconciled.retired || 0); detail.estancadas = estancadas.length; detail.absurdos_excluidos = absurdos.length; detail.etapas_duplicadas = Number(hig[0]?.variantes || 0);
     }
-    await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ corte, rol_db: "agentes_ia_exec" })},${sql.json({ created, skipped, detail, iso })},'ok')`;
-    return json({ ok: true, corte, created, skipped, detail, iso });
+    await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ corte, rol_db: "agentes_ia_exec" })},${sql.json({ detail, iso })},'ok')`;
+    return json({ ok: true, corte, detail, iso });
   } catch (e) { return json({ ok: false, error: String((e as Error).message || e) }, 500); }
   finally { if (sql) { try { await sql.end({ timeout: 5 }); } catch (_e) { /* noop */ } } }
 });

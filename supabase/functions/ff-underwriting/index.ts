@@ -53,13 +53,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
     const k = "ffuw:" + corte;
-    if (keys.has(k)) {
-      await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ corte, rol_db: "agentes_ia_exec" })}, ${sql.json({ created: 0, skipped: 1, detail: "dedup", isolation_test: iso })}, 'ok')`;
-      return json({ ok: true, created: 0, skipped: 1, dedup: true, isolation_test: iso });
-    }
     // tope normalizado (U2)
     const [{ tope }] = await sql`select (case when v>1 then v/100.0 else v end) tope from (select coalesce((select value::numeric from ff_uw_config where key='all_in_max_pct'), (select value::numeric from ff_uw_config where key='arv_factor'), 0.75) v) q`;
     // U1 violaciones + MAO por deal + escenarios ±10% (U4)
@@ -78,9 +72,11 @@ Deno.serve(async (req) => {
       appraisals_en_cero: appr0.map((r: Record<string, unknown>) => r.address),
       mao_por_deal: deals.slice(0, 30).map((d: Record<string, unknown>) => ({ casa: d.address, mao: Number(d.mao), mao_arv_menos10: Math.round((Number(d.arv) * 0.9 * Number(tope)) - Number(d.rr)), mao_arv_mas10: Math.round((Number(d.arv) * 1.1 * Number(tope)) - Number(d.rr)) })),
       nota: "MAO = ARV×" + (Number(tope) * 100) + "% − remodel real (simplificado); appraisal=0 se LISTA, no se asume ARV; escenarios ARV ±10%.", fuente: "ff_deals + ff_uw_config", origen: "ejecutor ff-underwriting" };
-    await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ corte, rol_db: "agentes_ia_exec" })}, ${sql.json({ created: 1, skipped: 0, detail: { violaciones: viol.length, sobre_mao: sobre_mao.length, appraisal_0: appr0.length }, isolation_test: iso })}, 'ok')`;
-    return json({ ok: true, created: 1, corte, detail: { violaciones: viol.length, sobre_mao: sobre_mao.length, appraisal_0: appr0.length }, isolation_test: iso });
+    const [recorded] = await sql`select outcome from record_agent_proposal(${agent.id}, 'conciliacion', ${sql.json(payload)}, ${sql.json(evid)})`;
+    const [reconciled] = await sql`select reconcile_agent_proposal_set(${agent.id}, 'conciliacion', 'ffuw:', ${[k]}::text[]) retired`;
+    const detail = { violaciones: viol.length, sobre_mao: sobre_mao.length, appraisal_0: appr0.length };
+    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ corte, rol_db: "agentes_ia_exec" })}, ${sql.json({ outcome: recorded.outcome, retired: Number(reconciled.retired || 0), detail, isolation_test: iso })}, 'ok')`;
+    return json({ ok: true, outcome: recorded.outcome, retired: Number(reconciled.retired || 0), corte, detail, isolation_test: iso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error).message || e) }, 500);
   } finally {

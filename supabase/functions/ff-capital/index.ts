@@ -66,13 +66,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
-    const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
     const k = "ffcap:" + mes;
-    if (keys.has(k)) {
-      await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mes, rol_db: "agentes_ia_exec" })}, ${sql.json({ created: 0, skipped: 1, detail: "dedup", isolation_test: iso })}, 'ok')`;
-      return json({ ok: true, created: 0, skipped: 1, dedup: true, isolation_test: iso });
-    }
     // C2 cap table
     const [{ holdings, holdings_cap }] = await sql`select count(*)::int holdings, count(*) filter (where coalesce(inversion_aportada,0)>0)::int holdings_cap from inv_holdings where active is not false`;
     const [{ inversores }] = await sql`select count(*)::int inversores from ff_investors where active is not false`;
@@ -98,9 +92,11 @@ Deno.serve(async (req) => {
       guard_falso_positivo: "nombres parecidos NO se fusionan (Yeison Vargas != Yeisson Garcia)",
       pii: "SSN/Green Card/document_id fuera del alcance (bloqueado por DB). Teléfono solo últimos 4; email nunca en el reporte.",
       fuente: "ff_investors (allowlist) + inv_holdings + inv_distributions + ff_deals", origen: "ejecutor ff-capital" };
-    await sql`insert into agent_proposals (agent_id, tipo_accion, estado, payload, evidencia) values (${agent.id}, 'conciliacion', 'propuesta', ${sql.json(payload)}, ${sql.json(evid)})`;
-    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mes, rol_db: "agentes_ia_exec" })}, ${sql.json({ created: 1, skipped: 0, detail: { holdings: Number(holdings), sin_pago: Number(sin_pago), tel_colision: telcol.length, prueba: prueba.length, mora: mora.length }, isolation_test: iso })}, 'ok')`;
-    return json({ ok: true, created: 1, mes, detail: { holdings: Number(holdings), sin_pago: Number(sin_pago), tel_colision: telcol.length, mora: mora.length }, isolation_test: iso });
+    const [recorded] = await sql`select outcome from record_agent_proposal(${agent.id}, 'conciliacion', ${sql.json(payload)}, ${sql.json(evid)})`;
+    const [reconciled] = await sql`select reconcile_agent_proposal_set(${agent.id}, 'conciliacion', 'ffcap:', ${[k]}::text[]) retired`;
+    const detail = { holdings: Number(holdings), sin_pago: Number(sin_pago), tel_colision: telcol.length, prueba: prueba.length, mora: mora.length };
+    await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mes, rol_db: "agentes_ia_exec" })}, ${sql.json({ outcome: recorded.outcome, retired: Number(reconciled.retired || 0), detail, isolation_test: iso })}, 'ok')`;
+    return json({ ok: true, outcome: recorded.outcome, retired: Number(reconciled.retired || 0), mes, detail, isolation_test: iso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error).message || e) }, 500);
   } finally {
