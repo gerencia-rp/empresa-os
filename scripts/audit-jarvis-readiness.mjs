@@ -61,6 +61,7 @@ const requiredControls = [
   'security_audit_run',
   'record_rentcast_call',
   'run_integration_health_review',
+  'run_approved_work_review',
 ];
 const missingControls = requiredControls.filter(control =>
   !new RegExp(`function\\s+public\\.${control}\\s*\\(`, 'i').test(migrations)

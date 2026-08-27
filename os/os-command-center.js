@@ -1172,7 +1172,7 @@ function jvWorkItems() {
   return proposalItems.concat(auditItems).sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
 }
 function jvWorkStateLabel(s) {
-  return { waiting: 'necesita decisión', running: 'aprobada · en cola', done: 'completada', failed: 'requiere revisión' }[s] || 'registrada';
+  return { waiting: 'necesita decisión', running: 'aprobada · pendiente del responsable', done: 'ejecución confirmada', failed: 'requiere revisión' }[s] || 'registrada';
 }
 function jvWorkPulse() {
   const items = jvWorkItems().filter(x => x.state !== 'failed').slice(0, 4);
@@ -1406,12 +1406,15 @@ function jvLanesHTML() {
   const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.decisionArea === a ? 'on' : '') + '" onclick="jvDecisionArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? allPending.length : allPending.filter(p => jvProposalArea(p) === a).length) + '</span></button>').join('') + '</div>';
   const pending = JV.decisionArea === 'Todas' ? allPending : allPending.filter(p => jvProposalArea(p) === JV.decisionArea);
   const overdueCount = pending.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) / 3600000 > Number(jvDecisionPolicy(p).sla_hours || 24)).length;
-  const history = lanes.aprobada.concat(lanes.ejecutada).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  const approvedWork = lanes.aprobada.sort((a, b) => new Date(a.approved_at || a.created_at || 0) - new Date(b.approved_at || b.created_at || 0));
+  const history = lanes.ejecutada.sort((a, b) => new Date(b.executed_at || b.created_at || 0) - new Date(a.executed_at || a.created_at || 0));
   return filters + '<div class="jv-status-strip"><span>' + pending.length + ' asuntos agrupados</span><span>' + overdueCount + ' fuera de plazo</span><span>Orden: riesgo financiero y comunicación primero</span></div><div class="jv-decisions-layout"><section><div class="jv-section-title">Pendientes <span>' + pending.length + '</span></div>'
     + (pending.length ? pending.slice(0, JV.decisionLimit).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>')
     + (pending.length > JV.decisionLimit ? '<button class="jv-btn ghost" style="width:100%;justify-content:center" onclick="jvMoreDecisions()">Ver ' + Math.min(40, pending.length - JV.decisionLimit) + ' decisiones más · faltan ' + (pending.length - JV.decisionLimit) + '</button>' : '') + '</section>'
-    + '<aside><div class="jv-section-title">Resueltas recientemente</div>'
-    + (history.length ? history.slice(0, 8).map(p => card(p, false, false)).join('') : '<div class="jv-empty">Todavía no hay historial.</div>') + '</aside></div>';
+    + '<aside><div class="jv-section-title">Aprobadas pendientes <span>' + approvedWork.length + '</span></div>'
+    + (approvedWork.length ? approvedWork.slice(0, 8).map(p => card(p, true, false)).join('') : '<div class="jv-empty">No hay aprobaciones esperando ejecución.</div>')
+    + '<div class="jv-section-title" style="margin-top:18px">Ejecución confirmada</div>'
+    + (history.length ? history.slice(0, 8).map(p => card(p, false, false)).join('') : '<div class="jv-empty">Todavía no hay ejecuciones confirmadas.</div>') + '</aside></div>';
 }
 function jvDecisionArea(area) { JV.decisionArea = area; JV.decisionLimit = 40; if (window.osRender) osRender(); }
 window.jvDecisionArea = jvDecisionArea;
@@ -1684,7 +1687,7 @@ function jvDecisionPreviewHTML() {
   const approving = preview.estado === 'aprobada';
   const groupIds = JV.props.filter(x => x.estado === 'propuesta' && jvDecisionGroupKey(x) === jvDecisionGroupKey(p)).map(x => x.id);
   const effect = approving
-    ? 'La propuesta quedará aprobada y entrará a la cola del agente. No se ejecuta ninguna migración, pago, deploy ni cambio de producción desde esta pantalla.'
+    ? 'La propuesta quedará aprobada y asignada al responsable para ejecución. Aprobar no confirma que el trabajo se realizó: deberá cerrar con evidencia y fecha. No se ejecuta ninguna migración, pago, mensaje, deploy ni cambio de producción desde esta pantalla.'
     : 'La propuesta quedará cerrada como no aplicada. La evidencia original seguirá disponible en el historial.';
   return '<div class="jv-review-backdrop" role="presentation" onclick="if(event.target===this)jvDecisionCancel()"><section class="jv-review" role="dialog" aria-modal="true" aria-labelledby="jv-review-title">'
     + '<div class="jv-review-head"><div><span>Confirmación humana</span><h2 id="jv-review-title">' + (approving ? 'Aprobar propuesta' : 'No aplicar propuesta') + '</h2></div><button onclick="jvDecisionCancel()" aria-label="Cerrar">×</button></div>'

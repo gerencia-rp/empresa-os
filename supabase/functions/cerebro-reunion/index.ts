@@ -99,6 +99,10 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     select corte::text corte, payload from pm_informes
     where tipo='continuidad_ausencia_6_meses' and archived_at is null
     order by corte desc limit 1`;
+  const [approvedWork] = await sql`
+    select corte::text corte, payload from pm_informes
+    where tipo='trabajo_aprobado_pendiente' and archived_at is null
+    order by corte desc limit 1`;
   const areaResumen = (t: string, label: string) => {
     const f = fotoDe(t);
     if (!f) return { area: label, foto: null, nota: "sin foto de hoy todavía" };
@@ -193,6 +197,16 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       fuente: "Director de Continuidad Operativa · Certificación de ausencia",
     });
   }
+  const approvedWorkPayload = (approvedWork?.payload || {}) as Record<string, unknown>;
+  const approvedWorkKpis = (approvedWorkPayload.kpis || {}) as Record<string, unknown>;
+  if (Number(approvedWorkKpis.fuera_de_plazo_24h || 0) > 0) {
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Cerrar ${Number(approvedWorkKpis.fuera_de_plazo_24h)} trabajos aprobados sin ejecución confirmada`,
+      requiere: "asignar responsable, ejecutar con el control correspondiente y adjuntar evidencia de cierre",
+      fuente: "Director de Continuidad Operativa · Trabajo aprobado pendiente",
+    });
+  }
 
   const payload = {
     corte,
@@ -215,6 +229,7 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     integridad_financiera: financialTriage ? financialPayload : { estado: "sin revisión previa disponible" },
     salud_integraciones: integrationHealth ? integrationsPayload : { estado: "sin revisión previa disponible" },
     continuidad_ausencia: absenceReadiness ? readinessPayload : { estado: "sin revisión previa disponible" },
+    trabajo_aprobado_pendiente: approvedWork ? approvedWorkPayload : { estado: "sin revisión previa disponible" },
     fidelidad: "consolida las 3 fotos de área + números transversales; cada decisión cita su fuente; nada inventado, nada dropeado",
     regla: "el Cerebro SOLO LEE — la directiva es una recomendación; ejecutar/pagar siempre lo confirma un humano",
     origen: "cerebro-reunion (agentes_ia_exec)",
