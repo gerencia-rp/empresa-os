@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   _req = req;
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(req) });
   // P0-SEG-1: aprobar/ejecutar acciones en ClickUp → exige usuario autenticado.
-  const auth = await requireAuth(req);
+  const auth = await requireAuth(req, { requireAdmin: true });
   if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status || 401);
   try {
     const { proposal_id, decision, decidido_por } = await req.json();
