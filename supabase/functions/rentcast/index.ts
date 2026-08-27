@@ -3,7 +3,8 @@
 // GET/POST ?address=...&endpoint=value|rent|property&refresh=true
 //   value    → /avm/value con compCount=20 (comps de venta para el ARV profesional)
 //   property → /properties (ficha del subject: sqft, camas, baños, año, lote, features)
-// Cache 30 días en rentcast_cache; cuenta llamadas en rentcast_usage (límite 50 gratis).
+// Cache 30 días en rentcast_cache; telemetría mensual atómica en rentcast_usage.
+// La función no impone una cuota: el límite contractual se configura por separado.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -48,14 +49,13 @@ Deno.serve(async (req) => {
         ? `/properties?address=${encodeURIComponent(address)}`
         : `/avm/value?address=${encodeURIComponent(address)}&compCount=20`;
     const res = await fetch(`https://api.rentcast.io/v1${path}`, { headers: { "X-Api-Key": KEY, Accept: "application/json" } });
-    // contar la llamada (aunque falle, consume cuota si llegó al server)
-    const { data: u } = await db.from("rentcast_usage").select("llamadas").eq("id", 1).maybeSingle();
-    await db.from("rentcast_usage").update({ llamadas: (u?.llamadas || 0) + 1, ultima: new Date().toISOString() }).eq("id", 1);
-
     if (!res.ok) {
       const txt = await res.text();
-      return json({ ok: false, disponible: false, status: res.status, error: `RentCast ${res.status}: ${txt.slice(0, 160)}`, llamadas: (u?.llamadas || 0) + 1 }, 200);
+      const error = `RentCast ${res.status}: ${txt.slice(0, 160)}`;
+      const { data: usage } = await db.rpc("record_rentcast_call", { p_status: res.status, p_error: error });
+      return json({ ok: false, disponible: false, status: res.status, error, usage }, 200);
     }
+    const { data: usage } = await db.rpc("record_rentcast_call", { p_status: res.status, p_error: null });
     let data = await res.json();
     if (endpoint === "property" && Array.isArray(data)) data = data[0] || null;   // /properties devuelve array
     const value = endpoint === "rent" ? (data?.rent ?? data?.rentEstimate ?? null)
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
 
     await db.from("rentcast_cache").upsert({ address_norm: key, endpoint: ep, address, payload: data, value, fetched_at: new Date().toISOString(), active: true, archived_at: null }, { onConflict: "address_norm,endpoint" });
 
-    return json({ ok: true, cached: false, endpoint: ep, value, payload: data, llamadas: (u?.llamadas || 0) + 1 });
+    return json({ ok: true, cached: false, endpoint: ep, value, payload: data, usage });
   } catch (e) {
     return json({ ok: false, disponible: false, error: String((e as any)?.message || e) }, 200);
   }

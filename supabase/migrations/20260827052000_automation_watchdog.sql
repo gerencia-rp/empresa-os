@@ -25,6 +25,7 @@ values
  ('data-integrity-daily','contable','Auditor de Integridad Financiera y Datos',30,'P1'),
  ('financial-exception-triage-daily','contable','Auditor de Integridad Financiera y Datos',30,'P1'),
  ('pm-sync-airtable-every-15min','rentas','Ejecución Rentas',1,'P1'),
+ ('sync-airtable-every-30min','fix-flip','Ejecución Fix & Flip',2,'P1'),
  ('sync-clickup-every-60min','operacion','Director de Continuidad Operativa',2,'P1'),
  ('sync-remodel-workers-hourly','remodelacion','Ejecución Remodelación',2,'P1'),
  ('rentas-ejecucion-am','rentas','Ejecución Rentas',30,'P1'),
