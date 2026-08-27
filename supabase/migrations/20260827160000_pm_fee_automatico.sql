@@ -1,5 +1,6 @@
 -- ================================================================
--- ITEM AUTOMATICO: "Pago Property Management (5%)" por casa y por mes
+-- ITEM AUTOMATICO: "Pago Property Management" por casa y por mes
+-- (nacio al 5%; el 27-ago-2026 el CEO lo bajo a 4% -> ver 20260827170000_pm_fee_5_a_4_pct.sql)
 --
 -- Pedido del CEO (27-ago-2026): un movimiento automatico en "Modelo & movimientos" con el
 -- 5% del TOTAL de renta cobrada del mes de esa casa, categoria OPERATIVO (resta del mes,
@@ -23,7 +24,7 @@
 --   4) El % vive en ff_uw_config (`inv_pm_fee_pct`, seed 5), no hardcodeado, y se recalcula
 --      solo en cada lectura del ledger porque el item se CALCULA, no se materializa.
 --
--- TRAZABILIDAD: fuente 'OS:pm_fee(auto 5% de la renta cobrada del mes)' o 'OS:pm_fee(manual)'.
+-- TRAZABILIDAD: fuente 'OS:pm_fee(auto N% de la renta cobrada del mes)' o 'OS:pm_fee(manual)'.
 -- subcategoria='pm_fee' -> es el asa que usa el admin para ofrecer editar/eliminar/volver-a-auto.
 -- OJO: 'pm_fee' NO se excluye del bucket operativo (a diferencia de 'servicio_deuda'): este SI
 -- es un gasto operativo comun y corriente, tiene que restar una vez como cualquier utility.

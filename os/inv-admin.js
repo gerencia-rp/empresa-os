@@ -248,7 +248,7 @@ function iaPnl(cat) { return IA_PNL_SI.includes(String(cat || '').toLowerCase())
 const IA_PNL_TIP = 'P&L = ¿resta del dinero del mes (afecta la utilidad)? SÍ: ingreso, operativo (incluye el PAGO MENSUAL DE DEUDA: interés HML + cuota Refi-30) y tax. NO: inversión y financiero (draw del HML, aporte de capital, cash-out, distribuciones): son capital, no gasto del mes.';
 const IA_CAT_GUIA = [
   ['ingreso', 'Ingreso', 'renta recibida, otros ingresos'],
-  ['operativo', 'Operativo (RESTA del mes)', 'utilities, mantenimiento, HOA, seguro, limpieza, el PAGO MENSUAL DE DEUDA (interés HML + cuota Refi-30) y el PAGO PROPERTY MANAGEMENT (5% de la renta cobrada del mes, automático y editable)'],
+  ['operativo', 'Operativo (RESTA del mes)', 'utilities, mantenimiento, HOA, seguro, limpieza, el PAGO MENSUAL DE DEUDA (interés HML + cuota Refi-30) y el PAGO PROPERTY MANAGEMENT (4% de la renta cobrada del mes, automático y editable)'],
   ['inversion', 'Inversión (NO resta del mes)', 'compra de propiedad, CapEx mayor, venta de propiedad'],
   ['financiero', 'Financiero (NO resta del mes)', 'DRAW del HML (no es ingreso), aporte de capital, cash-out del refi, distribuciones — es capital. El pago mensual de intereses/cuota del HML-refi YA NO va acá: va en Operativo'],
   ['tax', 'Tax', 'impuesto predial, impuesto de renta'],
@@ -286,6 +286,39 @@ window.iaPnlBadge = iaPnlBadge;
 function iaCatSel(id, cur) {
   return '<select id="' + id + '" class="osa-in" style="padding:6px" onchange="this.dataset.tocado=1;iaMovPnlPreview()">'
     + IA_CAT_GUIA.map(c => '<option value="' + c[0] + '"' + (cur === c[0] ? ' selected' : '') + ' title="' + c[2] + '">' + c[1] + '</option>').join('') + '</select>';
+}
+// ── ⓘ "¿de dónde sale este subtotal?" — qué conceptos y qué FUENTE suma cada categoría.
+// Las claves son las mismas que arma el Ledger: tipo + ":" + categoria (+ " · servicio de deuda").
+// Texto simple, sin jerga: el objetivo es que el número se pueda rastrear sin preguntar.
+const IA_SUBT_TIP = {
+  'ingreso:renta': 'Renta cobrada a los inquilinos en el período. Fuente: Rentas · pm_payments (solo los pagos con estado "pagado").',
+  'gasto:operativo': 'Lo que cuesta operar la casa en el mes: utilities, aseo y podada, mantenimiento, HOA, seguro, limpieza, el Pago Property Management (4% de la renta) y el servicio de deuda. Fuentes: Rentas · pm_expenses + el cálculo del PM (OS) + FF · ff_hml_payments. RESTA del mes y baja el saldo.',
+  'gasto:operativo · servicio de deuda (HML/refi)': 'Solo el pago mensual de la deuda: interés del Hard Money o cuota de la refi a 30 años, según el mes. Fuente: FF · ff_hml_payments (espejo de Airtable "Pagos interes (HML & REFI)"). Se muestra aparte para poder verlo, pero ya está contado una sola vez dentro de los gastos operativos.',
+  'gasto:inversion': 'Plata que compra o mejora el activo, no gasto del mes: compra de la casa, gastos de cierre y draws de remodelación. Fuentes: FF · ff_deals, ff_hml_loans, ff_draws. NO baja el saldo.',
+  'ingreso:financiero': 'Plata que ENTRA por financiamiento, no por operar la casa: desembolso del Hard Money y cash-out del refi. No es ganancia y NO mueve el saldo.',
+  'gasto:financiero': 'Salidas de financiamiento que no son gasto del mes: fee puntual del HML, aportes y movimientos de capital. NO bajan el saldo.',
+  'gasto:distribucion': 'Lo que ya se le pagó al inversionista (utilidad, cash-out o devolución de capital). No es un gasto de operar la casa: NO mueve el saldo.',
+  'gasto:tax': 'Impuestos de la casa (predial, renta). RESTA del mes.',
+  'ingreso:tax': 'Devoluciones de impuestos. Suma al mes.',
+};
+function iaSubtTip(k) {
+  if (IA_SUBT_TIP[k]) return IA_SUBT_TIP[k];
+  const cat = String(k.split(':')[1] || '');
+  return 'Suma de los movimientos "' + cat + '" del período. ' + (invEngine.pnlSi(cat.split(' · ')[0])
+    ? 'Entra al Estado de Resultados: RESTA o suma en el mes y mueve el saldo.'
+    : 'P&L NO: es capital o financiamiento, no entra al Estado de Resultados ni mueve el saldo.');
+}
+function iaToggleSubtGuia() { const el = document.getElementById('ia-subt-guia'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
+window.iaToggleSubtGuia = iaToggleSubtGuia;
+// bloque desplegable del recuadro: el desglose completo + qué significa "P&L NO"
+function iaSubtGuia(cats) {
+  const filas = Object.keys(cats || {}).sort().map(k =>
+    '<div style="margin-bottom:5px"><b>' + OS_E(k.replace(':', ' · ')) + '</b> — ' + OS_E(iaSubtTip(k)) + '</div>').join('');
+  return '<div id="ia-subt-guia" style="display:none;background:var(--glass);border:1px solid var(--glassb);border-radius:9px;padding:10px 12px;margin:8px 0;font-size:11.5px;line-height:1.6">'
+    + '<b>¿De dónde sale cada subtotal?</b> Cada línea es la suma de los movimientos de esa categoría <b>en el período elegido arriba</b>. Cambiá el período y estos números cambian con él.<br><br>'
+    + filas
+    + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--glassb)"><b>La etiqueta "P&L NO"</b> quiere decir que ese movimiento <b>no entra al Estado de Resultados</b>: no es ganancia ni gasto del mes, es <b>capital o financiamiento</b> (un draw del HML, el cash-out del refi, un aporte, la compra de la casa o una distribución al inversionista). Por eso <b>no mueve el saldo de caja</b> — solo se muestra para que el movimiento del dinero quede completo.</div>'
+    + '</div>';
 }
 function iaGuiaCat() {
   return '<div id="ia-guia-cat" style="display:none;background:var(--glass);border:1px solid var(--glassb);border-radius:9px;padding:10px 12px;margin:8px 0;font-size:11.5px;line-height:1.7">'
@@ -1097,7 +1130,7 @@ function iaTabLedger() {
   const deudaPer = vis.filter(esDeuda).reduce((s2, m) => s2 + (+m.monto || 0), 0);
   const cats = {};
   vis.forEach(m => { const k = m.tipo + ":" + m.categoria + (esDeuda(m) ? " · servicio de deuda (HML/refi)" : ""); cats[k] = (cats[k] || 0) + +m.monto; });
-  const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span>" + OS_E(k.replace(":", " · ")) + (invEngine.pnlSi(k.split(":")[1]) ? "" : " <span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>") + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
+  const subt = Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => "<div class=\"kv\"><span title=\"" + OS_E(iaSubtTip(k)) + "\" style=\"cursor:help\">" + OS_E(k.replace(":", " · ")) + " <span style=\"color:var(--mut2);font-size:10px\">ⓘ</span>" + (invEngine.pnlSi(k.split(":")[1]) ? "" : " <span class=\"badge b-warn\" style=\"font-size:8px\" title=\"P&L NO: es capital o financiamiento (draw, cash-out, aporte, compra, distribución) — no entra al Estado de Resultados y no mueve el saldo de caja\">P&L NO</span>") + "</span><b class=\"" + (k.startsWith("ingreso") ? "up" : "down") + "\">" + iaMoney(v) + "</b></div>").join("");
   const tagNo = "<span class=\"badge b-warn\" style=\"font-size:8px\" title=\"informativo — no afecta balance operativo\">P&L NO</span>";
   // BLOQUE 4 (03-ago): encabezado de ayuda — qué es el Ledger y cómo leerlo.
   const saldoTip = "caja de la casa: mueven el saldo las rentas y TODOS los gastos del mes — operativos y el servicio de deuda (interés HML + cuota Refi-30). NO lo mueven inversión, financiero (draw, cash-out, aporte) ni distribuciones: son capital, no gasto del mes.";
@@ -1108,7 +1141,9 @@ function iaTabLedger() {
     + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + saldoTip + "\">Saldo de caja (P&L) ⓘ · " + OS_E(perLbl(mf)) + ": <span style=\"color:" + (saldoPer >= 0 ? "var(--pos)" : "var(--neg)") + "\">" + iaMoney(saldoPer) + "</span></span>"
     + "<span style=\"font-size:14px;font-weight:800;cursor:help\" title=\"" + deudaTip + "\">Servicio de deuda ⓘ · " + OS_E(perLbl(mf)) + ": <span style=\"color:var(--neg)\">" + iaMoney(deudaPer) + "</span></span>"
     + "<span class=\"meta\">" + vis.length + " movimientos · mueven el saldo las rentas y los gastos del mes, incluido el servicio de deuda · no lo mueven inversión/financiero/distribución (capital) · <b>SOLO LECTURA</b> — se edita en 📐 Modelo & movimientos</span></div>"
-    + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div></div>" + subt + "</div>"
+    + "<div class=\"grid k2\"><div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Subtotales por categoría</div>"
+      + "<div class=\"k\"><a style=\"cursor:pointer;color:var(--a2)\" title=\"de dónde sale cada subtotal\" onclick=\"iaToggleSubtGuia()\">ⓘ ¿de dónde sale?</a></div></div>"
+      + iaSubtGuia(cats) + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
     + Object.entries(vis.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
     + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th title=\"P&L SÍ (renta/ingreso/operativo/tax) mueve el saldo; P&L NO (inversión/financiero/distribución) es informativo\" style=\"cursor:help\">Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\" title=\"acumulado de los movimientos P&L SÍ; las filas P&L NO repiten el saldo anterior\" >Saldo operativo</th><th title=\"de dónde salió el dato: FF = Fix&amp;Flip · Rentas = property management · OS = cargado a mano\" style=\"cursor:help\">Fuente ⓘ</th></tr></thead><tbody>"

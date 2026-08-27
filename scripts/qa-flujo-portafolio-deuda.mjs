@@ -25,11 +25,11 @@ const CASAS = [
     nombre: '4916 Barkbridge Trl (refinanciada oct-2025)',
     inv: 'rec8MhKDmkdD6Ouyr',
     pid: '6fa5ad93-31a7-462e-b48b-444491dd2b65',
-    // jun-26: renta 2,000 · operativos 669.35 (569.35 + PM 100) · REFI 30 1,579.73 · neto −249.08
-    mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /669/, deu: /1,580/, neto: /−\$249|-\$249/,
-    // Property Management: renta 2,000 x 5% = 100, al ultimo dia del mes.
+    // jun-26: renta 2,000 · operativos 649.35 (569.35 + PM 80) · REFI 30 1,579.73 · neto −229.08
+    mes: 'Junio 2026', ym: '2026-06', ing: /2,000/, gas: /649/, deu: /1,580/, neto: /−\$229|-\$229/,
+    // Property Management: renta 2,000 x 4% = 80, al ultimo dia del mes.
     // (se probo editarlo a mano a $120/28-jun: el ledger lo respeto; despues se volvio al automatico con ↩)
-    pm: { concepto: 'Pago Property Management (5%)', monto: '$100', fecha: '2026-06-30' },
+    pm: { concepto: 'Pago Property Management (4%)', monto: '$80', fecha: '2026-06-30' },
     // HML hasta sep-2025, Refi 30 desde oct-2025: los DOS conceptos tienen que aparecer
     conceptos: ['Pago Refi 30 años', 'Pago interés HML'], prohibidos: [/Pago interés HML.*1,600|1,600/],
   },
@@ -37,20 +37,20 @@ const CASAS = [
     nombre: '5003 Michelle Ct (refinanciada jul-2026)',
     inv: 'recRZUim6SaOnNmm5',
     pid: 'efad086f-3008-49fd-96da-dbeaaba650f2',
-    // jun-26 todavía HML: renta 3,700 · operativos 185 (solo el PM) · deuda 2,116.13 · neto 1,398.87
-    mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /185/, deu: /2,116/, neto: /1,399/,
-    // renta 3,700 x 5% = 185, al ultimo dia del mes. En jul-26 NO debe existir (hay uno manual de $148)
-    pm: { concepto: 'Pago Property Management (5%)', monto: '$185', fecha: '2026-06-30' },
+    // jun-26 todavía HML: renta 3,700 · operativos 148 (solo el PM 4%) · deuda 2,116.13 · neto 1,435.87
+    mes: 'Junio 2026', ym: '2026-06', ing: /3,700/, gas: /148/, deu: /2,116/, neto: /1,436/,
+    // renta 3,700 x 4% = 148, al ultimo dia del mes. En jul-26 NO debe existir (hay uno manual de $148)
+    pm: { concepto: 'Pago Property Management (4%)', monto: '$148', fecha: '2026-06-30' },
     conceptos: ['Pago interés HML', 'Pago Refi 30 años'], prohibidos: [],
   },
   {
     nombre: '311 Bartlett St (NO refinanciada)',
     inv: 'reclmX5mhMW6zrkaP',
     pid: '565c8ef9-f019-4acb-8b54-4c57d1056e01',
-    // jul-26: renta 850 · operativos 42.50 (solo el PM) · interés HML 3,060 · neto −2,252.50
-    mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /43/, deu: /3,060/, neto: /−\$2,252|-\$2,252/,
-    // renta 850 x 5% = 42.50 -> se muestra redondeado a $43
-    pm: { concepto: 'Pago Property Management (5%)', monto: '$43', fecha: '2026-07-31' },
+    // jul-26: renta 850 · operativos 34 (solo el PM 4%) · interés HML 3,060 · neto −2,244
+    mes: 'Julio 2026', ym: '2026-07', ing: /850/, gas: /34/, deu: /3,060/, neto: /−\$2,244|-\$2,244/,
+    // renta 850 x 4% = 34
+    pm: { concepto: 'Pago Property Management (4%)', monto: '$34', fecha: '2026-07-31' },
     // sin refi: NINGÚN movimiento puede decir "Refi 30"
     conceptos: ['Pago interés HML'], prohibidos: [/Refi 30/],
   },
@@ -178,7 +178,7 @@ for (const c of CASAS) {
     chk(c.nombre + ' · draw / cash-out / distribución NO mueve el saldo (sigue P&L NO)',
       d.movCapital.cambia === false, JSON.stringify(d.movCapital));
   }
-  // ── ítem automático "Pago Property Management" (5% de la renta del mes) ──
+  // ── ítem automático "Pago Property Management" (4% de la renta del mes) ──
   if (c.pm) {
     const fila = (d.pmRows || []).find(f => f.fecha === c.pm.fecha);
     chk(c.nombre + ' · PM: hay ítem en ' + c.pm.fecha, !!fila, JSON.stringify((d.pmRows || []).slice(0, 3)));

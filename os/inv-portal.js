@@ -1137,18 +1137,32 @@ function renderFlujo(pid, inv) {
   const balanceTot = balanceOp - tDeuda;
   // gastos por categoría (parse del concepto "Gasto {cat} · …")
   const porCat = {};
-  oper.forEach(m => { const mm = String(m.concepto || '').match(/^Gasto ([^·]+?)( ·|$)/); const c = mm ? mm[1].trim() : 'otros'; porCat[c] = (porCat[c] || 0) + +m.monto; });
-  const catRows = Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span>' + esc(c) + '</span><b class="down">−' + $money(v) + '</b></div>').join('');
+  // nombre de la categoria del gasto: "Gasto {cat} · detalle" viene de Rentas; el Property
+  // Management es un calculo del OS y su concepto no empieza con "Gasto", asi que se nombra
+  // aparte (antes caia en "otros" y el inversionista no sabia qué era ese numero).
+  const catDeGasto = m => {
+    const c = String(m.concepto || '');
+    const mm = c.match(/^Gasto ([^·]+?)( ·|$)/);
+    if (mm) return mm[1].trim();
+    if (m.subcategoria === 'pm_fee') return 'Property Management';
+    return c.replace(/\s*\(.*$/, '').replace(/\s*·.*$/, '').trim() || 'otros';
+  };
+  // de dónde sale cada línea del desglose (se muestra al pasar el mouse)
+  const catFuente = c => c === 'Property Management'
+    ? 'Lo que cobra la administración por operar la casa: 4% de la renta cobrada del mes. Lo calcula el sistema a partir de tus rentas.'
+    : 'Gasto de operar la casa, cargado en Rentas (pm_expenses) con su factura cuando la hay.';
+  oper.forEach(m => { const c = catDeGasto(m); porCat[c] = (porCat[c] || 0) + +m.monto; });
+  const catRows = Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span title="' + esc(catFuente(c)) + '" style="cursor:help">' + esc(c) + ' <span style="color:var(--mut2);font-size:9px">ⓘ</span></span><b class="down">−' + $money(v) + '</b></div>').join('');
   // el servicio de deuda también se itemiza (interés HML vs cuota de la refi) — es plata que sale de la casa
   const porDeu = {};
   deuda.forEach(m => { const c = String(m.concepto || 'Servicio de deuda').replace(/\s*·.*$/, ''); porDeu[c] = (porDeu[c] || 0) + +m.monto; });
-  const deuRows = Object.entries(porDeu).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span>' + esc(c) + '</span><b class="down">−' + $money(v) + '</b></div>').join('');
+  const deuRows = Object.entries(porDeu).sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="kv"><span title="Pago mensual del préstamo, tal cual figura en Airtable: interés del Hard Money mientras la casa estuvo con ese préstamo, o cuota de la refi a 30 años desde que se refinanció." style="cursor:help">' + esc(c) + ' <span style="color:var(--mut2);font-size:9px">ⓘ</span></span><b class="down">−' + $money(v) + '</b></div>').join('');
   const anioSel = '<select class="ibtn" onchange="ipSetAnio(this.value)"><option value="todos"' + (F === 'todos' ? ' selected' : '') + '>Todo el historial</option>' + anios.map(y => '<option value="' + y + '"' + (F === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select>';
 
   const box = (lab, val, meta, cls, extra) => '<div class="card"><div class="lab">' + lab + '</div><div class="big ' + (cls || '') + '">' + val + '</div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + (extra || '') + '</div>';
   const tres = '<div class="grid k4">'
     + box('Renta cobrada', $money(tRenta), mesesRenta.length + ' meses con renta · promedio ' + $money(promRenta) + '/mes <span class="src">Rentas</span>', 'up')
-    + box('Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
+    + box('Gastos operativos', tOper ? '−' + $money(tOper) : $money(0), 'de la operación de la casa — sin draws de remodelación · <span title="Cada línea de abajo es una categoría de gasto del período. Pasá el mouse por cada una para ver de dónde sale. La mayoría viene de Rentas (pm_expenses); el Property Management lo calcula el sistema como 4% de la renta cobrada del mes." style="cursor:help;border-bottom:1px dotted currentColor">ⓘ de dónde sale cada línea</span>', 'down', '<div style="margin-top:8px">' + (catRows || '<div class="meta">sin gastos en el período</div>') + '</div>')
     + box('Servicio de deuda', tDeuda ? '−' + $money(tDeuda) : $money(0), 'interés del HML + cuota de la refi a 30 años pagados en el período <span class="src">FF:ff_hml_payments</span>', 'down', '<div style="margin-top:8px">' + (deuRows || '<div class="meta">sin pagos de deuda en el período</div>') + '</div>')
     + box('Balance operativo (NOI)', $money(balanceOp), 'renta − gastos operativos, SIN el servicio de deuda · <span title="el NOI mide cómo rinde la casa como negocio, antes de pagarle al banco. El servicio de deuda SÍ resta del flujo del mes y SÍ baja el saldo del Ledger — pero se muestra aparte para no mezclarlo con el NOI.">así se compara contra otras casas</span>', balanceOp >= 0 ? 'up' : 'down')
     + '</div>'

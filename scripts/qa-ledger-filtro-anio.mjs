@@ -18,12 +18,13 @@ if (!PASS) { console.error('Falta QA_PASS'); process.exit(1); }
 
 // esperados = suma de los movimientos reales de 4916 Barkbridge en Supabase (agrupados por FECHA,
 // que es el criterio del Ledger del admin). Los dos años tienen que sumar el total:
-//   2,568.04 + 1,517.77 = 4,085.81   ·   9,774.27 + 11,058.11 = 20,832.38
+//   2,705.85 + 1,687.39 = 4,393.24   ·   9,774.27 + 11,058.11 = 20,832.38
+// (el saldo subió respecto de la corrida anterior porque el Property Management pasó de 5% a 4%)
 const CASOS = [
-  { valor: 'todos',   etiqueta: 'todos los años', saldo: '$4,086',  deuda: '$20,832', movs: 117 },
-  { valor: '2025',    etiqueta: 'año 2025',       saldo: '$2,568',  deuda: '$9,774',  movs: 59 },
-  { valor: '2026',    etiqueta: 'año 2026',       saldo: '$1,518',  deuda: '$11,058', movs: 58 },
-  { valor: '2026-06', etiqueta: 'Junio 2026',     saldo: '$-314',   deuda: '$1,580',  movs: 9 },
+  { valor: 'todos',   etiqueta: 'todos los años', saldo: '$4,393',  deuda: '$20,832', movs: 117 },
+  { valor: '2025',    etiqueta: 'año 2025',       saldo: '$2,706',  deuda: '$9,774',  movs: 59 },
+  { valor: '2026',    etiqueta: 'año 2026',       saldo: '$1,687',  deuda: '$11,058', movs: 58 },
+  { valor: '2026-06', etiqueta: 'Junio 2026',     saldo: '$-294',   deuda: '$1,580',  movs: 9 },
 ];
 
 const ok = [], fail = [], consola = [], pageerrors = [];
@@ -128,6 +129,29 @@ chk('2025 + 2026 = todos (saldo de caja)', n(CASOS[1].saldo) + n(CASOS[2].saldo)
   CASOS[1].saldo + ' + ' + CASOS[2].saldo + ' vs ' + CASOS[0].saldo);
 chk('2025 + 2026 = todos (movimientos)', CASOS[1].movs + CASOS[2].movs === CASOS[0].movs,
   CASOS[1].movs + ' + ' + CASOS[2].movs + ' vs ' + CASOS[0].movs);
+
+// ── ⓘ "¿de dónde sale?" en Subtotales por categoría ──
+const info = await page.evaluate(() => {
+  const root = document.getElementById('os-root');
+  const link = [...root.querySelectorAll('a')].find(a => /de dónde sale/i.test(a.textContent));
+  const guia = document.getElementById('ia-subt-guia');
+  const antes = guia ? getComputedStyle(guia).display : null;
+  if (link) link.click();
+  const g2 = document.getElementById('ia-subt-guia');
+  const filasConTip = [...root.querySelectorAll('.kv > span[title]')].filter(x => /ⓘ/.test(x.textContent)).length;
+  return {
+    hayLink: !!link, antes, despues: g2 ? getComputedStyle(g2).display : null,
+    txt: g2 ? g2.innerText : '',
+    filasConTip,
+  };
+});
+chk('Subtotales · hay botón ⓘ "¿de dónde sale?"', info.hayLink);
+chk('Subtotales · el bloque arranca cerrado y el ⓘ lo abre', info.antes === 'none' && info.despues === 'block', info.antes + ' -> ' + info.despues);
+chk('Subtotales · explica la fuente de la renta (pm_payments)', /pm_payments/.test(info.txt), info.txt.slice(0, 120));
+chk('Subtotales · explica el operativo (incluye property management 4% y servicio de deuda)',
+  /Property Management \(4%/.test(info.txt) && /servicio de deuda/i.test(info.txt), info.txt.slice(0, 200));
+chk('Subtotales · explica qué significa "P&L NO"', /P&L NO/.test(info.txt) && /capital o financiamiento/i.test(info.txt));
+chk('Subtotales · cada fila tiene su propio ⓘ con la explicación', info.filasConTip > 0, info.filasConTip + ' filas con ⓘ');
 
 chk('0 pageerrors', pageerrors.length === 0, pageerrors.join(' | '));
 const consolaReal = consola.filter(c => !/config\.js|favicon|Failed to load resource/.test(c));
