@@ -1026,3 +1026,4 @@ Cuando arranques una sesión en este repo:
 - `whatsapp-webhook` permanece deliberadamente sin publicar: falta `META_APP_SECRET` y una prueba firmada real. No presentar esta retención de seguridad como un fallo resuelto.
 - Validación local Node 24: cobertura 21/21, Jarvis 26/26 automatizaciones, 12/12 controles, 55/55 horarios, motor de cierre 9/9 y build `bundle.121e91521828.js`.
 - La certificación de ausencia prolongada continúa siendo estricta: credenciales externas inválidas, roles humanos sin aceptación o fuentes sin evidencia reciente se muestran como brechas operativas; nunca se convierten en verde por diseño.
+- Frontend publicado en Vercel desde `b5d23ca`; producción sirve `assets/bundle.121e91521828.js`. Smoke autenticado de `/jarvis` sin errores de consola y pruebas anónimas de rutas sensibles rechazadas con `401`.

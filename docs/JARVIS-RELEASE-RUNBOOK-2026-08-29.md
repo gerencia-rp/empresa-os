@@ -1,6 +1,6 @@
 # Release Jarvis — continuidad, evidencia y seguridad
 
-**Estado:** migraciones y funciones seguras aplicadas; frontend pendiente de push/deploy
+**Estado:** release desplegado y verificado; certificación de ausencia continúa `no_listo` por brechas externas declaradas
 **Proyecto Supabase autorizado:** `nezbaljfhhyznhltpjnk`
 **Rama de producción:** `main`
 
@@ -42,6 +42,14 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - [x] Exportar definición previa de las funciones/vistas reemplazadas y filas de `automation_expectations`.
 - [ ] Configurar `META_APP_SECRET` y probar una firma válida e inválida antes de desplegar `whatsapp-webhook`.
 - [x] Obtener autorización explícita para migración, commit, push y deploy.
+
+## Evidencia de publicación
+
+- Commit de release: `b5d23ca` en `main`.
+- Vercel confirmó el despliegue y `https://empresa-os.vercel.app` respondió `200` con `assets/bundle.121e91521828.js`.
+- La sesión autenticada de `/jarvis` cargó el organigrama completo, la ficha operativa y sus rutas principales sin errores de consola.
+- Las rutas sensibles probadas sin sesión respondieron `401`: ClickUp, QuickBooks, Remodelación, WhatsApp y cierre diario.
+- La validación SQL de producción terminó correctamente. `salud_automatizaciones` está saludable; `salud_integraciones` permanece en atención y `continuidad_ausencia_6_meses` permanece `no_listo`, sin falsos verdes.
 
 ## Secuencia de publicación
 
