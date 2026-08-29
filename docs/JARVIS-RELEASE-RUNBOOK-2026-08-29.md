@@ -53,6 +53,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - Seguimiento de cola: Financiero Rentas ahora reconcilia también el conjunto completo de alertas de servicios. La corrida productiva encontró y refrescó 11/11; no retiró ninguna porque todas siguen presentes en la fuente.
 - Corrección de representación: los horarios semanales expresados mediante el nombre del día ya no se evalúan con una ventana diaria. `Reportes Remodelación` tenía cron exitoso y evidencia del miércoles, pero la interfaz lo mostraba 6/7 después de 72 horas; la cadencia visual ahora coincide con el control semanal real.
 - Veracidad ejecutiva: el encabezado de Jarvis ya no afirma “todo bajo control” mientras la certificación de continuidad esté incompleta. Ahora muestra el número real de compuertas aprobadas y cambia a estado ámbar cuando existen controles pendientes.
+- Dirección accionable: el Centro de mando convierte las compuertas fallidas en un plan ordenado por riesgo, con responsable, evidencia y acceso directo al frente correcto. El orden prioriza integridad financiera, cobertura humana, decisiones fuera de SLA e integraciones, sin aprobar ni asignar por inferencia.
 
 ## Secuencia de publicación
 

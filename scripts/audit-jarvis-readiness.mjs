@@ -63,6 +63,16 @@ if (!/function\s+jvSystemPosture\s*\(/.test(source)
 }
 console.log('1/1 encabezado ejecutivo refleja la certificación real y no maquilla compuertas pendientes.');
 
+if (!/function\s+jvRecoveryPlan\s*\(/.test(source)
+  || !/integridad_financiera:\s*\{\s*order:\s*1/.test(source)
+  || !/cobertura_humana:\s*\{\s*order:\s*2/.test(source)
+  || !/decisiones:\s*\{\s*order:\s*3/.test(source)
+  || !/integraciones:\s*\{\s*order:\s*4/.test(source)
+  || !/Jarvis no asigna personas, borra hallazgos ni aprueba dinero por su cuenta/.test(source)) {
+  throw new Error('El centro de mando no convierte las compuertas fallidas en un plan priorizado, trazable y seguro.');
+}
+console.log('4/4 bloqueos de continuidad se convierten en un plan ejecutivo sin saltarse los límites humanos.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',
