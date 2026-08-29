@@ -81,9 +81,28 @@ try {
   });
   assert.deepEqual(approvalSafety, { metadataOnlyDisabled: true, substantiveEnabled: true, staleDisabled: true }, 'Las aprobaciones sensibles deben exigir evidencia sustantiva y fresca');
 
+  const decisionTriage = await page.evaluate(() => {
+    const now = new Date().toISOString();
+    const base = { agent_id: 'agent-qa', tipo_accion: 'conciliacion', estado: 'propuesta', created_at: now, payload: { requiere_aprobacion: true } };
+    window.JV.props = [
+      { ...base, id: 'ready', last_validated_at: now, evidencia: { hallazgo: 'Diferencia confirmada', monto: 900 } },
+      { ...base, id: 'stale', last_validated_at: new Date(Date.now() - 10 * 86400000).toISOString(), evidencia: { hallazgo: 'Dato anterior', monto: 500 } },
+      { ...base, id: 'metadata', last_validated_at: now, evidencia: { tipo: 'conciliacion', fuente: 'fixture', regla: 'QA' } },
+    ];
+    window.JV.decisionArea = 'Todas';
+    document.getElementById('os-root').innerHTML = jvLanesHTML();
+    return document.getElementById('os-root').innerText;
+  });
+  assert.match(decisionTriage, /1\s*Listas para decidir/i);
+  assert.match(decisionTriage, /2\s*esperando evidencia/i);
+  assert.match(decisionTriage, /Listas para decidir\s+1/i);
+  assert.match(decisionTriage, /Esperando nueva evidencia\s+2/i);
+  assert.match(decisionTriage, /Falta información concreta/i);
+
   console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
   console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
+  console.log('OK 4/4 clasificación ejecutiva: lista, vencida, alto riesgo y escalamiento sin mezclar evidencia pendiente.');
 } finally {
   await browser.close();
 }

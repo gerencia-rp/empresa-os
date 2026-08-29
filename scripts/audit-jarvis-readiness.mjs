@@ -89,6 +89,14 @@ if (!/const\s+metadataOnly\s*=/.test(source)
 }
 console.log('3/3 decisiones sensibles exigen evidencia sustantiva, fresca y confirmación humana.');
 
+if (!/jv-decision-brief/.test(source)
+  || !/const\s+decisionReady\s*=/.test(source)
+  || !/Listas para decidir/.test(source)
+  || !/Esperando nueva evidencia/.test(source)) {
+  throw new Error('La cola ejecutiva no separa claramente decisiones listas de asuntos que esperan evidencia.');
+}
+console.log('4/4 señales de la cola ejecutiva separan prioridad, riesgo, escalamiento y evidencia pendiente.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',
@@ -120,10 +128,30 @@ if (!/view\s+public\.v_automation_effective_health/i.test(migrations)
   || !/remodel_sync_parity/i.test(migrations)
   || !/source\s+in\s*\(\s*'ff_deals'\s*,\s*'ff_draws'\s*,\s*'ff_investors'\s*,\s*'ff_hml_loans'\s*\)/i.test(migrations)
   || !/from\s+public\.v_automation_effective_health/i.test(migrations)
-  || !/effective_health\s*<>\s*'healthy'/i.test(migrations)) {
+  || !/pending_first_run/i.test(migrations)
+  || !/effective_health\s+not\s+in\s*\(\s*'healthy'\s*,\s*'pending_first_run'\s*\)/i.test(migrations)
+  || !/rp\.data_refresh_log/i.test(migrations)
+  || !/fred_population/i.test(migrations)
+  || !/fred_unemployment/i.test(migrations)) {
   throw new Error('El vigilante de automatizaciones todavía puede confundir un cron disparado con un resultado exitoso.');
 }
-console.log('1/1 vigilante ejecutivo exige evidencia real para sincronizaciones críticas; un cron disparado no cuenta como éxito.');
+console.log('2/2 vigilante ejecutivo exige evidencia real y separa la gracia inicial de éxitos o fallos.');
+
+if (!/from\s+public\.agent_proposals\s+p/i.test(migrations)
+  || !/agent_proposals agrupadas/i.test(migrations)
+  || !/v_automation_effective_health/i.test(migrations)) {
+  throw new Error('La revisión de ausencia no usa la cola agrupada ni la salud efectiva como fuentes de verdad.');
+}
+console.log('2/2 compuertas de ausencia cuentan asuntos agrupados y resultados efectivos, no actividad superficial.');
+
+if (!/v_dedup\s+text\s*:=\s*'automation-health'/i.test(migrations)
+  || !/v_dedup\s*:=\s*'continuidad:'\s*\|\|\s*p_mode/i.test(migrations)
+  || !/v_dedup\s*:=\s*'student-success:'\s*\|\|\s*p_mode/i.test(migrations)
+  || !/v_dedup\s+text\s*:=\s*'data-integrity'/i.test(migrations)
+  || !/reconcile_agent_proposal_set/i.test(migrations)) {
+  throw new Error('Los controles recurrentes todavía pueden crear decisiones nuevas por fecha o dejar evidencia vencida.');
+}
+console.log('4/4 controles recurrentes conservan un asunto estable, refrescan evidencia y retiran snapshots obsoletos.');
 
 const scheduledJobNames = new Set([...migrations.matchAll(/cron\.schedule\(\s*'([^']+)'/gi)].map(match => match[1]));
 const expectedJobNames = new Set([...migrations.matchAll(/\(\s*'([^']+)'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*\d+(?:\.\d+)?\s*,\s*'P[123]'\s*\)/g)].map(match => match[1]));

@@ -50,9 +50,13 @@ check('Vigilante con inventario', automations.length >= 55, `${automations.lengt
 const falseGreens = automations.filter(row => row.effective_health === 'healthy'
   && (!row.evidence_at || row.evidence_error));
 check('Sin verdes falsos', falseGreens.length === 0, `${falseGreens.length} resultados inconsistentes`);
-const p1Failures = automations.filter(row => row.criticality === 'P1' && row.effective_health !== 'healthy');
+const p1Failures = automations.filter(row => row.criticality === 'P1'
+  && !['healthy', 'pending_first_run'].includes(row.effective_health));
 check('Automatizaciones P1 saludables', p1Failures.length === 0,
   p1Failures.map(row => row.jobname).slice(0, 6).join(', ') || 'sin fallos');
+const firstRuns = automations.filter(row => row.effective_health === 'pending_first_run');
+check('Primera corrida representada sin falso verde', firstRuns.every(row => !!row.evidence_at && !row.evidence_error),
+  `${firstRuns.length} trabajos dentro de su periodo inicial`);
 
 check('Empresas canónicas presentes', businesses.length >= 4, `${businesses.length} empresas`);
 const incompleteBusinesses = businesses.filter(row => !row.cobertura_completa);

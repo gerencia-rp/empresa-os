@@ -57,6 +57,8 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - Veracidad ejecutiva: el encabezado de Jarvis ya no afirma “todo bajo control” mientras la certificación de continuidad esté incompleta. Ahora muestra el número real de compuertas aprobadas y cambia a estado ámbar cuando existen controles pendientes.
 - Dirección accionable: el Centro de mando convierte las compuertas fallidas en un plan ordenado por riesgo, con responsable, evidencia y acceso directo al frente correcto. El orden prioriza integridad financiera, cobertura humana, decisiones fuera de SLA e integraciones, sin aprobar ni asignar por inferencia.
 - Aprobaciones con evidencia: una propuesta ya no se considera suficientemente sustentada por incluir solo metadatos como tipo, fuente, fecha o regla. Las aprobaciones sensibles exigen contenido verificable del negocio y evidencia vigente; la decisión final continúa siendo humana.
+- Higiene de decisiones recurrentes: Continuidad, Integridad de Datos, Éxito Estudiantil y Salud de Automatizaciones mantienen un único asunto vivo por control, refrescan su evidencia y retiran de forma recuperable los snapshots diarios anteriores.
+- Verdad de primera corrida: un trabajo semanal o mensual recién catalogado se muestra como `pending_first_run` durante su ventana inicial. No aparece verde sin evidencia ni rojo antes de vencer.
 
 ## Secuencia de publicación
 
