@@ -36,6 +36,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - [x] Motor financiero: 9/9 aserciones.
 - [x] Build Node 24 correcto.
 - [x] Detector visual sin hallazgos.
+- [x] Prueba de interfaz real en Chrome: navegación principal y destinos del plan de recuperación.
 - [ ] `ci:gate` completo con `SB_KEY` y `QA_PASS` inyectados solo durante la ejecución.
 - [ ] Revisión del diff por una segunda persona.
 - [x] Confirmar que el proyecto vinculado es exactamente `nezbaljfhhyznhltpjnk`.
@@ -71,6 +72,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 ## Smoke tests obligatorios
 
 - Jarvis abre Centro de mando, Equipo, Trabajo, Decisiones, Memoria y Reportes sin errores de consola.
+- `npm run test:jarvis:ui` comprueba con un navegador real el cambio de vista y la apertura del destino de cada bloqueo.
 - “Trabajo automático” muestra causa, responsable y evidencia para resultados fallidos.
 - ClickUp con una sincronización fallida nunca aparece verde y bloquea escrituras.
 - La asignación de roles rechaza usuario no administrador, titular=respaldo y falta de atestación.
