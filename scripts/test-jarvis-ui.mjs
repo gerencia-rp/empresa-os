@@ -28,8 +28,11 @@ try {
   });
   assert.equal(initial, 'network', 'Jarvis debe iniciar en el organigrama');
 
-  await page.click('[data-jv-nav="command"]');
-  assert.equal(await page.$eval('#render-state', node => node.textContent), 'command', 'Centro de mando debe cambiar el estado y renderizar');
+  const routes = ['network', 'command', 'work', 'propuestas', 'horarios', 'vault', 'reportes'];
+  for (const route of routes) {
+    await page.click(`[data-jv-nav="${route}"]`);
+    assert.equal(await page.$eval('#render-state', node => node.textContent), route, `${route} debe cambiar el estado y renderizar`);
+  }
 
   const recovery = await page.evaluate(() => {
     window.JV.reports = [{
@@ -56,7 +59,7 @@ try {
   await page.click('[data-jv-nav="reportes"]');
   assert.equal(await page.$eval('#render-state', node => node.textContent), 'reportes', 'Cada frente debe abrir su destino operativo');
 
-  console.log('OK 2/2 navegación real: menú principal + destino del plan de recuperación.');
+  console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
 } finally {
   await browser.close();
