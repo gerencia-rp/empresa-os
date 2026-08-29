@@ -114,6 +114,17 @@ if (!/v_agent_handoff_queue/.test(source)
 }
 console.log('5/5 traspasos reales conservan asunto, origen, destino, respaldo y escalamiento con SLA.');
 
+const dailyBrain = readFileSync(join(root, 'supabase/functions/cerebro-reunion/index.ts'), 'utf8');
+if (!/from\s+v_agent_handoff_queue/i.test(dailyBrain)
+  || !/traspasos_vencidos/.test(dailyBrain)
+  || !/coordinacion_agentes/.test(dailyBrain)
+  || !/backup_role/.test(dailyBrain)
+  || !/escalation_role/.test(dailyBrain)
+  || !/grant\s+select\s+on\s+public\.v_agent_handoff_queue\s+to\s+agentes_ia_exec/i.test(migrations)) {
+  throw new Error('La reunión diaria no incorpora la cola verificable con destino, respaldo y escalamiento bajo mínimo privilegio.');
+}
+console.log('5/5 reunión diaria incorpora traspasos reales, vencimiento, destino, respaldo y escalamiento.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',
