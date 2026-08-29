@@ -14,6 +14,7 @@ export interface AuthResult {
   role?: string;
   error?: string;
   status?: number;
+  service?: boolean;
 }
 
 /**
@@ -27,6 +28,13 @@ export async function requireAuth(req: Request, opts: { requireAdmin?: boolean }
   }
   const token = authHeader.slice(7).trim();
   if (!token) return { ok: false, error: "Token vacío", status: 401 };
+
+  // Los crons y edge functions internas usan exclusivamente la service key.
+  // Reconocerla aquí evita relajar cada endpoint por separado y mantiene un
+  // único contrato: service role o usuario real con el rol solicitado.
+  if (SERVICE_KEY && token === SERVICE_KEY) {
+    return { ok: true, role: "service_role", service: true };
+  }
 
   // Usar anon client + token del user para validar
   const client = createClient(SUPABASE_URL, ANON_KEY, {

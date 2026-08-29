@@ -2,6 +2,7 @@
 // Pulls propiedades, calcula KPIs (SPI, CPI, burn rate), genera snapshot diario + alertas.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const AIRTABLE_TOKEN = Deno.env.get("AIRTABLE_TOKEN")!;
 const AIRTABLE_BASE_ID = Deno.env.get("AIRTABLE_BASE_ID_REMODEL") || "appwFRqnkyyRljOld";
@@ -468,6 +469,10 @@ async function computeAndStoreRefinement(sb: any, projected: any[]) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const auth = await requireAuth(req, { requireAdmin: true });
+  if (!auth.ok) return new Response(JSON.stringify({ ok: false, error: auth.error }), {
+    status: auth.status || 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+  });
 
   const startMs = Date.now();
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

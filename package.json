@@ -8,10 +8,12 @@
   "scripts": {
     "audit:coverage": "node scripts/audit-agent-coverage.mjs",
     "audit:jarvis": "node scripts/audit-jarvis-readiness.mjs",
+    "test:cierre": "node scripts/test-cierre-engine.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs",
     "ci:gate": "node scripts/ci-gate.mjs",
     "gate:lineage": "node scripts/lineage-coverage.mjs --gate",
+    "gate:jarvis:prod": "node scripts/jarvis-production-gate.mjs",
     "lineage:register": "node scripts/lineage-coverage.mjs --register"
   },
   "devDependencies": {

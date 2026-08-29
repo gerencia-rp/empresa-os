@@ -31,7 +31,7 @@ async function ctLoad(force) {
   try {
     const [cfg, hml, pmf, db, rev, sinAno, ag] = await Promise.all([
       sb.from('ct_config').select('*'),
-      sb.from('ff_hml_loans').select('address,address_norm,monto_hml,fecha_vencimiento,fecha_inicio,plazo_meses,draws_cobrados').eq('active', true),
+      sb.from('ff_hml_loans').select('address,address_norm,monto_hml,fecha_vencimiento,fecha_inicio,plazo_meses,draws_cobrados,fecha_refi,fecha_venta,monto_prestamo_refi,monto_pagado_hml_refi,precio_venta').eq('active', true),
       sb.from('pm_monthly_finance').select('*').then(r => r.data || []).catch(() => []),
       sb.from('ct_findings').select('*').eq('active', true),
       sb.from('pm_payments').select('id', { count: 'exact', head: true }).eq('active', true).eq('status', 'revisar'),

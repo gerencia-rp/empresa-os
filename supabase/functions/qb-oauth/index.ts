@@ -1,6 +1,6 @@
 // QuickBooks OAuth multi-empresa (Intuit OAuth2) — conecta cada company de QBO a una empresa del holding.
 // Rutas (públicas para el redirect de Intuit; deploy con --no-verify-jwt):
-//   GET /qb-oauth/authorize?empresa=fix_flip|remodelacion|rentas|educacion → redirige a Intuit
+//   POST /qb-oauth/authorize?empresa=fix_flip|remodelacion|rentas|educacion → devuelve URL de Intuit (admin)
 //   GET /qb-oauth/callback?code=&realmId=&state=   → intercambia tokens, guarda + mapea empresa
 //   GET /qb-oauth/status                            → conexiones (SIN tokens)
 //   GET /qb-oauth/pnl?empresa=X                     → P&L YTD de esa empresa (verificación)
@@ -8,6 +8,7 @@
 // Secrets: QB_CLIENT_ID, QB_CLIENT_SECRET (Intuit app), SUPABASE_SERVICE_ROLE_KEY.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireAuth } from "../_shared/auth.ts";
 
 const CLIENT_ID = Deno.env.get("QBP_CLIENT_ID") || Deno.env.get("QB_CLIENT_ID") || "";
 const CLIENT_SECRET = Deno.env.get("QBP_CLIENT_SECRET") || Deno.env.get("QB_CLIENT_SECRET") || "";
@@ -20,10 +21,33 @@ const QBO_API = "https://quickbooks.api.intuit.com/v3/company";
 const EMPRESAS = ["fix_flip", "remodelacion", "rentas", "educacion"];
 const EMPRESA_LBL: Record<string, string> = { fix_flip: "Fix & Flip (Flipping Rentals LLC)", remodelacion: "Remodelación (Structure One LLC)", rentas: "Rentas (EverHome LLC)", educacion: "Educación (Rental Profits LLC)" };
 
+function b64url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function fromB64url(value: string): Uint8Array {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
+  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+}
+async function oauthState(empresa: string): Promise<string> {
+  const payload = b64url(new TextEncoder().encode(JSON.stringify({ empresa, exp: Date.now() + 10 * 60_000, nonce: crypto.randomUUID() })));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CLIENT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)));
+  return payload + '.' + b64url(sig);
+}
+async function verifyOauthState(state: string): Promise<string | null> {
+  const [payload, signature] = String(state || '').split('.');
+  if (!payload || !signature) return null;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CLIENT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  const ok = await crypto.subtle.verify('HMAC', key, fromB64url(signature), new TextEncoder().encode(payload));
+  if (!ok) return null;
+  const decoded = JSON.parse(new TextDecoder().decode(fromB64url(payload)));
+  return decoded && decoded.exp >= Date.now() && EMPRESAS.includes(decoded.empresa) ? decoded.empresa : null;
+}
+
 const html = (body: string, status = 200) => new Response(
   `<!doctype html><html><head><meta charset="utf-8"><title>QuickBooks · Rental Profits OS</title><style>body{font-family:-apple-system,sans-serif;background:#0b1220;color:#e8eefc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}div{max-width:560px;padding:32px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;line-height:1.6}b{color:#12b5a0}.err{color:#f87171}</style></head><body><div>${body}</div></body></html>`,
   { status, headers: { "Content-Type": "text/html; charset=utf-8" } });
-const json = (o: unknown, status = 200) => new Response(JSON.stringify(o, null, 1), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+const json = (o: unknown, status = 200) => new Response(JSON.stringify(o, null, 1), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" } });
 
 function sb() { return createClient(SUPABASE_URL, SERVICE_KEY); }
 function canOperate(req: Request, url: URL) {
@@ -77,6 +101,7 @@ async function qboGetWithToken(token: string, realm: string, path: string) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return json({ ok: true });
   const url = new URL(req.url);
   const path = url.pathname.split("/qb-oauth")[1] || "/";
   try {
@@ -85,6 +110,9 @@ Deno.serve(async (req) => {
     }
 
     if (path.startsWith("/authorize")) {
+      if (req.method !== 'POST') return json({ ok: false, error: 'Usá POST autenticado para iniciar la conexión.' }, 405);
+      const authUser = await requireAuth(req, { requireAdmin: true });
+      if (!authUser.ok) return json({ ok: false, error: authUser.error }, authUser.status || 401);
       const empresa = url.searchParams.get("empresa") || "";
       if (!EMPRESAS.includes(empresa)) return html(`<h2 class="err">Empresa inválida</h2><p>Usá ?empresa= ${EMPRESAS.join(" | ")}</p>`, 400);
       const auth = new URL("https://appcenter.intuit.com/connect/oauth2");
@@ -92,13 +120,14 @@ Deno.serve(async (req) => {
       auth.searchParams.set("response_type", "code");
       auth.searchParams.set("scope", "com.intuit.quickbooks.accounting");
       auth.searchParams.set("redirect_uri", REDIRECT_URI);
-      auth.searchParams.set("state", empresa);
-      return Response.redirect(auth.toString(), 302);
+      auth.searchParams.set("state", await oauthState(empresa));
+      return json({ ok: true, authorize_url: auth.toString(), expires_in_seconds: 600 });
     }
 
     if (path.startsWith("/callback")) {
-      const code = url.searchParams.get("code"), realmId = url.searchParams.get("realmId"), empresa = url.searchParams.get("state") || "";
+      const code = url.searchParams.get("code"), realmId = url.searchParams.get("realmId"), empresa = await verifyOauthState(url.searchParams.get("state") || "");
       if (!code || !realmId) return html(`<h2 class="err">Callback incompleto</h2><p>${url.search}</p>`, 400);
+      if (!empresa) return html(`<h2 class="err">Conexión rechazada</h2><p>El estado OAuth es inválido o venció. Iniciá nuevamente desde Empresa OS.</p>`, 401);
       const t = await tokenExchange({ grant_type: "authorization_code", code, redirect_uri: REDIRECT_URI });
       // nombre legal de la company
       let companyName = realmId;
@@ -120,6 +149,8 @@ Deno.serve(async (req) => {
     }
 
     if (path.startsWith("/status")) {
+      const authUser = await requireAuth(req, { requireAdmin: true });
+      if (!authUser.ok) return json({ ok: false, error: authUser.error }, authUser.status || 401);
       const { data } = await sb().from("qb_connections").select("empresa, company_name, connected_at, last_refreshed_at, token_expires_at").eq("active", true).order("empresa");
       return json({ ok: true, conexiones: data || [], esperadas: EMPRESA_LBL });
     }

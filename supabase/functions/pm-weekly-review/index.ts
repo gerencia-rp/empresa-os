@@ -7,6 +7,7 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAuth } from '../_shared/auth.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,8 @@ REGLAS:
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+  const auth = await requireAuth(req, { requireAdmin: true });
+  if (!auth.ok) return new Response(JSON.stringify({ ok: false, error: auth.error }), { status: auth.status || 401, headers: { ...CORS, 'content-type': 'application/json' } });
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   const supaUrl = Deno.env.get('SUPABASE_URL') || '';

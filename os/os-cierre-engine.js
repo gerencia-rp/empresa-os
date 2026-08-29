@@ -188,18 +188,24 @@
         exceso * ff.pagoMensual.valor, 'critica', 'Airtable FF', { meses_cubiertos: ff.mesesCubiertos.valor, meses_hueco: ff.mesesHueco.valor, plazo_total: plazo, exceso_meses: exceso, mensual: ff.pagoMensual.valor });
     });
 
-    // ══ C11 · DRAWS ≠ VALOR COBRADO — casos Capitol 63,750/85,000 · Idlewood 80,000/75,000 · Stonleigh 5,000/10,000 ══
+    // ══ C11 · FONDOS DISPONIBLES PARA OBRA ≠ VALOR COBRADO ══
+    // El draw bruto no es íntegramente presupuesto de remodelación: del mismo fondo salen
+    // intereses, servicios, muebles y extensiones. Comparar el cobro contra el bruto inflaba
+    // falsos gaps y contradecía remodelCasa()/precioCobrar().
     const gapMin = cfgNum(cfg, 'c11_gap_min_usd'), gapCrit = cfgNum(cfg, 'c11_gap_critico_usd');
     draws.forEach(d => {
       const td = N(d.total_draws), cobrado = N(d.remodel_complete);
       if (!td && !cobrado) return;
-      const gap = cobrado - td;
+      const ext = extByNorm[d.address_norm] || { monto: 0 };
+      const salidas = R2(N(d.interest_hml) + N(d.services_hml) + N(d.furniture) + N(ext.monto));
+      const disponible = R2(td - salidas);
+      const gap = R2(cobrado - disponible);
       if (Math.abs(gap) < gapMin) return;
       const loan = loanByNorm[d.address_norm];
       add('C11', 'fix_flip', 'gap-draw-' + slug(d.address_norm),
-        casa(d.address) + ': draws ingresados $' + td.toLocaleString() + ' vs cobrado por Remodelación $' + cobrado.toLocaleString() + ' → gap ' + (gap > 0 ? '+' : '') + '$' + gap.toLocaleString() + (gap > 0 ? ' (se cobró MÁS de lo que entró: sale de la caja de F&F)' : ' (draw sin cobrar o cobro de menos)'),
+        casa(d.address) + ': fondos disponibles para obra $' + disponible.toLocaleString() + ' (draw $' + td.toLocaleString() + ' − otras salidas $' + salidas.toLocaleString() + ') vs cobrado por Remodelación $' + cobrado.toLocaleString() + ' → gap ' + (gap > 0 ? '+' : '') + '$' + gap.toLocaleString() + (gap > 0 ? ' (el cobro supera el fondo disponible: requiere soporte de caja)' : ' (queda fondo de obra sin conciliar o cobro incompleto)'),
         gap, Math.abs(gap) >= gapCrit ? 'critica' : 'media', 'Airtable FF',
-        { draws: td, cobrado, gap, draws_cobrados_hml: loan ? N(loan.draws_cobrados) : null });
+        { draws: td, salidas_draw: salidas, fondos_disponibles_obra: disponible, cobrado, gap, draws_cobrados_hml: loan ? N(loan.draws_cobrados) : null });
     });
 
     // ══ C12 · GASTO TRABAJADORES = $0 EN CASA CON OBRA EJECUTADA — caso Stonleigh (labor cargada a otra casa) ══
@@ -247,7 +253,10 @@
     loans.forEach(l => {
       if (!l.fecha_vencimiento) return;
       const deal = dealByNorm[l.address_norm] || {};
-      if (/refinanciad|vendida/.test(deal.stage || '')) return;  // HML ya salió
+      const hmlCerrado = /refinanciad|vendida/.test(deal.stage || '')
+        || !!l.fecha_refi || !!l.fecha_venta || N(l.monto_prestamo_refi) > 0
+        || N(l.monto_pagado_hml_refi) > 0 || N(l.precio_venta) > 0;
+      if (hmlCerrado) return;  // evidencia de que el HML ya salió, aunque el stage siga como rentada
       const venc = new Date(l.fecha_vencimiento);
       if (hoy.getTime() - venc.getTime() < gracia) return;
       if (extByNorm[l.address_norm]) return;
