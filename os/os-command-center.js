@@ -1700,6 +1700,17 @@ window.jvSchedulePick = jvSchedulePick;
 const JV_CAPA_COL = { Command: '#a78bfa', Finance: '#38bdf8', Ops: '#f472b6', Integrity: '#34d399', Report: '#60a5fa', Signal: '#f87171' };
 const JV_CAPA_LABEL = { Command: 'Comando', Finance: 'Finance · Contable & Datos', Ops: 'Ops · Operación', Integrity: 'Integrity · Verificadores', Report: 'Report · Reporteros', Signal: 'Signal · Sabueso' };
 const JV_EMP_COL = '#fbbf24', JV_SRC_COL = '#8492ac';
+function jvVaultLayer(agent) {
+  const exact = String((agent && agent.capa) || '').trim();
+  if (JV_CAPA_COL[exact]) return exact;
+  const text = jvKey([agent && agent.capa, agent && agent.proceso, agent && agent.nombre].filter(Boolean).join(' '));
+  if (/report|reporte|briefing|informe/.test(text)) return 'Report';
+  if (/integrity|integridad|verific|auditor|gobernanza|calidad de datos/.test(text)) return 'Integrity';
+  if (/signal|senal|sabueso|alerta|deteccion/.test(text)) return 'Signal';
+  if (/finance|finanz|financier|contab|controller|capital|inversionista|underwriting|dato/.test(text)) return 'Finance';
+  if (/ops|operacion|operativ|ejecucion|optimiz|calidad|cronograma|continuidad|coordinacion/.test(text)) return 'Ops';
+  return 'Command';
+}
 function jvSvgIcon(name, x, y, size, color) {
   const inner = (window.OS_ICONS && OS_ICONS[name]) || '';
   const h = size / 2;
@@ -1763,14 +1774,14 @@ function jvVaultGraphView() {
   const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
   const cId = cerebro ? cerebro.id : 'cerebro';
   const order = ['Finance', 'Ops', 'Integrity', 'Report', 'Signal', 'Command'];
-  const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a)).sort((a, b) => order.indexOf(a.capa) - order.indexOf(b.capa));
+  const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a, { _vaultLayer: jvVaultLayer(a) })).sort((a, b) => order.indexOf(a._vaultLayer) - order.indexOf(b._vaultLayer));
   const emps = JV_EMPRESAS.map(e => Object.assign({}, e));
   const fus = JV_FUENTES.map(f => Object.assign({}, f));
   const groupCenters = {
     Command: { _x: 610, _y: 105 }, Finance: { _x: 900, _y: 205 }, Ops: { _x: 940, _y: 500 },
     Integrity: { _x: 690, _y: 645 }, Report: { _x: 385, _y: 545 }, Signal: { _x: 330, _y: 240 }
   };
-  const grouped = order.reduce((out, capa) => { out[capa] = ring.filter(a => a.capa === capa); return out; }, {});
+  const grouped = order.reduce((out, capa) => { out[capa] = ring.filter(a => a._vaultLayer === capa); return out; }, {});
   order.forEach(capa => {
     const arr = grouped[capa], center = groupCenters[capa];
     if (!arr.length || !center) return;
@@ -1797,8 +1808,8 @@ function jvVaultGraphView() {
   });
   fus.forEach(f => L(f, cNode, JV_SRC_COL));
   emps.forEach(emp => {
-    const v = ring.find(a => a.capa === 'Integrity' && a.area === emp.area);
-    const r = ring.find(a => a.capa === 'Report' && a.area === emp.area && !a.squad);
+    const v = ring.find(a => a._vaultLayer === 'Integrity' && a.area === emp.area);
+    const r = ring.find(a => a._vaultLayer === 'Report' && a.area === emp.area && !a.squad);
     if (v) L(v, emp, JV_EMP_COL); if (r) L(r, emp, JV_EMP_COL);
   });
   const rentasEmp = emps.find(e => e.area === 'rentas');
@@ -1823,8 +1834,8 @@ function jvVaultGraphView() {
   nodes[cId] = { kind: 'cerebro', label: cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', icon: 'brain', color: JV_CAPA_COL.Command, capaLabel: 'Comando · Orquestador', proceso: cerebro ? cerebro.proceso : '', riesgo: cerebro && cerebro.nivel_riesgo, estado: cerebro && cerebro.estado, area: 'holding', squad: null, run: cerebro ? jvAgentLastRun(cerebro) : null };
   svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo') + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', true);
   ring.forEach(a => {
-    const col = JV_CAPA_COL[a.capa] || '#888', ic = jvAgentIcon(a);
-    nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a.capa] || a.capa, proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: jvAgentLastRun(a) };
+    const col = JV_CAPA_COL[a._vaultLayer], ic = jvAgentIcon(a);
+    nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a._vaultLayer], proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: jvAgentLastRun(a) };
     svg += nodeG(a.id, a._x, a._y, 16, ic, col, a.nombre) + lbl(a._x, a._y, 16, a.nombre, false);
   });
   emps.forEach(e => {

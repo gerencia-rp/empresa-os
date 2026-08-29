@@ -144,7 +144,12 @@ try {
         id: `agent-${ci}-${i}`, nombre: `${capa} especialista ${i + 1}`, capa,
         area: i % 3 === 0 ? 'rentas' : (i % 3 === 1 ? 'remodelacion' : 'fix-flip'),
         estado: 'activo', proceso: `Responsabilidad ${i + 1}`,
-      }))));
+      }))))
+      .concat([
+        { id: 'agent-legacy-finance', nombre: 'Financiero Rentas', capa: 'Financiero', area: 'rentas', squad: 'Rentas', estado: 'activo', proceso: 'Controla cobros y cierres.' },
+        { id: 'agent-legacy-manager', nombre: 'Gerente de Rentas', capa: 'Gerencia', area: 'rentas', squad: 'Rentas', estado: 'activo', proceso: 'Dirige la operación.' },
+        { id: 'agent-without-layer', nombre: 'Coordinador de calidad', capa: null, area: 'remodelacion', estado: 'activo', proceso: 'Coordina calidad y cronograma.' },
+      ]);
     window.JV.audit = [];
     window.JV.vaultSel = null;
     document.getElementById('os-root').innerHTML = `<div class="jv"><main class="jv-main">${jvVaultGraphView()}</main></div>`;
@@ -154,19 +159,28 @@ try {
     const groups = document.querySelectorAll('.jv-vgroup-label').length;
     const firstAgent = document.querySelector('.jv-vnode[data-nid^="agent-"]');
     firstAgent.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const circles = [...document.querySelectorAll('.jv-vnode circle')].map(circle => ({ cx: Number(circle.getAttribute('cx')), cy: Number(circle.getAttribute('cy')) }));
+    const lineLengths = [...document.querySelectorAll('.jv-vstage line')].map(line => Math.hypot(
+      Number(line.getAttribute('x2')) - Number(line.getAttribute('x1')),
+      Number(line.getAttribute('y2')) - Number(line.getAttribute('y1')),
+    ));
     return {
       panelOutsideCanvas: canvas.right <= panel.left + 1,
       hiddenLabels,
       groups,
       selectedByKeyboard: firstAgent.classList.contains('sel'),
       nodeCount: document.querySelectorAll('.jv-vnode').length,
+      allNodesInsideCanvas: circles.every(point => Number.isFinite(point.cx) && Number.isFinite(point.cy) && point.cx >= 40 && point.cx <= 1160 && point.cy >= 40 && point.cy <= 810),
+      longestLink: Math.max(...lineLengths),
     };
   });
   assert.equal(vaultLayout.panelOutsideCanvas, true, 'El inspector no debe invadir el mapa en escritorio');
   assert.equal(vaultLayout.groups, 6, 'El mapa debe separar visualmente las seis capas');
   assert.ok(vaultLayout.hiddenLabels >= 40, 'Las etiquetas de detalle deben aparecer progresivamente');
   assert.equal(vaultLayout.selectedByKeyboard, true, 'Los nodos deben poder inspeccionarse con teclado');
-  assert.equal(vaultLayout.nodeCount, 50, 'El rediseño no debe ocultar nodos reales');
+  assert.equal(vaultLayout.nodeCount, 53, 'El rediseño no debe ocultar nodos reales, incluso si su capa viene con un nombre anterior');
+  assert.equal(vaultLayout.allNodesInsideCanvas, true, 'Ningún agente puede quedar sin coordenadas o fuera del mapa');
+  assert.ok(vaultLayout.longestLink < 700, `Ningún enlace debe cruzar el mapa de forma anormal (${vaultLayout.longestLink}px)`);
   if (process.env.JARVIS_VISUAL_DIR) {
     await page.screenshot({ path: path.join(process.env.JARVIS_VISUAL_DIR, 'memoria-escritorio.png'), fullPage: true });
   }
