@@ -107,19 +107,30 @@ try {
       payload: { resumen: '3 alertas requieren evidencia.', kpis: { criticos: 2, impacto_critico_usd: 170000, antiguedad_max_dias: 12 }, hallazgos_por_frente: [] },
     }];
     window.JV.financialActions = [
-      { check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar A', fuente: 'Airtable FF', impacto_usd: 100000, severidad: 'critica', dias_abierto: 12, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
-      { check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar B', fuente: 'Airtable FF', impacto_usd: 70000, severidad: 'critica', dias_abierto: 8, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
-      { check_id: 'C4', frente: 'Cartera y cobranza', responsable: 'Financiero Rentas', titulo: 'Saldo por verificar', fuente: 'ledger', impacto_usd: 3000, severidad: 'media', dias_abierto: 4, evidencia_requerida: 'Ledger y pagos aplicados.', siguiente_accion: 'Validar saldo neto.' },
+      { id: 'finding-a', check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar A', fuente: 'Airtable FF', impacto_usd: 100000, severidad: 'critica', dias_abierto: 12, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
+      { id: 'finding-b', check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar B', fuente: 'Airtable FF', impacto_usd: 70000, severidad: 'critica', dias_abierto: 8, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
+      { id: 'finding-c', check_id: 'C4', frente: 'Cartera y cobranza', responsable: 'Financiero Rentas', titulo: 'Saldo por verificar', fuente: 'ledger', impacto_usd: 3000, severidad: 'media', dias_abierto: 4, evidencia_requerida: 'Ledger y pagos aplicados.', siguiente_accion: 'Validar saldo neto.' },
+    ];
+    window.JV.financialEvidenceStatus = {
+      'finding-a': { closure_state: 'soporte_verificado_fuente_pendiente', verified_count: 1, pending_verification_count: 0 },
+      'finding-b': { closure_state: 'pendiente_verificacion', verified_count: 0, pending_verification_count: 1 },
+    };
+    window.JV.financialEvidence = [
+      { id: 'support-b', finding_id: 'finding-b', evidence_type: 'factura', title: 'Factura de Remodelación', artifact_url: 'https://example.com/support-b', status: 'submitted', submitted_by: 'another-user' },
     ];
     document.getElementById('os-root').innerHTML = jvReportesView();
-    const report = document.querySelector('.jv-report-item');
-    if (report) report.open = true;
+    document.querySelectorAll('details').forEach(report => { report.open = true; });
     return document.getElementById('os-root').innerText;
   });
   assert.match(financialPackets, /Paquetes por responsable/i);
   assert.match(financialPackets, /Fondos de obra y cobros/i);
   assert.match(financialPackets, /2 casos/i);
   assert.match(financialPackets, /Draw statement y factura/i);
+  assert.match(financialPackets, /Soporte verificado · falta corrida limpia/i);
+  assert.match(financialPackets, /Soporte pendiente de verificar/i);
+  assert.match(financialPackets, /Adjuntar soporte al expediente/i);
+  assert.match(financialPackets, /Factura de Remodelación/i);
+  assert.match(financialPackets, /Verificar/i);
 
   const handoffQueue = await page.evaluate(() => {
     const now = new Date().toISOString();
@@ -140,7 +151,7 @@ try {
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
   console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
   console.log('OK 4/4 clasificación ejecutiva: lista, vencida, alto riesgo y escalamiento sin mezclar evidencia pendiente.');
-  console.log('OK 4/4 paquetes financieros: responsable, casos, impacto y evidencia requerida.');
+  console.log('OK 8/8 paquetes financieros: responsable, impacto, soporte, verificación y corrida limpia obligatoria.');
   console.log('OK 4/4 traspasos verificables: origen, destino, respaldo y escalamiento con SLA.');
 } finally {
   await browser.close();

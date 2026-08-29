@@ -13,7 +13,7 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], financialActions: [], businessCoverage: [], handoffs: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], financialActions: [], financialEvidenceStatus: {}, financialEvidence: [], businessCoverage: [], handoffs: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.75,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', decisionLimit: 40, reportArea: 'Todas',
@@ -28,6 +28,7 @@ window.JV = JV;
 // ─── helpers ───
 function jvRole() { try { return (state && state.role) || 'viewer'; } catch (e) { return 'viewer'; } }
 function jvMe() { try { const u = state && state.user; return (u && (u.email || (u.user_metadata && u.user_metadata.full_name))) || 'admin'; } catch (e) { return 'admin'; } }
+function jvUserId() { try { return (state && state.user && state.user.id) || ''; } catch (e) { return ''; } }
 function jvNum(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('es-MX'); }
 function jvMoney(n) { return (n == null || isNaN(n)) ? '—' : '$' + Math.round(+n).toLocaleString('en-US'); }
 function jvAgent(id) { return JV.agents.find(x => x.id === id) || null; }
@@ -675,6 +676,7 @@ function jvCSS() {
     '#os-root .jv-readiness{margin-top:24px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-ready-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid var(--jc-line)}#os-root .jv-ready-head h2{font-family:Georgia,serif;font-size:24px;font-weight:400;margin:4px 0 0}#os-root .jv-ready-head p{max-width:540px;color:#81959c;font-size:10px;line-height:1.5;margin:0}#os-root .jv-ready-summary{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--jc-line)}#os-root .jv-ready-summary div{padding:13px 18px;border-right:1px solid var(--jc-line)}#os-root .jv-ready-summary b{display:block;font:24px Georgia,serif;color:#eff8f5}#os-root .jv-ready-summary span{font-size:8px;color:#6f858c;text-transform:uppercase;letter-spacing:.1em}#os-root .jv-ready-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#os-root .jv-ready-row{display:grid;grid-template-columns:minmax(130px,1fr) 94px 76px;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(111,179,188,.1);border-right:1px solid rgba(111,179,188,.1);cursor:pointer}#os-root .jv-ready-row:hover{background:rgba(52,221,188,.04)}#os-root .jv-ready-row b{display:block;font-size:10px}#os-root .jv-ready-row small{display:block;color:#71868c;font-size:8px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-ready-score{font:16px Georgia,serif;color:#49d8c0}#os-root .jv-ready-score.warn{color:#e8ae54}#os-root .jv-ready-pill{font-size:7.5px;text-transform:uppercase;letter-spacing:.07em;color:#49d8c0;border:1px solid rgba(73,216,192,.3);padding:5px 7px;text-align:center}#os-root .jv-ready-pill.warn{color:#e8ae54;border-color:rgba(232,174,84,.35)}',
     '#os-root .jv-role-manager{margin-top:12px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-role-manager>summary{padding:13px 16px;color:#dce9e6;font-size:10px;font-weight:750;cursor:pointer;list-style-position:inside}#os-root .jv-role-manager[open]>summary{border-bottom:1px solid var(--jc-line)}#os-root .jv-role-row{display:grid;grid-template-columns:minmax(150px,1.15fr) minmax(150px,1fr) minmax(150px,1fr) auto;gap:10px;align-items:end;padding:13px 16px;border-bottom:1px solid rgba(111,179,188,.1)}#os-root .jv-role-row:last-child{border-bottom:0}#os-root .jv-role-title b{display:block;font-size:10px;color:#eaf4f1}#os-root .jv-role-title small{display:block;color:#789097;font-size:8px;line-height:1.45;margin-top:4px}#os-root .jv-role-field label{display:block;color:#789097;font-size:8px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}#os-root .jv-role-field select{width:100%;min-height:34px;border:1px solid var(--jc-line);background:#061019;color:#dce9e6;padding:7px 9px;font:10px Inter,ui-sans-serif,sans-serif}#os-root .jv-role-attest{grid-column:2/-1;display:flex;align-items:flex-start;gap:8px;color:#a7bbb9;font-size:9px;line-height:1.5;cursor:pointer;max-width:760px}#os-root .jv-role-attest input{width:15px;height:15px;margin:0;accent-color:var(--jc-grn);flex:0 0 auto}#os-root .jv-role-field select:focus-visible,#os-root .jv-role-save:focus-visible,#os-root .jv-role-attest input:focus-visible{outline:2px solid var(--jc-grn);outline-offset:2px}#os-root .jv-role-save{min-height:34px;border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:7px 12px;font:750 9px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-role-save:hover{background:rgba(57,221,177,.14)}#os-root .jv-role-save:disabled{opacity:.45;cursor:not-allowed}#os-root .jv-role-msg{grid-column:2/-1;font-size:9px;line-height:1.45;color:var(--jc-grn)}#os-root .jv-role-msg.err{color:#ff8f8f}',
     '#os-root .jv-integration-detail{margin-top:12px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-integration-detail>summary{padding:13px 16px;color:#dce9e6;font-size:10px;font-weight:750;cursor:pointer}#os-root .jv-integration-detail[open]>summary{border-bottom:1px solid var(--jc-line)}#os-root .jv-integration-row{display:grid;grid-template-columns:minmax(110px,.7fr) 82px minmax(210px,1.8fr) minmax(130px,1fr);gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(111,179,188,.1)}#os-root .jv-integration-row:last-child{border-bottom:0}#os-root .jv-integration-row b{font-size:10px}#os-root .jv-integration-row span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--jc-grn)}#os-root .jv-integration-row span.warn{color:var(--jc-amber)}#os-root .jv-integration-row p,#os-root .jv-integration-row small{margin:0;font-size:9px;line-height:1.45;color:#8ba0a5}#os-root .jv-integration-row small{color:#698087}',
+    '#os-root .jv-fin-evidence{margin-top:9px;padding-top:8px;border-top:1px solid var(--jc-line)}#os-root .jv-fin-evidence>small{margin-left:8px;color:#71868c;font-size:8px}#os-root .jv-fin-evidence details{margin-top:8px}#os-root .jv-fin-evidence summary{color:var(--jc-grn);font-size:8.5px;cursor:pointer;list-style-position:inside}#os-root .jv-fin-supports{display:grid;gap:5px;margin-top:8px}#os-root .jv-fin-support{border:1px solid rgba(111,179,188,.12);padding:7px 8px;background:rgba(3,12,17,.55)}#os-root .jv-fin-support>a{color:#bff7e7;font-size:9px;text-decoration:none}#os-root .jv-fin-support>span{display:block;color:#71868c;font-size:7.5px;margin-top:3px}#os-root .jv-fin-verify{display:grid;grid-template-columns:1fr auto auto;gap:5px;margin-top:6px}#os-root .jv-fin-verify input{min-width:0;border:1px solid var(--jc-line);background:#050e15;color:#dce9e6;padding:6px 7px;font:8px Inter,ui-sans-serif,sans-serif}#os-root .jv-fin-verify button{border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:5px 7px;font:750 7.5px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-fin-verify button.reject{border-color:rgba(255,143,143,.35);background:rgba(255,143,143,.06);color:#ffaaaa}#os-root .jv-fin-evidence-form{display:grid;grid-template-columns:130px 1fr;gap:7px;margin-top:8px}#os-root .jv-fin-evidence-form input,#os-root .jv-fin-evidence-form select,#os-root .jv-fin-evidence-form textarea{min-width:0;border:1px solid var(--jc-line);background:#050e15;color:#dce9e6;padding:7px 8px;font:9px Inter,ui-sans-serif,sans-serif}#os-root .jv-fin-evidence-form input[type=url],#os-root .jv-fin-evidence-form textarea{grid-column:1/-1}#os-root .jv-fin-evidence-form textarea{min-height:52px;resize:vertical}#os-root .jv-fin-evidence-form button{justify-self:start;border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:7px 11px;font:750 8px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-fin-evidence-form button:disabled{opacity:.45;cursor:not-allowed}',
     '#os-root .jv-vault-wrap{border-radius:0;background:radial-gradient(circle at 45% 48%,rgba(24,112,113,.18),transparent 50%),linear-gradient(155deg,#061018,#03080d)}#os-root .jv-vpanel,#os-root .jv-vcount .cbox,#os-root .jv-vlegend{border-radius:2px;background:rgba(4,13,19,.94)}#os-root .jv-vpanel h3{font-family:Georgia,serif;font-size:20px;font-weight:400}',
     '@media(max-width:1050px){#os-root .jv-command-grid{grid-template-columns:1fr 1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:1/-1}#os-root .jv-command-kpis{grid-template-columns:repeat(3,1fr)}#os-root .jv-command-areas{grid-template-columns:repeat(2,1fr)}#os-root .jv-work-layout,#os-root .jv-schedule-layout{grid-template-columns:1fr}#os-root .jv-work-inspector{border-left:0;border-top:1px solid var(--jc-line)}#os-root .jv-role-row{grid-template-columns:1fr 1fr}#os-root .jv-role-title{grid-column:1/-1}#os-root .jv-role-msg{grid-column:1/-1}#os-root .jv-integration-row{grid-template-columns:110px 78px 1fr}#os-root .jv-integration-row small{grid-column:3}#os-root .jv-recovery-row{grid-template-columns:28px minmax(150px,.75fr) minmax(200px,1.25fr) auto}}@media(max-width:700px){#os-root .jv-page-title,#os-root .jv-cmd-title{font-size:31px}#os-root .jv-command-kpis{grid-template-columns:1fr 1fr}#os-root .jv-command-grid,#os-root .jv-command-areas,#os-root .jv-ready-list{grid-template-columns:1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:auto}#os-root .jv-ready-head,#os-root .jv-recovery-head{display:block}#os-root .jv-ready-head p,#os-root .jv-recovery-head p{margin-top:9px}#os-root .jv-ready-row{grid-template-columns:minmax(120px,1fr) 58px 70px}#os-root .jv-role-row,#os-root .jv-integration-row,#os-root .jv-recovery-row{grid-template-columns:1fr}#os-root .jv-recovery-rank{font-size:15px}#os-root .jv-role-title{grid-column:auto}#os-root .jv-role-msg,#os-root .jv-integration-row small{grid-column:auto}#os-root .jv-schedule-board{overflow:auto}#os-root .jv-schedule-head,#os-root .jv-schedule-row{min-width:720px}}',
   ].join('\n');
@@ -690,7 +692,7 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates, financialActions, businessCoverage, handoffs] = await Promise.all([
+    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates, financialActions, financialEvidenceStatus, financialEvidence, businessCoverage, handoffs] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at,last_validated_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
@@ -708,6 +710,8 @@ async function jvLoad(force) {
       sb.from('v_operational_role_coverage').select('role_code,role_name,area,criticality,primary_profile_id,backup_profile_id,primary_ready,backup_ready,verified_at').then(r => r).catch(() => ({ data: null })),
       sb.from('v_operational_role_candidates').select('role_code,role_name,profile_id,candidate_name,email,suitability_score,access_evidence').order('suitability_score', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       sb.from('v_financial_findings_actionable').select('id,check_id,empresa,titulo,fuente,impacto_usd,severidad,dias_abierto,frente,responsable,evidencia_requerida,siguiente_accion,prioridad_operativa').order('impacto_usd', { ascending: false }).limit(100).then(r => r).catch(() => ({ data: null })),
+      sb.from('v_financial_finding_evidence_status').select('finding_id,evidence_count,verified_count,pending_verification_count,rejected_count,last_evidence_at,closure_state').then(r => r).catch(() => ({ data: null })),
+      sb.from('financial_finding_evidence').select('id,finding_id,evidence_type,title,artifact_url,notes,source_date,status,submitted_by,submitted_at,verified_at,verification_note').order('submitted_at', { ascending: false }).limit(300).then(r => r).catch(() => ({ data: null })),
       sb.from('v_business_agent_coverage').select('slug,name,agentes,capacidades_cubiertas,capacidades_faltantes,cobertura_completa').order('name').then(r => r).catch(() => ({ data: null })),
       sb.from('v_agent_handoff_queue').select('proposal_id,from_agent_id,from_agent,from_area,tipo_accion,subject_key,to_role,backup_role,escalation_role,sla_hours,opened_at,evidence_at,age_hours,handoff_state,evidence_present,requested_action').order('age_hours', { ascending: false }).then(r => r).catch(() => ({ data: null })),
     ]);
@@ -721,6 +725,8 @@ async function jvLoad(force) {
     JV.roleCoverage = (roleCoverage && roleCoverage.data) || [];
     JV.roleCandidates = (roleCandidates && roleCandidates.data) || [];
     JV.financialActions = (financialActions && financialActions.data) || [];
+    JV.financialEvidenceStatus = ((financialEvidenceStatus && financialEvidenceStatus.data) || []).reduce((out, row) => { out[row.finding_id] = row; return out; }, {});
+    JV.financialEvidence = (financialEvidence && financialEvidence.data) || [];
     JV.businessCoverage = (businessCoverage && businessCoverage.data) || [];
     JV.handoffs = (handoffs && handoffs.data) || [];
     JV.runsTotal = runs.count || 0;
@@ -1814,6 +1820,34 @@ function jvVaultGraphView() {
 // ════════════════════════════════════════════════════════════════
 // VIEW · REPORTES (informes de los agentes)
 // ════════════════════════════════════════════════════════════════
+function jvFinancialEvidenceControls(item) {
+  const status = JV.financialEvidenceStatus[item.id] || {};
+  const state = status.closure_state || 'sin_soporte';
+  const label = state === 'soporte_verificado_fuente_pendiente'
+    ? 'Soporte verificado · falta corrida limpia'
+    : (state === 'pendiente_verificacion' ? 'Soporte pendiente de verificar' : (state === 'soporte_rechazado' ? 'Soporte rechazado · reemplazar' : 'Sin soporte adjunto'));
+  const cls = state === 'soporte_verificado_fuente_pendiente' ? 'b-ok' : 'b-wait';
+  const id = String(item.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!id) return '';
+  const supports = JV.financialEvidence.filter(row => row.finding_id === item.id);
+  const supportRows = supports.map(row => {
+    const supportId = String(row.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const canVerify = row.status === 'submitted' && row.submitted_by !== jvUserId();
+    return '<div class="jv-fin-support"><a href="' + OS_E(row.artifact_url || '#') + '" target="_blank" rel="noopener noreferrer">' + OS_E(row.title || 'Soporte') + '</a><span>' + OS_E(jvHumanize(row.evidence_type || 'otro')) + ' · ' + OS_E(jvHumanize(row.status || 'submitted')) + '</span>'
+      + (canVerify ? '<div class="jv-fin-verify"><input id="jv-fe-verify-note-' + supportId + '" maxlength="300" placeholder="Nota de verificación (mín. 10 caracteres)" aria-label="Nota de verificación"><button type="button" onclick="jvVerifyFinancialEvidence(\'' + supportId + '\',true)">Verificar</button><button type="button" class="reject" onclick="jvVerifyFinancialEvidence(\'' + supportId + '\',false)">Rechazar</button></div>' : '') + '</div>';
+  }).join('');
+  return '<div class="jv-fin-evidence"><span class="jv-badge ' + cls + '">' + OS_E(label) + '</span>'
+    + '<small>' + jvNum(status.verified_count || 0) + ' verificados · ' + jvNum(status.pending_verification_count || 0) + ' por revisar · ' + jvNum(status.rejected_count || 0) + ' rechazados</small>'
+    + (supportRows ? '<div class="jv-fin-supports">' + supportRows + '</div>' : '')
+    + '<details><summary>Adjuntar soporte al expediente</summary><div class="jv-fin-evidence-form">'
+    + '<select id="jv-fe-type-' + id + '" aria-label="Tipo de soporte"><option value="statement">Statement</option><option value="factura">Factura</option><option value="recibo">Recibo</option><option value="payoff">Payoff</option><option value="extension">Extensión</option><option value="ledger">Ledger</option><option value="nomina">Nómina</option><option value="conciliacion">Conciliación</option><option value="otro">Otro</option></select>'
+    + '<input id="jv-fe-title-' + id + '" maxlength="160" placeholder="Qué demuestra este soporte" aria-label="Título del soporte">'
+    + '<input id="jv-fe-url-' + id + '" type="url" placeholder="https:// enlace al documento" aria-label="Enlace https al soporte">'
+    + '<textarea id="jv-fe-notes-' + id + '" maxlength="600" placeholder="Nota opcional para quien lo verificará" aria-label="Nota del soporte"></textarea>'
+    + '<button type="button" onclick="jvRegisterFinancialEvidence(\'' + id + '\')"' + (JV.busyId === id ? ' disabled' : '') + '>' + (JV.busyId === id ? 'Guardando…' : 'Guardar en expediente') + '</button>'
+    + '</div></details></div>';
+}
+
 function jvReportesView() {
   const informes = JV.reports;
   const areaOf = r => { const k = jvKey([r.tipo, r.generado_por, r.titulo].join(' ')); if (/renta/.test(k)) return 'Rentas'; if (/remodel|obra/.test(k)) return 'Remodelación'; if (/\bff\b|fix.*flip|pipeline/.test(k)) return 'Fix & Flip'; if (/educa|estudiant|mentor/.test(k)) return 'Educación'; return 'Dirección'; };
@@ -1855,7 +1889,7 @@ function jvReportesView() {
           + sample.map(item => '<div class="jv-simple-row"><div class="jv-av">' + OS_E(item.check_id || 'C') + '</div><div class="body"><b>'
             + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>' + jvMoney(item.impacto_usd) + ' · Fuente: '
             + OS_E(item.fuente || 'no declarada') + '</span><span>Acción: ' + OS_E(item.siguiente_accion || 'Validar y conciliar con soporte.')
-            + '</span></div></div>').join('') + '</div></div></details>';
+            + '</span>' + jvFinancialEvidenceControls(item) + '</div></div>').join('') + '</div></div></details>';
       }).join('');
       const priorityRows = livePriorities.map((item, index) =>
         '<div class="jv-simple-row"><div class="jv-av">' + OS_E(String(item.prioridad || index + 1)) + '</div><div class="body"><b>'
@@ -1903,6 +1937,47 @@ function jvReportesView() {
   return '<h1 class="jv-page-title">Reportes del equipo</h1><div class="jv-lead">Organizados por área. Abre cualquiera para leer el resultado completo y saber qué agente lo generó.</div>' + filters + (groups || '<div class="jv-empty">Todavía no hay reportes en esta área.</div>');
 }
 function jvReportArea(area) { JV.reportArea = area; if (window.osRender) osRender(); }
+async function jvRegisterFinancialEvidence(id) {
+  if (!id || JV.busyId) return;
+  const type = document.getElementById('jv-fe-type-' + id)?.value || 'otro';
+  const title = document.getElementById('jv-fe-title-' + id)?.value.trim() || '';
+  const url = document.getElementById('jv-fe-url-' + id)?.value.trim() || '';
+  const notes = document.getElementById('jv-fe-notes-' + id)?.value.trim() || '';
+  if (title.length < 3) { if (window.toast) toast('Explica qué demuestra el soporte.', 'error'); return; }
+  if (!/^https:\/\//i.test(url)) { if (window.toast) toast('Usa un enlace https verificable al documento.', 'error'); return; }
+  JV.busyId = id; if (window.osRender) osRender();
+  try {
+    const { error } = await sb.rpc('register_financial_finding_evidence', {
+      p_finding_id: id, p_evidence_type: type, p_title: title,
+      p_artifact_url: url, p_notes: notes || null, p_source_date: null,
+    });
+    if (error) throw error;
+    if (window.toast) toast('Soporte guardado. Un administrador debe verificarlo y la fuente debe pasar una nueva corrida.', 'success');
+  } catch (e) {
+    if (window.toast) toast('No se pudo guardar el soporte: ' + (e.message || e), 'error');
+    else alert('No se pudo guardar el soporte: ' + (e.message || e));
+  } finally {
+    JV.busyId = null; await jvLoad(true); if (window.osRender) osRender();
+  }
+}
+async function jvVerifyFinancialEvidence(id, accept) {
+  if (!id || JV.busyId) return;
+  const note = document.getElementById('jv-fe-verify-note-' + id)?.value.trim() || '';
+  if (note.length < 10) { if (window.toast) toast('La verificación necesita una nota de al menos 10 caracteres.', 'error'); return; }
+  JV.busyId = id; if (window.osRender) osRender();
+  try {
+    const { error } = await sb.rpc('verify_financial_finding_evidence', {
+      p_evidence_id: id, p_accept: !!accept, p_verification_note: note,
+    });
+    if (error) throw error;
+    if (window.toast) toast(accept ? 'Soporte verificado. El hallazgo sigue abierto hasta que la fuente pase una nueva corrida.' : 'Soporte rechazado con trazabilidad.', accept ? 'success' : 'info');
+  } catch (e) {
+    if (window.toast) toast('No se pudo revisar el soporte: ' + (e.message || e), 'error');
+    else alert('No se pudo revisar el soporte: ' + (e.message || e));
+  } finally {
+    JV.busyId = null; await jvLoad(true); if (window.osRender) osRender();
+  }
+}
 window.jvReportArea = jvReportArea;
 
 // ════════════════════════════════════════════════════════════════

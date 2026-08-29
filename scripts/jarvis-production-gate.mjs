@@ -36,12 +36,13 @@ const check = (name, condition, detail = '') => {
   (condition ? passed : failed).push(`${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const [gaps, automations, businesses, roles, findings, reports] = await Promise.all([
+const [gaps, automations, businesses, roles, findings, evidenceStatuses, reports] = await Promise.all([
   query('v_automation_expectation_gaps?select=jobname'),
   query('v_automation_effective_health?select=jobname,criticality,effective_health,evidence_at,evidence_error'),
   query('v_business_agent_coverage?select=slug,name,cobertura_completa,capacidades_faltantes'),
   query('v_operational_role_coverage?select=role_code,role_name,primary_ready,backup_ready'),
   query('v_financial_findings_actionable?select=check_id,responsable,evidencia_requerida,siguiente_accion,prioridad_operativa'),
+  query('v_financial_finding_evidence_status?select=finding_id,evidence_count,verified_count,pending_verification_count,rejected_count,closure_state'),
   query('pm_informes?select=tipo,corte,payload,updated_at&tipo=in.(salud_automatizaciones,salud_integraciones,continuidad_ausencia_6_meses)&archived_at=is.null&order=corte.desc'),
 ]);
 
@@ -72,6 +73,10 @@ const incompleteFindings = findings.filter(row => !row.responsable || !row.evide
   || !row.siguiente_accion || !row.prioridad_operativa);
 check('Hallazgos financieros accionables', incompleteFindings.length === 0,
   `${incompleteFindings.length} hallazgos sin resolución completa`);
+const invalidEvidenceStates = evidenceStatuses.filter(row => !['sin_soporte', 'pendiente_verificacion', 'soporte_rechazado', 'soporte_verificado_fuente_pendiente'].includes(row.closure_state)
+  || Number(row.evidence_count || 0) < Number(row.verified_count || 0) + Number(row.pending_verification_count || 0) + Number(row.rejected_count || 0));
+check('Expediente para cada hallazgo abierto', evidenceStatuses.length === findings.length && invalidEvidenceStates.length === 0,
+  `${evidenceStatuses.length}/${findings.length} expedientes · ${invalidEvidenceStates.length} estados inválidos`);
 
 for (const type of ['salud_automatizaciones', 'salud_integraciones', 'continuidad_ausencia_6_meses']) {
   const latest = reports.find(report => report.tipo === type);

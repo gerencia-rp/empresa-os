@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const commandPath = join(root, 'os/os-command-center.js');
 const source = readFileSync(commandPath, 'utf8');
+const productionGatePath = join(root, 'scripts/jarvis-production-gate.mjs');
+const productionGate = existsSync(productionGatePath) ? readFileSync(productionGatePath, 'utf8') : '';
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const block = source.match(/const JV_AUTOMATIONS = \{([\s\S]*?)\n\};/);
 if (!block) throw new Error('No se encontró JV_AUTOMATIONS.');
@@ -105,6 +107,19 @@ if (!/const\s+packetMap\s*=\s*JV\.financialActions\.reduce/.test(source)
 }
 console.log('4/4 reportes financieros agrupan responsable, impacto, evidencia y siguiente acción.');
 
+if (!/table\s+if\s+not\s+exists\s+public\.financial_finding_evidence/i.test(migrations)
+  || !/register_financial_finding_evidence/i.test(migrations)
+  || !/verify_financial_finding_evidence/i.test(migrations)
+  || !/verified_by<>submitted_by/.test(migrations)
+  || !/soporte_verificado_fuente_pendiente/.test(migrations)
+  || !/register_financial_finding_evidence/.test(source)
+  || !/verify_financial_finding_evidence/.test(source)
+  || !/v_financial_finding_evidence_status/.test(productionGate)
+  || !/Soporte verificado · falta corrida limpia/.test(source)) {
+  throw new Error('Los paquetes financieros no conservan soporte verificable o permiten confundir soporte con cierre de fuente.');
+}
+console.log('5/5 expedientes financieros conservan soporte, verificación, segregación y corrida limpia obligatoria.');
+
 if (!/v_agent_handoff_queue/.test(source)
   || !/Traspaso verificable/.test(source)
   || !/backup_role/.test(source)
@@ -197,14 +212,13 @@ if (uncataloguedJobs.length) {
 }
 console.log(`${scheduledJobNames.size}/${scheduledJobNames.size} horarios versionados tienen dueño, criticidad y máximo silencio; los futuros no catalogados se escalan automáticamente.`);
 
-const productionGatePath = join(root, 'scripts/jarvis-production-gate.mjs');
-const productionGate = existsSync(productionGatePath) ? readFileSync(productionGatePath, 'utf8') : '';
 if (packageJson.scripts?.['gate:jarvis:prod'] !== 'node scripts/jarvis-production-gate.mjs'
   || !/v_automation_expectation_gaps/.test(productionGate)
   || !/v_automation_effective_health/.test(productionGate)
   || !/v_business_agent_coverage/.test(productionGate)
   || !/v_operational_role_coverage/.test(productionGate)
-  || !/v_financial_findings_actionable/.test(productionGate)) {
+  || !/v_financial_findings_actionable/.test(productionGate)
+  || !/v_financial_finding_evidence_status/.test(productionGate)) {
   throw new Error('La certificación de producción no cubre horarios, resultados, empresas, roles y hallazgos financieros.');
 }
 console.log('1/1 gate de producción certifica horarios, evidencia, empresas, roles humanos, finanzas e informes vivos.');
