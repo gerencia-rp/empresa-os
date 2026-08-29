@@ -121,11 +121,27 @@ try {
   assert.match(financialPackets, /2 casos/i);
   assert.match(financialPackets, /Draw statement y factura/i);
 
+  const handoffQueue = await page.evaluate(() => {
+    const now = new Date().toISOString();
+    window.JV.agents = [{ id: 'agent-qa', nombre: 'Financiero Fix & Flip', linea: 'Fix & Flip' }];
+    window.JV.props = [{ id: 'handoff-proposal', agent_id: 'agent-qa', tipo_accion: 'conciliacion', estado: 'propuesta', created_at: now, last_validated_at: now, payload: { dedup_key: 'qa-handoff' }, evidencia: { hallazgo: 'Draw por conciliar', monto: 1000 } }];
+    window.JV.audit = [];
+    window.JV.handoffs = [{ proposal_id: 'handoff-proposal', from_agent_id: 'agent-qa', from_agent: 'Financiero Fix & Flip', to_role: 'Controller', backup_role: 'Auditor de Integridad', escalation_role: 'Dirección', sla_hours: 24, handoff_state: 'overdue', evidence_at: now }];
+    window.JV.workArea = 'Todas'; window.JV.workState = 'Todos'; window.JV.workAgentId = null; window.JV.workSelectedId = null;
+    document.getElementById('os-root').innerHTML = jvWorkView();
+    return document.getElementById('os-root').innerText;
+  });
+  assert.match(handoffQueue, /1\s*Traspasos vencidos/i);
+  assert.match(handoffQueue, /Financiero Fix & Flip\s*→\s*Controller/i);
+  assert.match(handoffQueue, /Respaldo:\s*Auditor de Integridad/i);
+  assert.match(handoffQueue, /Escala a:\s*Dirección/i);
+
   console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
   console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
   console.log('OK 4/4 clasificación ejecutiva: lista, vencida, alto riesgo y escalamiento sin mezclar evidencia pendiente.');
   console.log('OK 4/4 paquetes financieros: responsable, casos, impacto y evidencia requerida.');
+  console.log('OK 4/4 traspasos verificables: origen, destino, respaldo y escalamiento con SLA.');
 } finally {
   await browser.close();
 }

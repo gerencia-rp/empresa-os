@@ -105,6 +105,15 @@ if (!/const\s+packetMap\s*=\s*JV\.financialActions\.reduce/.test(source)
 }
 console.log('4/4 reportes financieros agrupan responsable, impacto, evidencia y siguiente acción.');
 
+if (!/v_agent_handoff_queue/.test(source)
+  || !/Traspaso verificable/.test(source)
+  || !/backup_role/.test(source)
+  || !/escalation_role/.test(source)
+  || !/view\s+public\.v_agent_handoff_queue/i.test(migrations)) {
+  throw new Error('La coordinación todavía no demuestra origen, destino, respaldo, escalamiento y SLA por asunto real.');
+}
+console.log('5/5 traspasos reales conservan asunto, origen, destino, respaldo y escalamiento con SLA.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',
