@@ -153,6 +153,14 @@ if (!/v_dedup\s+text\s*:=\s*'automation-health'/i.test(migrations)
 }
 console.log('4/4 controles recurrentes conservan un asunto estable, refrescan evidencia y retiran snapshots obsoletos.');
 
+if (!/table\s+if\s+not\s+exists\s+public\.financial_scan_current/i.test(migrations)
+  || !/pg_advisory_xact_lock/i.test(migrations)
+  || !/truncate\s+table\s+financial_scan_current/i.test(migrations)
+  || !/snapshot protegido de la última corrida/i.test(migrations)) {
+  throw new Error('El escaneo financiero no conserva una mesa verificable o puede mezclar corridas simultáneas.');
+}
+console.log('2/2 auditor financiero usa un snapshot protegido y serializa corridas sin modificar fuentes.');
+
 const scheduledJobNames = new Set([...migrations.matchAll(/cron\.schedule\(\s*'([^']+)'/gi)].map(match => match[1]));
 const expectedJobNames = new Set([...migrations.matchAll(/\(\s*'([^']+)'\s*,\s*'[^']+'\s*,\s*'[^']+'\s*,\s*\d+(?:\.\d+)?\s*,\s*'P[123]'\s*\)/g)].map(match => match[1]));
 const uncataloguedJobs = [...scheduledJobNames].filter(jobname => !expectedJobNames.has(jobname));
