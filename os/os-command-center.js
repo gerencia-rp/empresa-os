@@ -202,12 +202,20 @@ function jvPendingDecisions() {
 function jvProposalDetails(p) {
   const e = jvEvidObj(p);
   const skip = /^(id|uuid|token|prompt|raw|debug|sql|query|stack|trace|source)$/i;
+  const metadataOnly = /^(tipo|regla|fuente|origen|nota|corte|fecha|version|rol_db|metodo|limite)$/i;
   const labels = { propiedad: 'Propiedad', property: 'Propiedad', property_name: 'Propiedad', address: 'Propiedad', monto: 'Monto', impacto: 'Impacto', recomendacion: 'Recomendación', accion_recomendada: 'Acción recomendada', razon: 'Por qué', porque: 'Por qué', riesgo: 'Riesgo', fecha: 'Fecha', corte: 'Corte', responsable: 'Responsable', plazo: 'Plazo' };
   const rows = Object.keys(e).filter(k => !skip.test(k) && e[k] != null && e[k] !== '' && typeof e[k] !== 'object').slice(0, 8).map(k => {
     const val = typeof e[k] === 'number' && /monto|impacto|total|costo|precio/i.test(k) ? jvMoney(e[k]) : String(e[k]);
     return '<div class="jv-detail-row"><span>' + OS_E(labels[k] || jvHumanize(k)) + '</span><b>' + OS_E(val) + '</b></div>';
   });
-  return { html: rows.join(''), sufficient: rows.length > 0 || !!(e.detalle || e.resumen || e.recomendacion || e.accion_recomendada) };
+  const hasValue = value => {
+    if (value == null || value === '') return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  };
+  const substantive = Object.keys(e).some(key => !skip.test(key) && !metadataOnly.test(key) && hasValue(e[key]));
+  return { html: rows.join(''), sufficient: substantive };
 }
 function jvFmtTs(ts) {
   if (!ts) return 'sin corridas';

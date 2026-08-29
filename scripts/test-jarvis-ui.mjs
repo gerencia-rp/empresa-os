@@ -59,8 +59,31 @@ try {
   await page.click('[data-jv-nav="reportes"]');
   assert.equal(await page.$eval('#render-state', node => node.textContent), 'reportes', 'Cada frente debe abrir su destino operativo');
 
+  const approvalSafety = await page.evaluate(() => {
+    const base = {
+      id: 'proposal-qa', agent_id: 'agent-qa', tipo_accion: 'conciliacion', estado: 'propuesta',
+      created_at: new Date().toISOString(), last_validated_at: new Date().toISOString(),
+      payload: { requiere_aprobacion: true, accion: 'conciliar' },
+    };
+    window.JV.props = [{ ...base, evidencia: { tipo: 'conciliacion', regla: 'QA-1', fuente: 'fixture', origen: 'test', nota: 'sin detalle sustantivo' } }];
+    window.JV.decisionPreview = { id: base.id, estado: 'aprobada' };
+    document.getElementById('os-root').innerHTML = jvDecisionPreviewHTML();
+    const metadataOnlyDisabled = document.querySelector('.jv-review-actions .confirm')?.disabled === true;
+
+    window.JV.props = [{ ...base, evidencia: { tipo: 'conciliacion', fuente: 'fixture', hallazgo: 'Diferencia de $1,250 en la cuenta de prueba', monto: 1250 } }];
+    document.getElementById('os-root').innerHTML = jvDecisionPreviewHTML();
+    const substantiveEnabled = document.querySelector('.jv-review-actions .confirm')?.disabled === false;
+
+    window.JV.props = [{ ...base, last_validated_at: new Date(Date.now() - 10 * 86400000).toISOString(), evidencia: { tipo: 'conciliacion', fuente: 'fixture', hallazgo: 'Diferencia vencida', monto: 1250 } }];
+    document.getElementById('os-root').innerHTML = jvDecisionPreviewHTML();
+    const staleDisabled = document.querySelector('.jv-review-actions .confirm')?.disabled === true;
+    return { metadataOnlyDisabled, substantiveEnabled, staleDisabled };
+  });
+  assert.deepEqual(approvalSafety, { metadataOnlyDisabled: true, substantiveEnabled: true, staleDisabled: true }, 'Las aprobaciones sensibles deben exigir evidencia sustantiva y fresca');
+
   console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
+  console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
 } finally {
   await browser.close();
 }

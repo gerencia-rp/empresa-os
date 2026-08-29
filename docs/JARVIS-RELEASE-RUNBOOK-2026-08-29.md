@@ -37,6 +37,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - [x] Build Node 24 correcto.
 - [x] Detector visual sin hallazgos.
 - [x] Prueba de interfaz real en Chrome: navegación principal y destinos del plan de recuperación.
+- [x] Prueba de seguridad de decisiones: metadatos bloqueados, evidencia sustantiva vigente habilitada y evidencia vencida bloqueada.
 - [ ] `ci:gate` completo con `SB_KEY` y `QA_PASS` inyectados solo durante la ejecución.
 - [ ] Revisión del diff por una segunda persona.
 - [x] Confirmar que el proyecto vinculado es exactamente `nezbaljfhhyznhltpjnk`.
@@ -55,6 +56,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - Corrección de representación: los horarios semanales expresados mediante el nombre del día ya no se evalúan con una ventana diaria. `Reportes Remodelación` tenía cron exitoso y evidencia del miércoles, pero la interfaz lo mostraba 6/7 después de 72 horas; la cadencia visual ahora coincide con el control semanal real.
 - Veracidad ejecutiva: el encabezado de Jarvis ya no afirma “todo bajo control” mientras la certificación de continuidad esté incompleta. Ahora muestra el número real de compuertas aprobadas y cambia a estado ámbar cuando existen controles pendientes.
 - Dirección accionable: el Centro de mando convierte las compuertas fallidas en un plan ordenado por riesgo, con responsable, evidencia y acceso directo al frente correcto. El orden prioriza integridad financiera, cobertura humana, decisiones fuera de SLA e integraciones, sin aprobar ni asignar por inferencia.
+- Aprobaciones con evidencia: una propuesta ya no se considera suficientemente sustentada por incluir solo metadatos como tipo, fuente, fecha o regla. Las aprobaciones sensibles exigen contenido verificable del negocio y evidencia vigente; la decisión final continúa siendo humana.
 
 ## Secuencia de publicación
 
@@ -73,6 +75,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 
 - Jarvis abre Centro de mando, Equipo, Trabajo, Decisiones, Memoria y Reportes sin errores de consola.
 - `npm run test:jarvis:ui` comprueba con un navegador real el cambio de vista y la apertura del destino de cada bloqueo.
+- La misma prueba confirma que una decisión sensible queda bloqueada con metadatos solos o evidencia vencida, y solo se habilita con evidencia sustantiva vigente.
 - “Trabajo automático” muestra causa, responsable y evidencia para resultados fallidos.
 - ClickUp con una sincronización fallida nunca aparece verde y bloquea escrituras.
 - La asignación de roles rechaza usuario no administrador, titular=respaldo y falta de atestación.

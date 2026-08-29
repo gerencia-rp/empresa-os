@@ -81,6 +81,14 @@ if (!/data-jv-nav=/.test(source)
 }
 console.log('1/1 navegación principal usa delegación estable y conserva controles accesibles.');
 
+if (!/const\s+metadataOnly\s*=/.test(source)
+  || !/sufficient:\s*substantive/.test(source)
+  || !/\(!detail\.sufficient\s*\|\|\s*!evidence\.fresh\)/.test(source)
+  || !/La evidencia venció/.test(source)) {
+  throw new Error('Las decisiones sensibles pueden habilitarse con metadatos o evidencia vencida.');
+}
+console.log('3/3 decisiones sensibles exigen evidencia sustantiva, fresca y confirmación humana.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',
