@@ -50,6 +50,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - La sesión autenticada de `/jarvis` cargó el organigrama completo, la ficha operativa y sus rutas principales sin errores de consola.
 - Las rutas sensibles probadas sin sesión respondieron `401`: ClickUp, QuickBooks, Remodelación, WhatsApp y cierre diario.
 - La validación SQL de producción terminó correctamente. `salud_automatizaciones` está saludable; `salud_integraciones` permanece en atención y `continuidad_ausencia_6_meses` permanece `no_listo`, sin falsos verdes.
+- Seguimiento de cola: Financiero Rentas ahora reconcilia también el conjunto completo de alertas de servicios. La corrida productiva encontró y refrescó 11/11; no retiró ninguna porque todas siguen presentes en la fuente.
 
 ## Secuencia de publicación
 

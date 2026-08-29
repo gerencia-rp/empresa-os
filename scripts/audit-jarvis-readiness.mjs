@@ -160,6 +160,13 @@ if (!/action_type:\s*['"]reschedule['"]/.test(dailyClose) || !/tasks_carried_ove
 }
 console.log('1/1 carry-over diario cambia la fecha real, cuenta éxitos y registra fallos.');
 
+const rentalsFinance = readFileSync(join(root, 'supabase/functions/rentas-financiero/index.ts'), 'utf8');
+if (!rentalsFinance.includes("reconcile_agent_proposal_set(${agent.id},'conciliacion','svc:'")
+  || !/svcSeen\.push\(dedupKey\)/.test(rentalsFinance)) {
+  throw new Error('Financiero Rentas no retira hallazgos de servicios que desaparecieron de un escaneo completo.');
+}
+console.log('1/1 escaneo de servicios retira hallazgos resueltos sin ejecutar decisiones.');
+
 const whatsappSender = readFileSync(join(root, 'supabase/functions/whatsapp-send/index.ts'), 'utf8');
 const whatsappCloudSender = readFileSync(join(root, 'supabase/functions/whatsapp-send-cloud/index.ts'), 'utf8');
 const sharedAuth = readFileSync(join(root, 'supabase/functions/_shared/auth.ts'), 'utf8');
