@@ -57,6 +57,15 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
+    // Un espejo de ClickUp sin sincronización válida no es evidencia operativa.
+    const [sync] = await sql`select error,synced_at from clickup_sync_log order by synced_at desc limit 1`;
+    const clickupOk = !sync?.error && sync?.synced_at && (Date.now() - new Date(sync.synced_at).getTime()) < 2 * 3600 * 1000;
+    if (!clickupOk) {
+      const output = { skipped: "clickup_unhealthy", fuente: "clickup_sync_log", ultima_sincronizacion: sync?.synced_at || null, error: sync?.error || "sin sincronización reciente" };
+      await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ accion: "skip" })},${sql.json(output)},'skipped')`;
+      return json({ ok: true, ...output });
+    }
+
     const open = await sql`select payload->>'dedup_key' k from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
     const keys = new Set<string>(open.map((r: Record<string, unknown>) => r.k as string).filter(Boolean));
     const k = "ffej:pulso:" + corte;

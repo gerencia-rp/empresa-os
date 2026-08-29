@@ -73,6 +73,15 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
+    // No generar trabajo desde un espejo viejo o una sincronización fallida.
+    const [sync] = await sql`select error,synced_at from clickup_sync_log order by synced_at desc limit 1`;
+    const clickupOk = !sync?.error && sync?.synced_at && (Date.now() - new Date(sync.synced_at).getTime()) < 2 * 3600 * 1000;
+    if (!clickupOk) {
+      const output = { skipped: "clickup_unhealthy", fuente: "clickup_sync_log", ultima_sincronizacion: sync?.synced_at || null, error: sync?.error || "sin sincronización reciente" };
+      await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ mode, accion: "skip" })},${sql.json(output)},'skipped')`;
+      return json({ ok: true, ...output });
+    }
+
     let created = 0, skipped = 0;
     const detail: Record<string, unknown> = { vencidas: 0, cobros_sin_dueno: 0, cuello: 0, recurrentes: 0, informe: "—" };
     // helper: inserta y cuenta según el trigger de dedup (RETURNING vacío = deduplicado)
