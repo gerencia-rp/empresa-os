@@ -92,12 +92,11 @@ Deno.serve(async (req) => {
 
     // ── DEDUP: cargar propuestas abiertas del Financiero ──
     const open = await sql`select tipo_accion, evidencia from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const cobroKeys = new Set<string>(), descKeys = new Set<string>(), resKeys = new Set<string>();
+    const cobroKeys = new Set<string>(), descKeys = new Set<string>();
     for (const p of open) {
       const e = (p.evidencia || {}) as Record<string, unknown>;
       if (p.tipo_accion === "recordatorio_cobro") cobroKeys.add(((e.casa as string) || "") + "|" + ((e.inquilino as string) || ""));
       if (p.tipo_accion === "conciliacion") descKeys.add((e.casa as string) || "");
-      if (p.tipo_accion === "informe" && e.tipo === "resumen_cobranza_diario") resKeys.add((e.corte as string) || "");
     }
 
     let created = 0, refreshed = 0, skipped = 0;
@@ -159,8 +158,8 @@ Deno.serve(async (req) => {
         const [kpi] = await sql`select * from v_cartera_kpi`;
         const buckets = await sql`select case when mes_mas_viejo>='2026-07' then '0-30' when mes_mas_viejo='2026-06' then '31-60' when mes_mas_viejo<'2026-06' then '60+' else 's/d' end b, count(*) n, coalesce(sum(vencido_neto),0) v from v_cartera_inquilino where vencido_neto>0 group by 1`;
         const evid = { tipo: "resumen_cobranza_diario", corte, vencido_neto_total: kpi?.vencido_neto, pendiente_neto_total: kpi?.pendiente_neto_total, morosos_reales: kpi?.morosos_reales, aging: buckets, nota: "resumen automático del ejecutor (dry-run)", origen: "ejecutor rentas-financiero" };
-        const summaryOutcome = await recordProposal("informe", { tipo: "resumen_cobranza_diario", corte, dedup_key: "resumen_cobranza:" + corte }, evid);
-        if (summaryOutcome === "created") (detail.resumen_new as number)++; else (detail.resumen_skip as number)++;
+        await sql`select record_agent_report(${agent.id},'resumen_cobranza_diario',${corte}::date,${'Cobranza diaria · ' + corte},${sql.json(evid)})`;
+        detail.resumen_new = 1;
     } else if (mode === "servicios") {
       // Dedup: claves de descuadres de servicio abiertos (casa|servicio|mes|subtipo)
       const svcKeys = new Set<string>();
