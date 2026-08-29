@@ -637,21 +637,25 @@ function jvCSS() {
     '#os-root textarea.jv-ein{min-height:52px;resize:vertical}',
     '#os-root .jv-ein:focus{border-color:var(--jc-purple)}',
     // DNA map (Knowledge Vault)
-    '#os-root .jv-vault-wrap{position:relative;height:640px;margin-top:8px;border:1px solid var(--jc-line);border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 46%,rgba(20,30,60,.45),var(--jc-bg) 72%)}',
+    '#os-root .jv-vault-wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(650px,1fr) auto;margin-top:18px;border:1px solid var(--jc-line);border-radius:14px;overflow:hidden;background:radial-gradient(circle at 46% 48%,rgba(20,30,60,.45),var(--jc-bg) 72%)}',
+    '#os-root .jv-vcanvas{position:relative;grid-column:1;grid-row:2;min-width:0;min-height:650px;overflow:hidden;border-top:1px solid var(--jc-line);border-right:1px solid var(--jc-line)}',
     '#os-root .jv-vstage{position:absolute;inset:0;width:100%;height:100%}',
     '#os-root .jv-vnode{cursor:pointer}',
-    '#os-root .jv-vnode circle{transition:.15s}',
-    '#os-root .jv-vnode:hover circle{filter:brightness(1.35)}',
-    '#os-root .jv-vnode.sel circle{filter:brightness(1.45)}',
+    '#os-root .jv-vnode circle{transition:transform .18s ease,filter .18s ease;transform-box:fill-box;transform-origin:center}',
+    '#os-root .jv-vnode:hover circle,#os-root .jv-vnode:focus-visible circle{filter:brightness(1.35);transform:scale(1.16)}',
+    '#os-root .jv-vnode.sel circle{filter:brightness(1.5);stroke-width:3px;transform:scale(1.12)}',
+    '#os-root .jv-vnode:focus-visible{outline:none}',
     '#os-root .jv-vnode text{user-select:none}',
-    '#os-root .jv-vcount{position:absolute;top:14px;right:14px;display:flex;gap:8px;z-index:3}',
+    '#os-root .jv-vlabel{opacity:0;pointer-events:none;transition:opacity .16s ease}.jv-vnode:hover .jv-vlabel,.jv-vnode:focus-visible .jv-vlabel,.jv-vnode.sel .jv-vlabel{opacity:1}',
+    '#os-root .jv-vgroup-label{font:700 9px Inter,ui-sans-serif,sans-serif;letter-spacing:.13em;text-transform:uppercase}.jv-vgroup-count{font:8px Inter,ui-sans-serif,sans-serif;fill:#6f858c}',
+    '#os-root .jv-vcount{grid-column:1/-1;grid-row:1;display:flex;gap:0;justify-content:flex-end;z-index:3;padding:13px 16px}',
     '#os-root .jv-vcount .cbox{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:10px;padding:6px 12px;text-align:center}',
     '#os-root .jv-vcount .n{font-size:16px;font-weight:750;color:var(--jc-cyan);font-variant-numeric:tabular-nums}',
     '#os-root .jv-vcount .l{font-size:8.5px;letter-spacing:.08em;color:var(--jc-mut);text-transform:uppercase}',
-    '#os-root .jv-vlegend{position:absolute;left:14px;bottom:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:10px 12px;z-index:3}',
-    '#os-root .jv-vlegend .li{display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0;color:var(--jc-mut)}',
+    '#os-root .jv-vlegend{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--jc-card);border-top:1px solid var(--jc-line);padding:10px 14px;z-index:3}',
+    '#os-root .jv-vlegend .li{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--jc-mut)}',
     '#os-root .jv-vlegend .sw{width:10px;height:10px;border-radius:50%}',
-    '#os-root .jv-vpanel{position:absolute;right:14px;top:70px;width:262px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:14px;padding:16px;z-index:3;max-height:540px;overflow:auto}',
+    '#os-root .jv-vpanel{grid-column:2;grid-row:2;position:relative;width:auto;background:var(--jc-card);border:0;border-top:1px solid var(--jc-line);padding:24px 22px;z-index:3;max-height:650px;overflow:auto}',
     '#os-root .jv-vp-ic{margin-bottom:2px}',
     '#os-root .jv-vpanel h3{font-size:15px;margin:4px 0 2px}',
     '#os-root .jv-vp-lay{font-size:10px;letter-spacing:.1em;text-transform:uppercase}',
@@ -659,8 +663,9 @@ function jvCSS() {
     '#os-root .jv-vp-meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}',
     '#os-root .jv-vp-meta .tag{font-size:10px;padding:3px 8px;border-radius:8px;background:rgba(120,140,180,.14);color:var(--jc-tx)}',
     '#os-root .jv-vp-run{margin-top:12px;font-size:11px;color:var(--jc-mut);border-top:1px solid var(--jc-line);padding-top:10px}',
-    '#os-root .jv-vhint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:10.5px;color:var(--jc-mut);z-index:2;pointer-events:none}',
-    '@media(max-width:1000px){#os-root .jv-vpanel{position:static;width:auto;max-height:none;margin-top:10px}#os-root .jv-vault-wrap{height:auto;padding-bottom:10px}#os-root .jv-vstage{position:relative;height:440px}#os-root .jv-vcount{position:static;justify-content:flex-end;padding:10px 10px 0}#os-root .jv-vlegend{position:static;margin:10px}}',
+    '#os-root .jv-vhint{position:absolute;left:50%;bottom:13px;width:calc(100% - 28px);transform:translateX(-50%);font-size:10px;color:var(--jc-mut);z-index:2;pointer-events:none;text-align:center}',
+    '@media(max-width:1100px){#os-root .jv-vault-wrap{grid-template-columns:1fr;grid-template-rows:auto 560px auto auto}#os-root .jv-vcanvas{grid-column:1;grid-row:2;min-height:560px;border-right:0}#os-root .jv-vpanel{grid-column:1;grid-row:3;max-height:none;border-top:1px solid var(--jc-line)}#os-root .jv-vlegend{grid-row:4}}',
+    '@media(max-width:680px){#os-root .jv-vault-wrap{grid-template-rows:auto 470px auto auto;margin-top:14px}#os-root .jv-vcanvas{min-height:470px}#os-root .jv-vstage{width:100%;height:100%}#os-root .jv-vcount{justify-content:flex-start;overflow-x:auto}#os-root .jv-vcount .cbox{min-width:84px}#os-root .jv-vlegend{gap:9px}#os-root .jv-vlabel{display:none}}',
     // JARVIS cinematic system — shared across command, team, work, schedule and memory.
     '#os-root .jv{--jc-bg:#030910;--jc-side:#050b12;--jc-card:#07121b;--jc-line:rgba(118,190,201,.17);--jc-tx:#edf6f4;--jc-mut:#7f969d;--jc-purple:#4fd8c1;--jc-cyan:#38d7c1;--jc-pink:#f2a34a;--jc-grn:#39ddb1;--jc-amber:#e9ae4c;--jc-blue:#49a8e8;border-radius:0;min-height:calc(100dvh - 92px);background:radial-gradient(circle at 72% 8%,rgba(27,126,132,.12),transparent 32%),radial-gradient(ellipse at 20% 80%,rgba(40,90,112,.055),transparent 44%),var(--jc-bg);font-family:Inter,ui-sans-serif,system-ui,sans-serif}',
     '#os-root .jv-side{width:184px;padding:21px 13px;background:rgba(3,9,15,.93);border-right-color:rgba(99,178,187,.2)}#os-root .jv-logo{padding:0 8px 24px;gap:11px}#os-root .jv-logo .m{width:29px;height:29px;border-radius:50%;background:radial-gradient(circle,#58e6ce 0 12%,transparent 14%),conic-gradient(from 30deg,transparent,#41d9c2,transparent,#41d9c2,transparent);box-shadow:0 0 22px rgba(57,221,177,.2)}#os-root .jv-logo b{font-family:Georgia,serif;font-size:15px;letter-spacing:.12em;text-transform:uppercase}#os-root .jv-nav button{border-radius:2px;padding:10px 10px;border-left:2px solid transparent;font-size:11.5px}#os-root .jv-nav button.on{background:linear-gradient(90deg,rgba(57,221,177,.13),transparent);border-left-color:var(--jc-grn);color:#cffff0}#os-root .jv-lbl{margin-top:24px;color:#526a72}#os-root .jv-mini{border-radius:3px;padding:7px 9px;font-size:10.5px}#os-root .jv-mini.on{background:rgba(57,221,177,.08);border-color:rgba(57,221,177,.22)}',
@@ -1728,6 +1733,12 @@ function jvVaultPick(id) {
   const g = root.querySelector('.jv-vnode[data-nid="' + id + '"]'); if (g) g.classList.add('sel');
 }
 window.jvVaultPick = jvVaultPick;
+function jvVaultKey(event, id) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  jvVaultPick(id);
+}
+window.jvVaultKey = jvVaultKey;
 
 function jvVaultView() {
   const sourceEvidence = f => {
@@ -1753,7 +1764,7 @@ function jvVaultView() {
 }
 
 function jvVaultGraphView() {
-  const cx = 600, cy = 400;
+  const cx = 610, cy = 380;
   const nodes = {}, lines = [];
   const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
   const cId = cerebro ? cerebro.id : 'cerebro';
@@ -1761,12 +1772,36 @@ function jvVaultGraphView() {
   const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a)).sort((a, b) => order.indexOf(a.capa) - order.indexOf(b.capa));
   const emps = JV_EMPRESAS.map(e => Object.assign({}, e));
   const fus = JV_FUENTES.map(f => Object.assign({}, f));
-  const place = (arr, rad, start) => { const n = arr.length; arr.forEach((it, k) => { const ang = (start + k / n * 360) * Math.PI / 180; it._x = cx + rad * Math.cos(ang); it._y = cy + rad * Math.sin(ang); }); };
-  place(ring, 250, -90); place(emps, 365, -50); place(fus, 365, 130);
+  const groupCenters = {
+    Command: { _x: 610, _y: 105 }, Finance: { _x: 900, _y: 205 }, Ops: { _x: 940, _y: 500 },
+    Integrity: { _x: 690, _y: 645 }, Report: { _x: 385, _y: 545 }, Signal: { _x: 330, _y: 240 }
+  };
+  const grouped = order.reduce((out, capa) => { out[capa] = ring.filter(a => a.capa === capa); return out; }, {});
+  order.forEach(capa => {
+    const arr = grouped[capa], center = groupCenters[capa];
+    if (!arr.length || !center) return;
+    const firstRing = Math.min(arr.length, 7);
+    arr.forEach((it, k) => {
+      const outer = k >= firstRing;
+      const localIndex = outer ? k - firstRing : k;
+      const localCount = outer ? arr.length - firstRing : firstRing;
+      const radius = outer ? 92 : (arr.length === 1 ? 0 : 58);
+      const angle = (-90 + (localIndex / Math.max(1, localCount)) * 360 + (outer ? 18 : 0)) * Math.PI / 180;
+      it._x = center._x + radius * Math.cos(angle);
+      it._y = center._y + radius * Math.sin(angle);
+    });
+  });
+  fus.forEach((f, i) => { f._x = 82; f._y = 255 + i * 82; });
+  emps.forEach((e, i) => { e._x = 380 + i * (470 / Math.max(1, emps.length - 1)); e._y = 770; });
   const cNode = { _x: cx, _y: cy };
   const L = (a, b, col) => lines.push('<line x1="' + a._x + '" y1="' + a._y + '" x2="' + b._x + '" y2="' + b._y + '" stroke="' + col + '" stroke-width="1" stroke-opacity="0.22"/>');
-  ring.forEach(a => L(cNode, a, JV_CAPA_COL[a.capa] || '#888'));
-  fus.forEach(f => L(cNode, f, JV_SRC_COL));
+  order.forEach(capa => {
+    const center = groupCenters[capa], arr = grouped[capa];
+    if (!center || !arr.length) return;
+    L(cNode, center, JV_CAPA_COL[capa] || '#888');
+    arr.forEach(a => L(center, a, JV_CAPA_COL[capa] || '#888'));
+  });
+  fus.forEach(f => L(f, cNode, JV_SRC_COL));
   emps.forEach(emp => {
     const v = ring.find(a => a.capa === 'Integrity' && a.area === emp.area);
     const r = ring.find(a => a.capa === 'Report' && a.area === emp.area && !a.squad);
@@ -1776,30 +1811,36 @@ function jvVaultGraphView() {
   if (rentasEmp) ring.filter(a => a.squad === 'Rentas').forEach(a => L(a, rentasEmp, JV_EMP_COL));
   const linkCount = lines.length;
   let svg = '';
-  const nodeG = (id, x, y, r, icon, col) => {
+  const nodeG = (id, x, y, r, icon, col, label) => {
     const isSel = id === (JV.vaultSel || cId);
-    return '<g class="jv-vnode' + (isSel ? ' sel' : '') + '" data-nid="' + id + '" onclick="jvVaultPick(\'' + id + '\')">'
+    return '<g class="jv-vnode' + (isSel ? ' sel' : '') + '" data-nid="' + id + '" role="button" tabindex="0" aria-label="Inspeccionar ' + OS_E(label || id) + '" onclick="jvVaultPick(\'' + id + '\')" onkeydown="jvVaultKey(event,\'' + id + '\')"><title>' + OS_E(label || id) + '</title>'
       + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#0e1220" stroke="' + col + '" stroke-width="' + (id === cId ? 3 : 1.6) + '"/>'
       + (id === cId ? '<circle cx="' + x + '" cy="' + y + '" r="' + (r + 8) + '" fill="none" stroke="' + col + '" stroke-opacity="0.4"/>' : '')
       + jvSvgIcon(icon, x, y, Math.round(r * 0.85), col) + '</g>';
   };
-  const lbl = (x, y, r, t) => '<text x="' + x + '" y="' + (y + r + 13) + '" text-anchor="middle" font-size="10" fill="#c7d0e0">' + OS_E(t.length > 15 ? t.slice(0, 14) + '…' : t) + '</text>';
+  const lbl = (x, y, r, t, always) => '<text class="' + (always ? '' : 'jv-vlabel') + '" x="' + x + '" y="' + (y + r + 13) + '" text-anchor="middle" font-size="10" fill="#c7d0e0">' + OS_E(t.length > 18 ? t.slice(0, 17) + '…' : t) + '</text>';
+  order.forEach(capa => {
+    const center = groupCenters[capa], arr = grouped[capa];
+    if (!center || !arr.length) return;
+    svg += '<text class="jv-vgroup-label" x="' + center._x + '" y="' + (center._y - 77) + '" text-anchor="middle" fill="' + (JV_CAPA_COL[capa] || '#888') + '">' + OS_E(JV_CAPA_LABEL[capa] || capa) + '</text>'
+      + '<text class="jv-vgroup-count" x="' + center._x + '" y="' + (center._y - 63) + '" text-anchor="middle">' + arr.length + ' agentes</text>';
+  });
   // cerebro
   nodes[cId] = { kind: 'cerebro', label: cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', icon: 'brain', color: JV_CAPA_COL.Command, capaLabel: 'Comando · Orquestador', proceso: cerebro ? cerebro.proceso : '', riesgo: cerebro && cerebro.nivel_riesgo, estado: cerebro && cerebro.estado, area: 'holding', squad: null, run: cerebro ? jvAgentLastRun(cerebro) : null };
-  svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command) + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo');
+  svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo') + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', true);
   ring.forEach(a => {
     const col = JV_CAPA_COL[a.capa] || '#888', ic = jvAgentIcon(a);
     nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a.capa] || a.capa, proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: jvAgentLastRun(a) };
-    svg += nodeG(a.id, a._x, a._y, 19, ic, col) + lbl(a._x, a._y, 19, a.nombre);
+    svg += nodeG(a.id, a._x, a._y, 16, ic, col, a.nombre) + lbl(a._x, a._y, 16, a.nombre, false);
   });
   emps.forEach(e => {
     const id = 'emp-' + e.area;
     nodes[id] = { kind: 'empresa', label: e.name, icon: e.icon, color: JV_EMP_COL, capaLabel: 'Empresa · property_id', proceso: 'La casa como clave común (property_id): una propiedad fluye Fix&Flip → Remodelación → Rentas con la misma identidad.', area: e.area, squad: null, run: null };
-    svg += nodeG(id, e._x, e._y, 20, e.icon, JV_EMP_COL) + lbl(e._x, e._y, 20, e.name);
+    svg += nodeG(id, e._x, e._y, 20, e.icon, JV_EMP_COL, e.name) + lbl(e._x, e._y, 20, e.name, true);
   });
   fus.forEach(f => {
     nodes[f.id] = { kind: 'fuente', label: f.label, icon: f.icon, color: JV_SRC_COL, capaLabel: 'Fuente de verdad', proceso: f.desc, area: null, squad: null, run: null };
-    svg += nodeG(f.id, f._x, f._y, 20, f.icon, JV_SRC_COL) + lbl(f._x, f._y, 20, f.label);
+    svg += nodeG(f.id, f._x, f._y, 20, f.icon, JV_SRC_COL, f.label) + lbl(f._x, f._y, 20, f.label, true);
   });
   JV.vaultNodes = nodes;
   if (!JV.vaultSel || !nodes[JV.vaultSel]) JV.vaultSel = cId;
@@ -1810,10 +1851,11 @@ function jvVaultGraphView() {
   const recent = JV.memories.slice(0, 6).map(m => '<div class="jv-simple-row"><div class="jv-av">' + osIcon('library', { size: 14 }) + '</div><div class="body"><b>' + OS_E(jvHumanize(m.tipo || 'aprendizaje')) + '</b><span>' + OS_E(m.texto || 'Memoria sin contenido visible.') + '</span></div><span class="jv-chip">' + OS_E(m.fuente || 'fuente no declarada') + '</span></div>').join('');
   return '<h1 class="jv-page-title">Memoria compartida.</h1><div class="jv-lead">Lo que el negocio aprendió, quién lo aportó y cómo se conecta con agentes, empresas y fuentes reales.</div>'
     + '<div class="jv-vault-wrap">' + counters
-    + '<svg class="jv-vstage" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">' + lines.join('') + svg + '</svg>'
+    + '<div class="jv-vcanvas"><svg class="jv-vstage" viewBox="0 0 1200 840" preserveAspectRatio="xMidYMid meet">' + lines.join('') + svg + '</svg>'
+    + '<div class="jv-vhint">Seleccioná un nodo para ver su función · las etiquetas aparecen al explorar</div></div>'
     + '<div class="jv-vlegend">' + legend + '</div>'
     + '<div class="jv-vpanel" id="jv-vault-panel">' + jvVaultFicha(nodes[JV.vaultSel]) + '</div>'
-    + '<div class="jv-vhint">Tocá un nodo para inspeccionarlo</div></div>'
+    + '</div>'
     + '<section style="margin-top:18px"><div class="jv-section-title">Aprendizajes recientes</div><div class="jv-simple-list">' + (recent || '<div class="jv-empty">Todavía no hay aprendizajes guardados.</div>') + '</div></section>';
 }
 

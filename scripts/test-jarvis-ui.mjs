@@ -20,6 +20,7 @@ try {
     window.OS_E = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   });
   await page.addScriptTag({ path: path.join(root, 'os/os-command-center.js') });
+  await page.evaluate(() => jvCSS());
 
   const initial = await page.evaluate(() => {
     window.osRender = () => { document.getElementById('render-state').textContent = window.JV.tab; };
@@ -147,12 +148,59 @@ try {
   assert.match(handoffQueue, /Respaldo:\s*Auditor de Integridad/i);
   assert.match(handoffQueue, /Escala a:\s*Dirección/i);
 
+  const vaultLayout = await page.evaluate(() => {
+    const capas = ['Command', 'Finance', 'Ops', 'Integrity', 'Report', 'Signal'];
+    window.JV.agents = [{ id: 'brain', nombre: 'Cerebro Ejecutivo', capa: 'Command', area: 'holding', estado: 'activo', proceso: 'Coordina el equipo.' }]
+      .concat(capas.flatMap((capa, ci) => Array.from({ length: 7 }, (_, i) => ({
+        id: `agent-${ci}-${i}`, nombre: `${capa} especialista ${i + 1}`, capa,
+        area: i % 3 === 0 ? 'rentas' : (i % 3 === 1 ? 'remodelacion' : 'fix-flip'),
+        estado: 'activo', proceso: `Responsabilidad ${i + 1}`,
+      }))));
+    window.JV.audit = [];
+    window.JV.vaultSel = null;
+    document.getElementById('os-root').innerHTML = `<div class="jv"><main class="jv-main">${jvVaultGraphView()}</main></div>`;
+    const canvas = document.querySelector('.jv-vcanvas').getBoundingClientRect();
+    const panel = document.querySelector('.jv-vpanel').getBoundingClientRect();
+    const hiddenLabels = [...document.querySelectorAll('.jv-vlabel')].filter(node => getComputedStyle(node).opacity === '0').length;
+    const groups = document.querySelectorAll('.jv-vgroup-label').length;
+    const firstAgent = document.querySelector('.jv-vnode[data-nid^="agent-"]');
+    firstAgent.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return {
+      panelOutsideCanvas: canvas.right <= panel.left + 1,
+      hiddenLabels,
+      groups,
+      selectedByKeyboard: firstAgent.classList.contains('sel'),
+      nodeCount: document.querySelectorAll('.jv-vnode').length,
+    };
+  });
+  assert.equal(vaultLayout.panelOutsideCanvas, true, 'El inspector no debe invadir el mapa en escritorio');
+  assert.equal(vaultLayout.groups, 6, 'El mapa debe separar visualmente las seis capas');
+  assert.ok(vaultLayout.hiddenLabels >= 40, 'Las etiquetas de detalle deben aparecer progresivamente');
+  assert.equal(vaultLayout.selectedByKeyboard, true, 'Los nodos deben poder inspeccionarse con teclado');
+  assert.equal(vaultLayout.nodeCount, 50, 'El rediseño no debe ocultar nodos reales');
+  if (process.env.JARVIS_VISUAL_DIR) {
+    await page.screenshot({ path: path.join(process.env.JARVIS_VISUAL_DIR, 'memoria-escritorio.png'), fullPage: true });
+  }
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  const mobileVault = await page.evaluate(() => {
+    const canvas = document.querySelector('.jv-vcanvas').getBoundingClientRect();
+    const panel = document.querySelector('.jv-vpanel').getBoundingClientRect();
+    return { panelBelowCanvas: panel.top >= canvas.bottom - 1, canvasHeight: canvas.height, pageWidth: document.documentElement.scrollWidth };
+  });
+  assert.equal(mobileVault.panelBelowCanvas, true, 'En móvil el inspector debe quedar debajo del mapa');
+  assert.ok(mobileVault.canvasHeight >= 460, 'El mapa móvil debe conservar un área útil de exploración');
+  if (process.env.JARVIS_VISUAL_DIR) {
+    await page.screenshot({ path: path.join(process.env.JARVIS_VISUAL_DIR, 'memoria-movil.png'), fullPage: true });
+  }
+
   console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
   console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
   console.log('OK 4/4 clasificación ejecutiva: lista, vencida, alto riesgo y escalamiento sin mezclar evidencia pendiente.');
   console.log('OK 8/8 paquetes financieros: responsable, impacto, soporte, verificación y corrida limpia obligatoria.');
   console.log('OK 4/4 traspasos verificables: origen, destino, respaldo y escalamiento con SLA.');
+  console.log('OK 7/7 memoria visual: capas separadas, inspector externo, detalle progresivo, teclado, nodos completos y adaptación móvil.');
 } finally {
   await browser.close();
 }

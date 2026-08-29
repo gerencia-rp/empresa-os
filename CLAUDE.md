@@ -1021,6 +1021,8 @@ Cuando arranques una sesión en este repo:
 
 ## Liberación operativa Jarvis — 29 Ago 2026
 
+- Rediseño local de Memoria compartida (29 Ago 2026, pendiente de aprobación/deploy): el grafo conserva todos los nodos y conexiones reales, pero separa las seis capas en grupos legibles, mueve el inspector fuera del lienzo y revela nombres de agentes al explorar. Empresas y fuentes quedan en carriles propios; escritorio y móvil comparten el mismo mapa completo y la selección funciona con teclado. No cambia datos, estados ni cálculos.
+
 - Las cinco migraciones de control financiero, cobertura humana/empresarial y salud efectiva de automatizaciones fueron aplicadas de forma dirigida al proyecto canónico `flipping-rentals`; no se ejecutó un `db push` general sobre el historial divergente.
 - Se publicaron las funciones endurecidas de ClickUp, cierres/reportes de Property Management, QuickBooks, Remodelación y emisores WhatsApp conservando su contrato de autenticación previo.
 - `whatsapp-webhook` permanece deliberadamente sin publicar: falta `META_APP_SECRET` y una prueba firmada real. No presentar esta retención de seguridad como un fallo resuelto.
