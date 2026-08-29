@@ -73,6 +73,14 @@ if (!/function\s+jvRecoveryPlan\s*\(/.test(source)
 }
 console.log('4/4 bloqueos de continuidad se convierten en un plan ejecutivo sin saltarse los límites humanos.');
 
+if (!/data-jv-nav=/.test(source)
+  || !/__jvDelegatedNavigation/.test(source)
+  || !/closest\('\[data-jv-nav\]'\)/.test(source)
+  || /JV_NAV\.map\([^\n]+onclick=\"jvNav/.test(source)) {
+  throw new Error('La navegación principal de Jarvis todavía depende de handlers inline frágiles.');
+}
+console.log('1/1 navegación principal usa delegación estable y conserva controles accesibles.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',

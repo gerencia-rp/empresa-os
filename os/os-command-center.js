@@ -769,6 +769,15 @@ window.jvFilterLinea = jvFilterLinea;
 function jvFilterClear() { JV.filterLinea = null; JV.tab = 'network'; if (window.osRender) osRender(); }
 window.jvFilterClear = jvFilterClear;
 window.jvNav = jvNav;
+if (!window.__jvDelegatedNavigation) {
+  window.__jvDelegatedNavigation = true;
+  document.addEventListener('click', function (event) {
+    const trigger = event.target && event.target.closest ? event.target.closest('[data-jv-nav]') : null;
+    if (!trigger || !document.getElementById('os-root')?.contains(trigger)) return;
+    event.preventDefault();
+    jvNav(trigger.getAttribute('data-jv-nav') || 'network');
+  });
+}
 
 // ════════════════════════════════════════════════════════════════
 // SHELL
@@ -783,7 +792,7 @@ function jvView() {
 window.jvView = jvView;
 
 function jvSidebar() {
-  const nav = JV_NAV.map(n => '<button type="button" class="' + (JV.tab === n.k ? 'on' : '') + '" onclick="jvNav(\'' + n.k + '\')">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</button>').join('');
+  const nav = JV_NAV.map(n => '<button type="button" class="' + (JV.tab === n.k ? 'on' : '') + '" data-jv-nav="' + n.k + '">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</button>').join('');
   const todos = '<div class="jv-mini jv-mini-all' + (JV.filterLinea == null ? ' on' : '') + '" onclick="jvFilterClear()" style="cursor:pointer"><div class="ic">' + osIcon('list', { size: 13 }) + '</div>Todo el equipo<span class="stt idle" style="visibility:hidden"></span></div>';
   const minis = JV_LINEAS.filter(L => L.linea !== 'Comando' && L.linea.indexOf('Transversal') !== 0 && (JV.agents.some(a => a.linea === L.linea && !jvIsLegacy(a)) || JV_LINEA_PLANNED.includes(L.linea))).map(L => {
     const st = jvLineaStatus(L.linea);
@@ -1119,7 +1128,7 @@ function jvRecoveryPlan() {
   const rows = Object.keys(gates).filter(key => gates[key] && gates[key].ok === false && definitions[key]).map(key => ({ key, gate: gates[key], ...definitions[key] })).sort((a, b) => a.order - b.order);
   if (!rows.length) return '';
   return '<section class="jv-recovery"><div class="jv-recovery-head"><div><div class="jv-eyebrow">Plan de recuperación verificable</div><h2>Qué debe ocurrir para delegar la operación.</h2></div><p>Ordenado por riesgo. Cada frente conserva responsable, evidencia y destino; Jarvis no asigna personas, borra hallazgos ni aprueba dinero por su cuenta.</p></div><div class="jv-recovery-list">'
-    + rows.map((x, i) => '<article class="jv-recovery-row"><span class="jv-recovery-rank">' + String(i + 1).padStart(2, '0') + '</span><div><b>' + OS_E(x.title) + '</b><small>Responsable: ' + OS_E(x.owner) + '</small></div><p>' + OS_E(x.evidence(x.gate)) + '</p><button type="button" onclick="jvNav(\'' + x.tab + '\')">' + OS_E(x.action) + '</button></article>').join('')
+    + rows.map((x, i) => '<article class="jv-recovery-row"><span class="jv-recovery-rank">' + String(i + 1).padStart(2, '0') + '</span><div><b>' + OS_E(x.title) + '</b><small>Responsable: ' + OS_E(x.owner) + '</small></div><p>' + OS_E(x.evidence(x.gate)) + '</p><button type="button" data-jv-nav="' + x.tab + '">' + OS_E(x.action) + '</button></article>').join('')
     + '</div></section>';
 }
 function jvDashboard() {
