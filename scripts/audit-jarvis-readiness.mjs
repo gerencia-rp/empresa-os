@@ -97,6 +97,14 @@ if (!/jv-decision-brief/.test(source)
 }
 console.log('4/4 señales de la cola ejecutiva separan prioridad, riesgo, escalamiento y evidencia pendiente.');
 
+if (!/const\s+packetMap\s*=\s*JV\.financialActions\.reduce/.test(source)
+  || !/Paquetes por responsable/.test(source)
+  || !/Evidencia para cerrar/.test(source)
+  || !/siguiente_accion/.test(source)) {
+  throw new Error('Los hallazgos financieros siguen dispersos y no forman paquetes accionables por responsable.');
+}
+console.log('4/4 reportes financieros agrupan responsable, impacto, evidencia y siguiente acción.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',

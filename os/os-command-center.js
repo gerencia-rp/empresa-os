@@ -1829,6 +1829,29 @@ function jvReportesView() {
         const order = { inmediata: 0, vencida: 1, prioritaria: 2, seguimiento: 3 };
         return (order[a.prioridad_operativa] ?? 9) - (order[b.prioridad_operativa] ?? 9) || Math.abs(Number(b.impacto_usd || 0)) - Math.abs(Number(a.impacto_usd || 0));
       }).slice(0, 20) : (Array.isArray(obj.prioridades) ? obj.prioridades : []);
+      const packetMap = JV.financialActions.reduce((out, item) => {
+        const owner = item.responsable || 'Auditor de Integridad Financiera y Datos';
+        const front = item.frente || 'Control financiero';
+        const key = owner + '|' + front;
+        if (!out[key]) out[key] = { owner, front, items: [], impact: 0, critical: 0, oldest: 0, evidence: item.evidencia_requerida || '' };
+        out[key].items.push(item);
+        out[key].impact += Math.abs(Number(item.impacto_usd || 0));
+        out[key].critical += item.severidad === 'critica' ? 1 : 0;
+        out[key].oldest = Math.max(out[key].oldest, Number(item.dias_abierto || 0));
+        return out;
+      }, {});
+      const packetRows = Object.values(packetMap).sort((a, b) => b.critical - a.critical || b.impact - a.impact).map(packet => {
+        const sample = packet.items.slice().sort((a, b) => Math.abs(Number(b.impacto_usd || 0)) - Math.abs(Number(a.impacto_usd || 0))).slice(0, 3);
+        return '<details class="jv-report-item"><summary><div><h3>' + OS_E(packet.front) + '</h3><div class="report-meta">'
+          + OS_E(packet.owner) + ' · ' + jvNum(packet.items.length) + ' casos · ' + jvMoney(packet.impact)
+          + ' · ' + jvNum(packet.oldest) + ' días máx.</div></div><span class="jv-badge ' + (packet.critical ? 'b-wait' : 'b-ok') + '">'
+          + jvNum(packet.critical) + ' críticos</span></summary><div class="jv-report-body"><div class="jv-review-summary"><b>Evidencia para cerrar</b><span>'
+          + OS_E(packet.evidence || 'Fuente original, corrección confirmada y nueva corrida limpia.') + '</span></div><div class="jv-simple-list">'
+          + sample.map(item => '<div class="jv-simple-row"><div class="jv-av">' + OS_E(item.check_id || 'C') + '</div><div class="body"><b>'
+            + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>' + jvMoney(item.impacto_usd) + ' · Fuente: '
+            + OS_E(item.fuente || 'no declarada') + '</span><span>Acción: ' + OS_E(item.siguiente_accion || 'Validar y conciliar con soporte.')
+            + '</span></div></div>').join('') + '</div></div></details>';
+      }).join('');
       const priorityRows = livePriorities.map((item, index) =>
         '<div class="jv-simple-row"><div class="jv-av">' + OS_E(String(item.prioridad || index + 1)) + '</div><div class="body"><b>'
         + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>'
@@ -1850,6 +1873,7 @@ function jvReportesView() {
         + '<div class="jv-kpi"><div class="n">' + jvMoney(kpis.impacto_critico_usd) + '</div><div class="l">impacto señalado</div></div>'
         + '<div class="jv-kpi"><div class="n">' + jvNum(kpis.antiguedad_max_dias) + ' días</div><div class="l">antigüedad máxima</div></div></div>'
         + '<div class="jv-section-title" style="margin-top:18px">Frentes de trabajo</div><div class="jv-detail-list">' + fronts + '</div>'
+        + '<div class="jv-section-title" style="margin-top:18px">Paquetes por responsable</div><div class="jv-report-list">' + (packetRows || '<div class="jv-empty">No hay paquetes financieros abiertos.</div>') + '</div>'
         + '<div class="jv-section-title" style="margin-top:18px">Prioridades verificadas</div><div class="jv-simple-list">' + priorityRows + '</div>'
         + '<div class="jv-needs-info" style="margin-top:14px">' + OS_E(obj.limite || 'Solo observación; requiere soporte antes de corregir.') + '</div>';
     }

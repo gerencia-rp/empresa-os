@@ -99,10 +99,33 @@ try {
   assert.match(decisionTriage, /Esperando nueva evidencia\s+2/i);
   assert.match(decisionTriage, /Falta información concreta/i);
 
+  const financialPackets = await page.evaluate(() => {
+    window.JV.reportArea = 'Todas';
+    window.JV.reports = [{
+      tipo: 'triage_excepciones_financieras', titulo: 'Prioridades financieras', estado: 'borrador',
+      corte: '2026-08-29', generado_por: 'Auditor de Integridad Financiera y Datos',
+      payload: { resumen: '3 alertas requieren evidencia.', kpis: { criticos: 2, impacto_critico_usd: 170000, antiguedad_max_dias: 12 }, hallazgos_por_frente: [] },
+    }];
+    window.JV.financialActions = [
+      { check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar A', fuente: 'Airtable FF', impacto_usd: 100000, severidad: 'critica', dias_abierto: 12, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
+      { check_id: 'C11', frente: 'Fondos de obra y cobros', responsable: 'Financiero Fix & Flip + Financiero Remodelación', titulo: 'Draw sin conciliar B', fuente: 'Airtable FF', impacto_usd: 70000, severidad: 'critica', dias_abierto: 8, evidencia_requerida: 'Draw statement y factura.', siguiente_accion: 'Conciliar por propiedad.' },
+      { check_id: 'C4', frente: 'Cartera y cobranza', responsable: 'Financiero Rentas', titulo: 'Saldo por verificar', fuente: 'ledger', impacto_usd: 3000, severidad: 'media', dias_abierto: 4, evidencia_requerida: 'Ledger y pagos aplicados.', siguiente_accion: 'Validar saldo neto.' },
+    ];
+    document.getElementById('os-root').innerHTML = jvReportesView();
+    const report = document.querySelector('.jv-report-item');
+    if (report) report.open = true;
+    return document.getElementById('os-root').innerText;
+  });
+  assert.match(financialPackets, /Paquetes por responsable/i);
+  assert.match(financialPackets, /Fondos de obra y cobros/i);
+  assert.match(financialPackets, /2 casos/i);
+  assert.match(financialPackets, /Draw statement y factura/i);
+
   console.log(`OK ${routes.length + 1}/${routes.length + 1} navegación real: ${routes.length} vistas principales + destino del plan de recuperación.`);
   console.log('OK 4/4 compuertas fallidas: orden, responsable y evidencia legible.');
   console.log('OK 3/3 seguridad de decisiones: metadatos bloqueados, evidencia sustantiva permitida, evidencia vencida bloqueada.');
   console.log('OK 4/4 clasificación ejecutiva: lista, vencida, alto riesgo y escalamiento sin mezclar evidencia pendiente.');
+  console.log('OK 4/4 paquetes financieros: responsable, casos, impacto y evidencia requerida.');
 } finally {
   await browser.close();
 }
