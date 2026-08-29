@@ -55,6 +55,14 @@ if (!/lunes\|martes\|mi\[eé\]rcoles\|jueves\|viernes/.test(source)) {
 }
 console.log('1/1 frescura visual reconoce días semanales sin relajar la evidencia operativa.');
 
+if (!/function\s+jvSystemPosture\s*\(/.test(source)
+  || !/continuidad_ausencia_6_meses/.test(source)
+  || /todo bajo control/.test(source)
+  || !/Operación con atención/.test(source)) {
+  throw new Error('El encabezado de Jarvis puede presentar una operación no certificada como si estuviera completamente sana.');
+}
+console.log('1/1 encabezado ejecutivo refleja la certificación real y no maquilla compuertas pendientes.');
+
 const requiredControls = [
   'run_business_continuity_review',
   'run_operational_role_review',

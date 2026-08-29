@@ -52,6 +52,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - La validación SQL de producción terminó correctamente. `salud_automatizaciones` está saludable; `salud_integraciones` permanece en atención y `continuidad_ausencia_6_meses` permanece `no_listo`, sin falsos verdes.
 - Seguimiento de cola: Financiero Rentas ahora reconcilia también el conjunto completo de alertas de servicios. La corrida productiva encontró y refrescó 11/11; no retiró ninguna porque todas siguen presentes en la fuente.
 - Corrección de representación: los horarios semanales expresados mediante el nombre del día ya no se evalúan con una ventana diaria. `Reportes Remodelación` tenía cron exitoso y evidencia del miércoles, pero la interfaz lo mostraba 6/7 después de 72 horas; la cadencia visual ahora coincide con el control semanal real.
+- Veracidad ejecutiva: el encabezado de Jarvis ya no afirma “todo bajo control” mientras la certificación de continuidad esté incompleta. Ahora muestra el número real de compuertas aprobadas y cambia a estado ámbar cuando existen controles pendientes.
 
 ## Secuencia de publicación
 

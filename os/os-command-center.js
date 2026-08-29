@@ -364,6 +364,7 @@ function jvCSS() {
     '#os-root .jv-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}',
     '#os-root .jv-op{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--jc-grn);border:1px solid rgba(52,211,153,.25);padding:5px 11px;border-radius:20px}',
     '#os-root .jv-op .d{width:6px;height:6px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 6px var(--jc-grn);animation:jvpulse 1.8s infinite}',
+    '#os-root .jv-op.attention{color:var(--jc-amber);border-color:rgba(233,174,76,.34);background:rgba(233,174,76,.055)}#os-root .jv-op.attention .d{background:var(--jc-amber);box-shadow:0 0 7px rgba(233,174,76,.72);animation:none}',
     '@keyframes jvpulse{0%,100%{opacity:1}50%{opacity:.35}}',
     '#os-root .jv-eyebrow{font-size:10px;letter-spacing:.24em;color:var(--jc-mut);text-transform:uppercase}',
     '#os-root .jv-lead{font-size:13.5px;color:var(--jc-mut);margin:3px 0 22px}',
@@ -500,6 +501,7 @@ function jvCSS() {
     '#os-root .jv-hi{font-size:23px;font-weight:700;letter-spacing:-.01em}',
     '#os-root .jv-hi span{color:var(--jc-cyan)}',
     '#os-root .jv-hud-date{font-size:12px;color:var(--jc-mut);margin-top:3px}',
+    '#os-root .jv-hud-date.attention{color:var(--jc-amber)}',
     '#os-root .jv-clock{text-align:right}',
     '#os-root .jv-clock .t{font-size:25px;font-weight:700;font-variant-numeric:tabular-nums}',
     '#os-root .jv-clock .w{font-size:11px;color:var(--jc-mut)}',
@@ -790,9 +792,20 @@ function jvSidebar() {
     + '<nav class="jv-nav">' + nav + '</nav>'
     + '<div class="jv-lbl">Áreas</div>' + todos + minis + '</aside>';
 }
+function jvSystemPosture() {
+  const report = JV.reports.find(r => r.tipo === 'continuidad_ausencia_6_meses');
+  const payload = report && report.payload && typeof report.payload === 'object' ? report.payload : null;
+  const passed = payload ? Number(payload.compuertas_aprobadas || 0) : 0;
+  const total = payload ? Number(payload.compuertas_totales || 8) : 8;
+  const ready = !!payload && payload.estado === 'listo' && passed === total;
+  if (ready) return { ready: true, label: 'Operación verificada', detail: passed + ' de ' + total + ' controles aprobados' };
+  if (payload) return { ready: false, label: 'Operación con atención', detail: passed + ' de ' + total + ' controles aprobados · ' + Math.max(0, total - passed) + ' requieren atención' };
+  return { ready: false, label: 'Verificación pendiente', detail: 'Todavía no existe una certificación reciente de continuidad' };
+}
 function jvTopBar() {
   const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-  return '<div class="jv-top"><div class="jv-eyebrow">Rental Profitss · Agentic OS</div><div class="jv-op"><span class="d"></span> Sistema Operativo · ' + now + '</div></div>';
+  const posture = jvSystemPosture();
+  return '<div class="jv-top"><div class="jv-eyebrow">Rental Profitss · Agentic OS</div><div class="jv-op' + (posture.ready ? '' : ' attention') + '" title="' + OS_E(posture.detail) + '"><span class="d"></span> ' + OS_E(posture.label) + ' · ' + now + '</div></div>';
 }
 function jvTabBody() {
   switch (JV.tab) {
@@ -1354,7 +1367,8 @@ function jvHudHeader() {
   const d = new Date();
   const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Chicago' });
   const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Chicago' });
-  return '<div class="jv-hud-hdr"><div><div class="jv-hi">Buen día, <span>' + OS_E(jvGreetName()) + '</span> 👋</div><div class="jv-hud-date">' + OS_E(fecha.charAt(0).toUpperCase() + fecha.slice(1)) + ' · todo bajo control</div></div>'
+  const posture = jvSystemPosture();
+  return '<div class="jv-hud-hdr"><div><div class="jv-hi">Buen día, <span>' + OS_E(jvGreetName()) + '</span></div><div class="jv-hud-date' + (posture.ready ? '' : ' attention') + '">' + OS_E(fecha.charAt(0).toUpperCase() + fecha.slice(1)) + ' · ' + OS_E(posture.detail) + '</div></div>'
     + '<div class="jv-clock"><div class="t" id="jv-clock">' + hora + '</div><div class="w">Austin, TX</div></div></div>';
 }
 function jvClockStart() {
