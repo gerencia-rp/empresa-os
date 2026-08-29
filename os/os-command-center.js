@@ -96,7 +96,7 @@ function jvAgentLastRun(a) {
 function jvFreshnessDays(a) {
   const schedule = jvScheduleText(a).toLowerCase();
   if (/mensual|monthly|d[ií]a 1|cada mes/.test(schedule)) return 40;
-  if (/semanal|weekly|cada semana/.test(schedule)) return 10;
+  if (/semanal|weekly|cada semana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo/.test(schedule)) return 10;
   if (/quincenal|cada 15/.test(schedule)) return 20;
   if (/on-demand|bajo demanda|nicol[aá]s pide/.test(schedule)) return 30;
   return 3;

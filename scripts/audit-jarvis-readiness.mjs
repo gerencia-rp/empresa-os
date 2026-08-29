@@ -50,6 +50,10 @@ if (failures.length) {
   console.error(JSON.stringify(failures, null, 2));
   process.exit(1);
 }
+if (!/lunes\|martes\|mi\[eé\]rcoles\|jueves\|viernes/.test(source)) {
+  throw new Error('Jarvis trata horarios semanales escritos con el día de la semana como si fueran diarios.');
+}
+console.log('1/1 frescura visual reconoce días semanales sin relajar la evidencia operativa.');
 
 const requiredControls = [
   'run_business_continuity_review',

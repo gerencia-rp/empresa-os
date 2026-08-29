@@ -51,6 +51,7 @@ Superficie web: Jarvis, motor de cierre y Sabueso.
 - Las rutas sensibles probadas sin sesión respondieron `401`: ClickUp, QuickBooks, Remodelación, WhatsApp y cierre diario.
 - La validación SQL de producción terminó correctamente. `salud_automatizaciones` está saludable; `salud_integraciones` permanece en atención y `continuidad_ausencia_6_meses` permanece `no_listo`, sin falsos verdes.
 - Seguimiento de cola: Financiero Rentas ahora reconcilia también el conjunto completo de alertas de servicios. La corrida productiva encontró y refrescó 11/11; no retiró ninguna porque todas siguen presentes en la fuente.
+- Corrección de representación: los horarios semanales expresados mediante el nombre del día ya no se evalúan con una ventana diaria. `Reportes Remodelación` tenía cron exitoso y evidencia del miércoles, pero la interfaz lo mostraba 6/7 después de 72 horas; la cadencia visual ahora coincide con el control semanal real.
 
 ## Secuencia de publicación
 
