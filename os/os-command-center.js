@@ -301,6 +301,7 @@ const JV_NAV = [
   { k: 'horarios', ic: 'clock', t: 'Horarios' },
   { k: 'vault', ic: 'library', t: 'Memoria compartida' },
   { k: 'reportes', ic: 'chart', t: 'Reportes' },
+  { k: 'manual', ic: 'briefcase', t: 'Manual operativo' },
 ];
 const JV_EMPRESAS = [
   { area: 'fix-flip', name: 'Fix & Flip', icon: 'construction' },
@@ -785,7 +786,7 @@ async function jvLoad(force) {
   if (window.osRender) osRender();
 }
 window.jvLoad = jvLoad;
-function jvNav(tab) { JV.tab = tab; if (window.osRender) osRender(); }
+function jvNav(tab) { JV.tab = tab; if (tab === 'manual' && window.opmLoad) opmLoad(); if (window.osRender) osRender(); }
 // Filtro del Mapa de Agentes por escuadra/línea (sidebar "Escuadras")
 function jvFilterLinea(linea) { JV.filterLinea = (JV.filterLinea === linea) ? null : linea; JV.tab = 'network'; if (window.osRender) osRender(); }
 window.jvFilterLinea = jvFilterLinea;
@@ -850,6 +851,7 @@ function jvTabBody() {
     case 'horarios': return jvHorariosView();
     case 'vault': return jvVaultGraphView();
     case 'reportes': return jvReportesView();
+    case 'manual': return window.opmView ? opmView() : '<div class="jv-empty">Manual operativo no disponible.</div>';
     default: return jvMapaView();
   }
 }

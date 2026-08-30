@@ -15,12 +15,13 @@ try {
   await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
   await page.setContent('<!doctype html><html><head></head><body><div id="os-root"></div><output id="render-state"></output></body></html>');
   await page.evaluate(() => {
-    window.state = { role: 'admin', user: { email: 'qa@example.com' } };
+    window.state = { role: 'admin', user: { id: 'user-qa', email: 'qa@example.com' } };
     window.osIcon = name => `<span data-icon="${name}"></span>`;
     window.OS_E = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   });
+  await page.addScriptTag({ path: path.join(root, 'os/os-operating-manual.js') });
   await page.addScriptTag({ path: path.join(root, 'os/os-command-center.js') });
-  await page.evaluate(() => jvCSS());
+  await page.evaluate(() => { jvCSS(); window.OPM.loaded = true; });
 
   const initial = await page.evaluate(() => {
     window.osRender = () => { document.getElementById('render-state').textContent = window.JV.tab; };
@@ -29,7 +30,7 @@ try {
   });
   assert.equal(initial, 'network', 'Jarvis debe iniciar en el organigrama');
 
-  const routes = ['network', 'command', 'work', 'propuestas', 'horarios', 'vault', 'reportes'];
+  const routes = ['network', 'command', 'work', 'propuestas', 'horarios', 'vault', 'reportes', 'manual'];
   for (const route of routes) {
     await page.click(`[data-jv-nav="${route}"]`);
     assert.equal(await page.$eval('#render-state', node => node.textContent), route, `${route} debe cambiar el estado y renderizar`);
