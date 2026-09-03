@@ -412,5 +412,82 @@ else if (typeof globalThis !== 'undefined') globalThis.HORIZONTES = [3, 5, 8];
     return out;
   }
 
-  return { run, PMT, NPV, IRR, amortizacion, escenario, movsPorMes, pnlSi, mesEs, drawsFromMovs };
+
+  // ═══ 📋 LISTA "TODOS LOS MOVIMIENTOS" agrupada por mes — UNA SOLA DEFINICIÓN ═══
+  // La usan el Ledger del admin (os/inv-admin.js) y el Flujo Mensual del portal
+  // (os/inv-portal.js): si cambia acá, cambian las dos vistas juntas.
+  // ⚠ NO recalcula NADA de negocio: recibe las filas YA filtradas y YA con su `acum`
+  // (saldo) calculado en orden cronológico real. Solo agrupa, ordena y suma montos que
+  // ya existen. El saldo de cada fila viaja con la fila: reordenar no lo toca.
+  function movsGrupos(rows, mesFn) {
+    const mes = mesFn || (m => String(m.mes || String(m.fecha || '').slice(0, 7)));
+    const map = {};
+    (rows || []).forEach(m => {
+      const ym = mes(m) || 'sin-fecha';
+      const g = map[ym] || (map[ym] = { ym, items: [], ing: 0, gas: 0, capIn: 0, capOut: 0 });
+      g.items.push(m);
+      const v = Math.abs(+m.monto || 0), esIng = m.tipo === 'ingreso';
+      // Ingresos/Gastos/Neto del encabezado = SOLO lo que mueve el saldo (P&L SI, misma regla
+      // pnlSi del resto del sistema). Lo que es capital (draw, cash-out, aporte, compra,
+      // distribucion) se declara aparte y NUNCA se mezcla en el neto: mezclarlo contradiria
+      // el "Detalle anio -> mes" y el Saldo de caja del periodo.
+      if (pnlSi(m.categoria)) { if (esIng) g.ing += v; else g.gas += v; }
+      else if (esIng) g.capIn += v; else g.capOut += v;
+    });
+    const fdesc = (a, b) => String(b.fecha || '').localeCompare(String(a.fecha || ''));
+    return Object.keys(map).sort().reverse().map(ym => {
+      const g = map[ym];
+      // dentro del mes: PRIMERO los ingresos, DEBAJO los gastos; cada subgrupo por fecha desc
+      g.items = g.items.filter(m => m.tipo === 'ingreso').sort(fdesc)
+        .concat(g.items.filter(m => m.tipo !== 'ingreso').sort(fdesc));
+      g.neto = g.ing - g.gas;
+      return g;
+    });
+  }
+  // esta abierto este mes? sin estado explicito: solo el mas reciente (i === 0)
+  function movsAbierto(st, ym, i) { const v = (st || {})[ym]; return v === undefined ? i === 0 : !!v; }
+  // Expandir / Colapsar todo: fija el estado de TODOS los meses visibles
+  function movsSetTodos(st, rows, mesFn, abrir) {
+    movsGrupos(rows, mesFn).forEach(g => { st[g.ym] = !!abrir; });
+    return st;
+  }
+  // Render de la tabla agrupada. `o` trae lo propio de cada vista (escape, formato de
+  // plata, encabezados y el <tr> de cada fila); la logica de agrupar/ordenar/sumar/abrir
+  // es la misma para las dos.
+  function movsTabla(rows, o) {
+    o = o || {};
+    const esc = o.esc || (s => String(s == null ? '' : s));
+    const money = o.money || (v => String(v));
+    const $ = v => (v < 0 ? '−' : '') + money(Math.abs(v)); // signo propio: no depende del formateador de cada vista
+    const grupos = movsGrupos(rows, o.mes);
+    const st = o.abierto || {};
+    const ths = o.ths || [];
+    const nCols = ths.length || 6;
+    if (!grupos.length) return o.vacio || '';
+    const barra = o.toggleAllFn
+      ? '<div style="display:flex;gap:6px;justify-content:flex-end;margin-bottom:8px;flex-wrap:wrap">'
+        + '<button class="' + (o.btnClass || 'ibtn') + '" onclick="' + o.toggleAllFn + '(true)">Expandir todo</button>'
+        + '<button class="' + (o.btnClass || 'ibtn') + '" onclick="' + o.toggleAllFn + '(false)">Colapsar todo</button></div>'
+      : '';
+    const cuerpo = grupos.map((g, i) => {
+      const open = movsAbierto(st, g.ym, i);
+      const cap = (g.capIn || g.capOut)
+        ? ' <span style="opacity:.65;font-size:11px" title="movimientos de capital/financiamiento del mes (draw, cash-out, aporte, compra, distribucion): P&amp;L NO — no entran al neto ni mueven el saldo">· capital '
+          + (g.capIn ? '+' + money(g.capIn) : '') + (g.capIn && g.capOut ? ' / ' : '') + (g.capOut ? '−' + money(g.capOut) : '') + ' (P&amp;L NO)</span>'
+        : '';
+      const head = '<tr onclick="' + o.toggleFn + '(\'' + g.ym + '\')" style="cursor:pointer">'
+        + '<td colspan="' + nCols + '" style="background:var(--glass);border-top:1px solid var(--glassb)">'
+        + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
+        + '<b style="font-size:13px">' + (open ? '▾' : '▸') + ' ' + esc(mesEs(g.ym)) + ' <span style="font-weight:500;opacity:.6;font-size:11px">· ' + g.items.length + (g.items.length === 1 ? ' movimiento' : ' movimientos') + '</span></b>'
+        + '<span style="font-variant-numeric:tabular-nums;font-size:12px">Ingresos <b style="color:var(--pos)">' + money(g.ing) + '</b>'
+        + ' · Gastos <b style="color:var(--neg)">−' + money(g.gas) + '</b>'
+        + ' · Neto <b style="color:' + (g.neto >= 0 ? 'var(--pos)' : 'var(--neg)') + '">' + $(g.neto) + '</b>' + cap + '</span>'
+        + '</div></td></tr>';
+      return head + (open ? g.items.map(o.row).join('') : '');
+    }).join('');
+    return barra + '<div class="overx"><table' + (o.tableClass ? ' class="' + o.tableClass + '"' : '') + '><thead><tr>'
+      + ths.join('') + '</tr></thead><tbody>' + cuerpo + '</tbody></table></div>';
+  }
+
+  return { run, PMT, NPV, IRR, amortizacion, escenario, movsPorMes, pnlSi, mesEs, drawsFromMovs, movsGrupos, movsAbierto, movsSetTodos, movsTabla };
 });

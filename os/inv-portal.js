@@ -11,7 +11,7 @@
 // ════════════════════════════════════════════════════════════════
 
 const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
-const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'ruta', rutaEtapa: null, myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [], viewOnly: false, ver: null, verNombre: '', verList: [] };
+const IP = { holdings: [], params: {}, cashflow: {}, docs: {}, casa: null, charts: [], email: '', tab: 'ruta', rutaEtapa: null, myIds: [], dists: [], msgs: [], chat: [], ledger: {}, ledgerF: { tipo: 'todos', mes: 'todos' }, anio: 'todos', anioOpen: {}, mesOpen: {}, docQ: '', docTipo: 'todos', proj: [], infoDefs: {}, resumen: [], viewOnly: false, ver: null, verNombre: '', verList: [] };
 window.IP = IP;
 
 const $money = v => (v == null || isNaN(+v)) ? '—' : (+v < 0 ? '−$' : '$') + Math.abs(Math.round(+v)).toLocaleString('en-US');
@@ -1103,6 +1103,15 @@ function ipSetAnio(v) { IP.anio = v; render(); }
 window.ipSetAnio = ipSetAnio;
 function ipToggleAnio(y) { IP.anioOpen[y] = !IP.anioOpen[y]; render(); }
 window.ipToggleAnio = ipToggleAnio;
+// ── acordeón por mes de "Todos los movimientos" (misma definición que el Ledger del admin:
+// invEngine.movsTabla). MES del dinero = mes contable del ledger, igual que el resto del flujo.
+const ipMesDe = m => String(m.mes || String(m.fecha || '').slice(0, 7));
+function ipToggleMes(ym) { IP.mesOpen[ym] = !invEngine.movsAbierto(IP.mesOpen, ym, ipMesIdx(ym)); render(); }
+window.ipToggleMes = ipToggleMes;
+// índice del mes dentro de los grupos visibles (para saber si hoy está abierto por default)
+function ipMesIdx(ym) { return (IP._movsYms || []).indexOf(ym); }
+function ipMesTodos(abrir) { invEngine.movsSetTodos(IP.mesOpen, IP._movsRows || [], ipMesDe, abrir); render(); }
+window.ipMesTodos = ipMesTodos;
 
 function renderFlujo(pid, inv) {
   const led = IP.ledger[pid];
@@ -1208,6 +1217,8 @@ function renderFlujo(pid, inv) {
   const mesesAll = [...new Set(led.map(m => mesDe(m)))].filter(x => /^\d{4}-\d{2}$/.test(x)).sort().reverse();
   const LF = IP.ledgerF;
   const rows = full.filter(m => (LF.tipo === 'todos' || m.tipo === LF.tipo) && (LF.mes === 'todos' || mesDe(m) === LF.mes));
+  // lo que ve el acordeón (ya filtrado) — lo usa "Expandir/Colapsar todo" y el default del mes más reciente
+  IP._movsRows = rows; IP._movsYms = invEngine.movsGrupos(rows, ipMesDe).map(g => g.ym);
   const srcTag = f => '<span class="src' + (/manual/.test(f) ? ' sup' : '') + '" title="' + esc(f) + '">' + esc(String(f).split(':')[0]) + '</span>';
   const sel = (campo, opts, cur) => '<select class="ibtn" style="padding:7px 10px" onchange="ipLedgerF(\'' + campo + '\', this.value)">' + opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
 
@@ -1218,19 +1229,25 @@ function renderFlujo(pid, inv) {
     + sel('tipo', [['todos', 'Todos'], ['ingreso', '↑ Ingresos'], ['gasto', '↓ Gastos']], LF.tipo)
     + sel('mes', [['todos', 'Todos los meses']].concat(mesesAll.map(m => [m, invEngine.mesEs(m)])), LF.mes)
     + '</div></div>'
-    + '<div class="overx"><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right" title="acumulado de la caja de la casa: renta − gastos operativos − servicio de deuda. El pago del HML/refi SÍ lo baja; draws, cash-out y distribuciones no lo mueven (son capital).">Saldo de caja ⓘ</th><th>Fuente</th></tr></thead><tbody>'
-    // las filas de SERVICIO DE DEUDA se ven a plena luz y desde el 27-ago-2026 BAJAN el saldo
-    // (categoria 'operativo'). En tenue queda solo lo que NO es gasto del mes: draws, cash-out,
-    // aportes de capital, distribuciones y la compra (P&L NO).
-    + rows.slice().reverse().map(m => '<tr' + (m.pnl || m.deu ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
-      + '<td>' + esc(m.concepto)
-      + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — resta del mes y baja el saldo, igual que un utility. Se muestra aparte del NOI, que mide la casa antes de la deuda.">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
-      + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">' + osIcon('paperclip') + '</a>' : '') + '</td>'
-      + '<td>' + esc(m.categoria) + '</td>'
-      + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
-      + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO (capital, no gasto del mes): repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
-      + '<td>' + srcTag(m.fuente) + '</td></tr>').join('')
-    + '</tbody></table></div>'
+    + invEngine.movsTabla(rows, {
+      esc: esc, money: $money, mes: ipMesDe, abierto: IP.mesOpen,
+      toggleFn: 'ipToggleMes', toggleAllFn: 'ipMesTodos', btnClass: 'ibtn',
+      vacio: '<div class="empty" style="padding:18px">Nada coincide con los filtros elegidos.</div>',
+      ths: ['<th>Fecha</th>', '<th>Concepto</th>', '<th>Categoría</th>', '<th style="text-align:right">Monto</th>',
+        '<th style="text-align:right" title="acumulado de la caja de la casa: renta − gastos operativos − servicio de deuda. El pago del HML/refi SÍ lo baja; draws, cash-out y distribuciones no lo mueven (son capital). Se calcula en orden cronológico real: agrupar por mes no lo altera.">Saldo de caja ⓘ</th>',
+        '<th>Fuente</th>'],
+      // las filas de SERVICIO DE DEUDA se ven a plena luz y desde el 27-ago-2026 BAJAN el saldo
+      // (categoria 'operativo'). En tenue queda solo lo que NO es gasto del mes: draws, cash-out,
+      // aportes de capital, distribuciones y la compra (P&L NO).
+      row: m => '<tr' + (m.pnl || m.deu ? '' : ' style="opacity:.55"') + '><td style="white-space:nowrap">' + esc(m.fecha) + '</td>'
+        + '<td>' + esc(m.concepto)
+        + (m.deu ? ' <span class="src" title="interés del HML / cuota de la refi — resta del mes y baja el saldo, igual que un utility. Se muestra aparte del NOI, que mide la casa antes de la deuda.">🏦 servicio de deuda</span>' : (m.pnl ? '' : ' <span class="src sup" title="informativo — no afecta balance operativo">P&L NO</span>'))
+        + (m.comprobante ? ' <a href="' + esc(m.comprobante) + '" target="_blank" style="color:var(--a2)">' + osIcon('paperclip') + '</a>' : '') + '</td>'
+        + '<td>' + esc(m.categoria) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap" class="' + (m.tipo === 'ingreso' ? 'up' : 'down') + '">' + (m.tipo === 'ingreso' ? '+' : '−') + $money(m.monto) + '</td>'
+        + '<td style="text-align:right;white-space:nowrap;color:' + (m.acum >= 0 ? 'var(--pos)' : 'var(--neg)') + '"' + (m.pnl ? '' : ' title="P&L NO (capital, no gasto del mes): repite el saldo anterior"') + '>' + $money(m.acum) + '</td>'
+        + '<td>' + srcTag(m.fuente) + '</td></tr>'
+    })
     + '<div class="meta" style="margin-top:10px">Cada movimiento declara su fuente (FF = Fix &amp; Flip · Rentas = property management · OS = registro del holding). El detalle es de la casa completa; tu parte de la utilidad es el ' + $pct(inv) + '. Los draws vienen agregados (la fuente no fecha draw por draw).</div>'
     + '</div>';
 }

@@ -1088,6 +1088,17 @@ async function iaLoadLedger(pid) {
   IA.ledgerCache[pid] = error ? { err: error.message } : (data || []);
   osRender();
 }
+// ── acordeón por mes de la lista de movimientos (MISMA definición que el portal:
+// invEngine.movsTabla). El Ledger del admin agrupa por `fecha` (igual que su filtro de
+// período), no por mes contable — divergencia PRE-EXISTENTE declarada, no se toca acá.
+const iaMesDe = m => String(m.fecha || "").slice(0, 7);
+IA.mesOpen = IA.mesOpen || {};
+function iaMesIdx(ym) { return (IA._movsYms || []).indexOf(ym); }
+function iaToggleMes(ym) { IA.mesOpen[ym] = !invEngine.movsAbierto(IA.mesOpen, ym, iaMesIdx(ym)); osRender(); }
+window.iaToggleMes = iaToggleMes;
+function iaMesTodos(abrir) { invEngine.movsSetTodos(IA.mesOpen, IA._movsRows || [], iaMesDe, abrir); osRender(); }
+window.iaMesTodos = iaMesTodos;
+
 function iaTabLedger() {
   const casas = [...new Set(IA.holdings.map(h => h.property_id))];
   if (!casas.includes(IA.casa)) IA.casa = casas[0];
@@ -1120,6 +1131,8 @@ function iaTabLedger() {
       + "</optgroup>").join("")
     + "</select>";
   const vis = full.filter(m => mf === "todos" || String(m.fecha || "").startsWith(mf));
+  // lo que ve el acordeón (ya filtrado) — lo usan "Expandir/Colapsar todo" y el default
+  IA._movsRows = vis; IA._movsYms = invEngine.movsGrupos(vis, iaMesDe).map(g => g.ym);
   const saldoPer = vis.filter(m => m.pnl).reduce((s2, m) => s2 + (m.tipo === "ingreso" ? 1 : -1) * (+m.monto || 0), 0);
   // 🔴 SERVICIO DE DEUDA (interés HML + cuota refi 30a) — marcado en el motor con
   // subcategoria='servicio_deuda'. Desde el 27-ago-2026 es categoria 'operativo' → P&L SÍ:
@@ -1146,11 +1159,19 @@ function iaTabLedger() {
       + iaSubtGuia(cats) + subt + "</div>"
     + "<div class=\"card\"><div class=\"chart-h\"><div class=\"t\">Fuentes</div></div>"
     + Object.entries(vis.reduce((a, m) => { a[m.fuente] = (a[m.fuente] || 0) + 1; return a; }, {})).map(([f, n]) => "<div class=\"kv\"><span>" + OS_E(f) + "</span><b>" + n + " movs</b></div>").join("") + "</div></div>"
-    + "<div class=\"card overx\" style=\"margin-top:14px\"><table class=\"ptable\"><thead><tr><th>Fecha</th><th>Concepto</th><th title=\"P&L SÍ (renta/ingreso/operativo/tax) mueve el saldo; P&L NO (inversión/financiero/distribución) es informativo\" style=\"cursor:help\">Cat.</th><th style=\"text-align:right\">Monto</th><th style=\"text-align:right\" title=\"acumulado de los movimientos P&L SÍ; las filas P&L NO repiten el saldo anterior\" >Saldo operativo</th><th title=\"de dónde salió el dato: FF = Fix&amp;Flip · Rentas = property management · OS = cargado a mano\" style=\"cursor:help\">Fuente ⓘ</th></tr></thead><tbody>"
-    + vis.slice().reverse().map(m => "<tr" + (m.pnl ? "" : " style=\"opacity:.55\"") + "><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.pnl ? "" : " " + tagNo) + (esDeuda(m) ? " " + tagDeuda : "") + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
-      + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
-      + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\"" + (m.pnl ? "" : " title=\"P&L NO: repite el saldo anterior\"") + ">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>").join("")
-    + "</tbody></table></div>";
+    + "<div class=\"card\" style=\"margin-top:14px\">" + invEngine.movsTabla(vis, {
+      esc: OS_E, money: iaMoney, mes: iaMesDe, abierto: IA.mesOpen,
+      toggleFn: "iaToggleMes", toggleAllFn: "iaMesTodos", btnClass: "ct-btn", tableClass: "ptable",
+      vacio: "<div class=\"empty\">Sin movimientos en el período elegido.</div>",
+      ths: ["<th>Fecha</th>", "<th>Concepto</th>",
+        "<th title=\"P&L SÍ (renta/ingreso/operativo/tax) mueve el saldo; P&L NO (inversión/financiero/distribución) es informativo\" style=\"cursor:help\">Cat.</th>",
+        "<th style=\"text-align:right\">Monto</th>",
+        "<th style=\"text-align:right\" title=\"acumulado de los movimientos P&L SÍ, calculado en orden cronológico real; agrupar por mes no lo altera. Las filas P&L NO repiten el saldo anterior\">Saldo de caja</th>",
+        "<th title=\"de dónde salió el dato: FF = Fix&amp;Flip · Rentas = property management · OS = cargado a mano\" style=\"cursor:help\">Fuente ⓘ</th>"],
+      row: m => "<tr" + (m.pnl ? "" : " style=\"opacity:.55\"") + "><td style=\"white-space:nowrap\">" + OS_E(m.fecha) + "</td><td>" + OS_E(m.concepto) + (m.pnl ? "" : " " + tagNo) + (esDeuda(m) ? " " + tagDeuda : "") + (m.comprobante ? " <a href=\"" + OS_E(m.comprobante) + "\" target=\"_blank\">📎</a>" : "") + "</td><td>" + OS_E(m.categoria) + "</td>"
+        + "<td style=\"text-align:right\" class=\"" + (m.tipo === "ingreso" ? "up" : "down") + "\">" + (m.tipo === "ingreso" ? "+" : "−") + iaMoney(m.monto) + "</td>"
+        + "<td style=\"text-align:right;color:" + (m.acum >= 0 ? "var(--pos)" : "var(--neg)") + "\"" + (m.pnl ? "" : " title=\"P&L NO: repite el saldo anterior\"") + ">" + iaMoney(m.acum) + "</td><td class=\"meta\">" + OS_E(m.fuente) + "</td></tr>"
+    }) + "</div>";
 }
 
 // ── B: parámetros en los 9 BLOQUES de Juan (colapsables; mayoría auto-llenada con su fuente) ──
