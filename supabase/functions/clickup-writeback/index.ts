@@ -43,6 +43,22 @@ Deno.serve(async (req) => {
       return json({ ok: true, estado: "rechazada" });
     }
 
+    // Fail closed: una aprobación no puede operar sobre un espejo vencido o
+    // sobre una credencial que la última sincronización ya declaró inválida.
+    const { data: syncHealth } = await db.from("clickup_sync_log")
+      .select("synced_at,error")
+      .order("synced_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const syncAgeMs = syncHealth?.synced_at ? Date.now() - new Date(syncHealth.synced_at).getTime() : Number.POSITIVE_INFINITY;
+    if (!syncHealth || syncHealth.error || syncAgeMs > 2 * 60 * 60 * 1000) {
+      return json({
+        ok: false,
+        error: "ClickUp está bloqueado por continuidad: recuperá la conexión y completá una sincronización real antes de ejecutar cambios.",
+        evidence: { synced_at: syncHealth?.synced_at || null, error: syncHealth?.error || "sin sincronización reciente" },
+      }, 503);
+    }
+
     // aprobar → aplicar a ClickUp según tipo
     const pay = p.payload || {};
     let applied: unknown = null;

@@ -118,6 +118,17 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     where ap.estado='propuesta' and ap.deleted_at is null
     group by 1,2 order by 3 desc`;
   const propuestasTotal = cola.reduce((a: number, x: Record<string, unknown>) => a + Number(x.n), 0);
+  const traspasos = await sql`
+    select to_role, backup_role, escalation_role,
+           count(*)::int total,
+           count(*) filter (where handoff_state='overdue')::int vencidos,
+           round(max(age_hours),1) max_horas,
+           min(evidence_at)::text evidencia_mas_antigua
+    from v_agent_handoff_queue
+    group by 1,2,3
+    order by vencidos desc, total desc, to_role` as unknown as Array<Record<string, unknown>>;
+  const traspasosVencidos = traspasos.reduce((a, x) => a + Number(x.vencidos || 0), 0);
+  const traspasosTotal = traspasos.reduce((a, x) => a + Number(x.total || 0), 0);
 
   const vencido = Number(cart?.vencido_neto || 0);
   const morosos = Number(cart?.morosos_reales || 0);
@@ -143,6 +154,17 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   const decisiones: Array<Record<string, unknown>> = [];
   if (vencido > 0) decisiones.push({ prioridad: "critico", decision: `Aprobar la cobranza: ${morosos} inquilinos, ${money(vencido)} vencido neto`, requiere: "tu OK para enviar los recordatorios (borradores listos)", fuente: "Financiero Rentas → cola de propuestas" });
   if (propuestasTotal > 0) decisiones.push({ prioridad: "medio", decision: `${propuestasTotal} propuestas de tus agentes esperando OK`, requiere: "revisar y aprobar en /decisiones (Agentes)", fuente: "cola agent_proposals" });
+  if (traspasosVencidos > 0) {
+    const destinoPrincipal = traspasos.find((x) => Number(x.vencidos || 0) > 0);
+    decisiones.unshift({
+      prioridad: "critico",
+      decision: `Destrabar ${traspasosVencidos} traspasos vencidos entre agentes y responsables`,
+      requiere: destinoPrincipal
+        ? `${String(destinoPrincipal.to_role)} recibe primero; ${String(destinoPrincipal.backup_role)} respalda y ${String(destinoPrincipal.escalation_role)} escala`
+        : "asignar destino, respaldo y escalamiento según la política vigente",
+      fuente: "Cola verificable de traspasos · v_agent_handoff_queue",
+    });
+  }
   if (defRows.length > 0) decisiones.push({ prioridad: "medio", decision: `${defRows.length} casas con caja atrapada (${money(defTot)})`, requiere: "definir plan de refi/venta por casa", fuente: "Fix & Flip · ff_deals.deficit_total" });
   const remFoto = fotoDe("foto_ejecutiva_remodelacion");
   const remAtras = remFoto ? Number(((remFoto.payload as Record<string, unknown>)?.resumen as Record<string, unknown>)?.obras_atrasadas ?? 0) : 0;
@@ -217,6 +239,7 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
       caja_atrapada: Math.round(defTot * 100) / 100, casas_con_deficit: defRows.length,
       cartera_vencida: vencido, morosos, por_cobrar_del_mes: Number(cart?.por_cobrar_neto || 0),
       ocupacion_pct: occPct, propuestas_en_cola: propuestasTotal,
+      traspasos_abiertos: traspasosTotal, traspasos_vencidos: traspasosVencidos,
     },
     areas: [areaResumen("foto_ejecutiva_ff", "Fix & Flip"), areaResumen("foto_ejecutiva_rentas", "Rentas"), areaResumen("foto_ejecutiva_remodelacion", "Remodelación")],
     continuidad_operativa: continuidad ? {
@@ -230,6 +253,21 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
     salud_integraciones: integrationHealth ? integrationsPayload : { estado: "sin revisión previa disponible" },
     continuidad_ausencia: absenceReadiness ? readinessPayload : { estado: "sin revisión previa disponible" },
     trabajo_aprobado_pendiente: approvedWork ? approvedWorkPayload : { estado: "sin revisión previa disponible" },
+    coordinacion_agentes: {
+      total: traspasosTotal,
+      vencidos: traspasosVencidos,
+      por_destino: traspasos.map((x) => ({
+        destino: x.to_role,
+        respaldo: x.backup_role,
+        escalamiento: x.escalation_role,
+        abiertos: Number(x.total || 0),
+        vencidos: Number(x.vencidos || 0),
+        antiguedad_max_horas: Number(x.max_horas || 0),
+        evidencia_mas_antigua: x.evidencia_mas_antigua,
+      })),
+      fuente: "v_agent_handoff_queue",
+      regla: "coordina y escala; no aprueba ni ejecuta decisiones humanas",
+    },
     fidelidad: "consolida las 3 fotos de área + números transversales; cada decisión cita su fuente; nada inventado, nada dropeado",
     regla: "el Cerebro SOLO LEE — la directiva es una recomendación; ejecutar/pagar siempre lo confirma un humano",
     origen: "cerebro-reunion (agentes_ia_exec)",
@@ -249,7 +287,7 @@ async function runReunion(sql: ReturnType<typeof postgres>, agentId: string) {
   }
 
   // ACTA en memoria (tipo='decisión') — que el Cerebro aprenda la directiva de hoy. Dedup por día.
-  const actaTxt = `Directiva ${corte}: ${directiva} (por qué: ${porque}). Números: caja atrapada ${money(defTot)} en ${defRows.length} casas · vencido ${money(vencido)}/${morosos} morosos · ocupación ${occPct ?? "?"}% · ${propuestasTotal} propuestas en cola.`;
+  const actaTxt = `Directiva ${corte}: ${directiva} (por qué: ${porque}). Números: caja atrapada ${money(defTot)} en ${defRows.length} casas · vencido ${money(vencido)}/${morosos} morosos · ocupación ${occPct ?? "?"}% · ${propuestasTotal} propuestas en cola · ${traspasosVencidos}/${traspasosTotal} traspasos vencidos.`;
   const [mex] = await sql`select id from pm_brain_memory where tipo='decisión' and fuente='cerebro-reunion' and texto like ${"Directiva " + corte + ":%"} and activo=true limit 1`;
   if (mex) {
     await sql`update pm_brain_memory set texto=${actaTxt}, fecha=now(), updated_at=now() where id=${mex.id as string}`;

@@ -27,3 +27,12 @@ Si este archivo y `CLAUDE.md` parecen contradecirse, detente, muestra la contrad
 ## Verificación mínima
 
 Para cambios de código, ejecuta las verificaciones relevantes descritas en `CLAUDE.md`; como base, `npm run ci:gate` y `npm run build` cuando correspondan. Reporta por separado lo verificado localmente y lo que siga pendiente de validación externa o de producción.
+
+## Estándar permanente de excelencia
+
+- “Funciona” no equivale a “terminado”. Cada entrega debe quedar correcta, comprensible, consistente, profesional y comprobada con evidencia proporcional al riesgo.
+- Toda superficie visual que se toque debe quedar mejor que antes: jerarquía más clara, menos ruido, lenguaje humano, estados completos (`cargando`, `vacío`, `error`, `éxito`), respuesta móvil y de escritorio, teclado, contraste y temas coherentes.
+- No agregues decoración sin propósito ni rediseñes áreas ajenas por impulso. La mejora visual debe reforzar la tarea principal, la confianza en los datos y la operación real.
+- Reutiliza tokens y componentes existentes; no introduzcas estilos aislados, datos de demostración, actividad ficticia, JSON crudo ni indicadores positivos sin evidencia vigente.
+- Antes de declarar una tarea completa, valida lógica, permisos, persistencia, errores, regresiones, rendimiento razonable y presentación visual. Si algo no pudo verificarse, decláralo con precisión; nunca presentes una suposición como certificación.
+- Para cambios de interfaz, realiza una comprobación visual en escritorio y móvil de la superficie afectada y corrige la primera ronda de defectos antes de entregar.

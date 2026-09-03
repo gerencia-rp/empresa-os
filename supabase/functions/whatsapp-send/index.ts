@@ -25,6 +25,7 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAuth } from '../_shared/auth.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,13 @@ const CORS = {
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
+
+  // Enviar mensajes es una acción externa irreversible. El service role de
+  // los crons o un administrador autenticado son los únicos emisores válidos.
+  const auth = await requireAuth(req, { requireAdmin: true });
+  if (!auth.ok) return new Response(JSON.stringify({ ok: false, error: auth.error }), {
+    status: auth.status || 401, headers: { ...CORS, 'content-type': 'application/json' }
+  });
 
   const phoneNumberId = Deno.env.get('WA_PHONE_NUMBER_ID');
   const accessToken = Deno.env.get('WA_ACCESS_TOKEN');
@@ -48,6 +56,11 @@ serve(async (req: Request) => {
 
   if (!to) {
     return new Response(JSON.stringify({ ok: false, error: 'Falta "to"' }), {
+      status: 400, headers: { ...CORS, 'content-type': 'application/json' }
+    });
+  }
+  if (!['text', 'template', 'interactive'].includes(type)) {
+    return new Response(JSON.stringify({ ok: false, error: 'type debe ser text, template o interactive' }), {
       status: 400, headers: { ...CORS, 'content-type': 'application/json' }
     });
   }

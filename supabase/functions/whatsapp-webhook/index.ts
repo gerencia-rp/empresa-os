@@ -27,6 +27,22 @@ const CORS = {
   'Access-Control-Allow-Headers': 'content-type, authorization'
 };
 
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function validMetaSignature(raw: string, signature: string | null): Promise<boolean> {
+  const secret = Deno.env.get('META_APP_SECRET') || '';
+  if (!secret || !signature?.startsWith('sha256=')) return false;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw));
+  const expected = 'sha256=' + [...new Uint8Array(signed)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return safeEqual(expected, signature);
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
@@ -43,8 +59,15 @@ serve(async (req: Request) => {
     return new Response('Forbidden', { status: 403 });
   }
 
-  // 2) Webhook POST con evento
-  const payload = await req.json().catch(() => ({}));
+  // 2) Webhook POST con evento. Meta firma el cuerpo exacto; sin firma válida
+  // no se registra ni se ejecuta ninguna respuesta o cierre de tarea.
+  const raw = await req.text();
+  if (!(await validMetaSignature(raw, req.headers.get('x-hub-signature-256')))) {
+    return new Response(JSON.stringify({ ok: false, error: 'Firma de Meta inválida o META_APP_SECRET no configurado' }), {
+      status: 401, headers: { ...CORS, 'content-type': 'application/json' }
+    });
+  }
+  const payload = JSON.parse(raw || '{}');
   const supaUrl = Deno.env.get('SUPABASE_URL') || '';
   const supaKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const sb = createClient(supaUrl, supaKey);

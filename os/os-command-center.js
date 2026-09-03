@@ -13,13 +13,14 @@
 const JV = {
   loaded: false, loading: false, err: null,
   tab: 'network',
-  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
+  agents: [], props: [], audit: [], reports: [], memories: [], decisionPolicies: {}, roleCoverage: [], financialActions: [], financialEvidenceStatus: {}, financialEvidence: [], businessCoverage: [], handoffs: [], lastRun: {}, lastEvidence: {}, lastAudit: {}, runsTotal: 0, crit: [], critImpact: 0, memCount: null,
   capital: null, nsCfg: null, nsEditing: false, _clock: null,
   vaultSel: null, vaultNodes: {}, mapEdit: null, mapBusy: false, filterLinea: null, inspectAgentId: null, orgZoom: 0.75,
   busyId: null, chat: [], chatBusy: false, decisionArea: 'Todas', decisionLimit: 40, reportArea: 'Todas',
   workArea: 'Todas', workState: 'Todos', workAgentId: null,
   workSelectedId: null, scheduleAgentId: null,
   decisionPreview: null,
+  roleBusy: null, roleMessages: {},
   controls: { occupancy: null, lineage: null },
 };
 window.JV = JV;
@@ -27,6 +28,7 @@ window.JV = JV;
 // ─── helpers ───
 function jvRole() { try { return (state && state.role) || 'viewer'; } catch (e) { return 'viewer'; } }
 function jvMe() { try { const u = state && state.user; return (u && (u.email || (u.user_metadata && u.user_metadata.full_name))) || 'admin'; } catch (e) { return 'admin'; } }
+function jvUserId() { try { return (state && state.user && state.user.id) || ''; } catch (e) { return ''; } }
 function jvNum(n) { return (n == null || isNaN(n)) ? '—' : Number(n).toLocaleString('es-MX'); }
 function jvMoney(n) { return (n == null || isNaN(n)) ? '—' : '$' + Math.round(+n).toLocaleString('en-US'); }
 function jvAgent(id) { return JV.agents.find(x => x.id === id) || null; }
@@ -95,7 +97,7 @@ function jvAgentLastRun(a) {
 function jvFreshnessDays(a) {
   const schedule = jvScheduleText(a).toLowerCase();
   if (/mensual|monthly|d[ií]a 1|cada mes/.test(schedule)) return 40;
-  if (/semanal|weekly|cada semana/.test(schedule)) return 10;
+  if (/semanal|weekly|cada semana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo/.test(schedule)) return 10;
   if (/quincenal|cada 15/.test(schedule)) return 20;
   if (/on-demand|bajo demanda|nicol[aá]s pide/.test(schedule)) return 30;
   return 3;
@@ -201,12 +203,20 @@ function jvPendingDecisions() {
 function jvProposalDetails(p) {
   const e = jvEvidObj(p);
   const skip = /^(id|uuid|token|prompt|raw|debug|sql|query|stack|trace|source)$/i;
+  const metadataOnly = /^(tipo|regla|fuente|origen|nota|corte|fecha|version|rol_db|metodo|limite)$/i;
   const labels = { propiedad: 'Propiedad', property: 'Propiedad', property_name: 'Propiedad', address: 'Propiedad', monto: 'Monto', impacto: 'Impacto', recomendacion: 'Recomendación', accion_recomendada: 'Acción recomendada', razon: 'Por qué', porque: 'Por qué', riesgo: 'Riesgo', fecha: 'Fecha', corte: 'Corte', responsable: 'Responsable', plazo: 'Plazo' };
   const rows = Object.keys(e).filter(k => !skip.test(k) && e[k] != null && e[k] !== '' && typeof e[k] !== 'object').slice(0, 8).map(k => {
     const val = typeof e[k] === 'number' && /monto|impacto|total|costo|precio/i.test(k) ? jvMoney(e[k]) : String(e[k]);
     return '<div class="jv-detail-row"><span>' + OS_E(labels[k] || jvHumanize(k)) + '</span><b>' + OS_E(val) + '</b></div>';
   });
-  return { html: rows.join(''), sufficient: rows.length > 0 || !!(e.detalle || e.resumen || e.recomendacion || e.accion_recomendada) };
+  const hasValue = value => {
+    if (value == null || value === '') return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  };
+  const substantive = Object.keys(e).some(key => !skip.test(key) && !metadataOnly.test(key) && hasValue(e[key]));
+  return { html: rows.join(''), sufficient: substantive };
 }
 function jvFmtTs(ts) {
   if (!ts) return 'sin corridas';
@@ -291,6 +301,7 @@ const JV_NAV = [
   { k: 'horarios', ic: 'clock', t: 'Horarios' },
   { k: 'vault', ic: 'library', t: 'Memoria compartida' },
   { k: 'reportes', ic: 'chart', t: 'Reportes' },
+  { k: 'manual', ic: 'briefcase', t: 'Manual operativo' },
 ];
 const JV_EMPRESAS = [
   { area: 'fix-flip', name: 'Fix & Flip', icon: 'construction' },
@@ -363,6 +374,7 @@ function jvCSS() {
     '#os-root .jv-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}',
     '#os-root .jv-op{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--jc-grn);border:1px solid rgba(52,211,153,.25);padding:5px 11px;border-radius:20px}',
     '#os-root .jv-op .d{width:6px;height:6px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 6px var(--jc-grn);animation:jvpulse 1.8s infinite}',
+    '#os-root .jv-op.attention{color:var(--jc-amber);border-color:rgba(233,174,76,.34);background:rgba(233,174,76,.055)}#os-root .jv-op.attention .d{background:var(--jc-amber);box-shadow:0 0 7px rgba(233,174,76,.72);animation:none}',
     '@keyframes jvpulse{0%,100%{opacity:1}50%{opacity:.35}}',
     '#os-root .jv-eyebrow{font-size:10px;letter-spacing:.24em;color:var(--jc-mut);text-transform:uppercase}',
     '#os-root .jv-lead{font-size:13.5px;color:var(--jc-mut);margin:3px 0 22px}',
@@ -454,6 +466,8 @@ function jvCSS() {
     '#os-root .jv-empty{font-size:11px;color:var(--jc-mut);padding:6px 2px}',
     '#os-root .jv-status-strip{display:flex;gap:8px;flex-wrap:wrap;margin:-10px 0 18px}',
     '#os-root .jv-status-strip span{font-size:11px;padding:6px 10px;border:1px solid var(--jc-line);border-radius:10px;color:var(--jc-mut)}',
+    '#os-root .jv-decision-brief{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:0 0 18px}',
+    '#os-root .jv-decision-metric{padding:12px 13px;border:1px solid var(--jc-line);border-radius:11px;background:var(--jc-card)}#os-root .jv-decision-metric b{display:block;font-size:20px;font-variant-numeric:tabular-nums}#os-root .jv-decision-metric span{display:block;margin-top:3px;color:var(--jc-mut);font-size:9px;letter-spacing:.08em;text-transform:uppercase}#os-root .jv-decision-metric.ready{border-color:rgba(52,211,153,.28)}#os-root .jv-decision-metric.ready b{color:var(--jc-grn)}#os-root .jv-decision-metric.overdue{border-color:rgba(244,114,182,.32)}#os-root .jv-decision-metric.overdue b{color:var(--jc-pink)}',
     '#os-root .jv-decision{background:var(--jc-card);border:1px solid rgba(167,139,250,.28);border-radius:12px;padding:13px 14px;margin-bottom:10px}',
     '#os-root .jv-decision.alert{border-color:rgba(244,114,182,.34)}',
     '#os-root .jv-decision h4{font-size:13px;margin:0 0 5px}',
@@ -469,7 +483,7 @@ function jvCSS() {
     '#os-root .jv-controls{margin-top:24px}#os-root .jv-controls-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#os-root .jv-control-card{display:flex;gap:12px;padding:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:13px;min-width:0}#os-root .jv-control-card.ok{border-color:rgba(52,211,153,.28)}#os-root .jv-control-card.warn{border-color:rgba(251,191,36,.34)}#os-root .jv-control-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:rgba(96,165,250,.1);color:var(--jc-cyan)}#os-root .jv-control-card.ok .jv-control-icon{background:rgba(52,211,153,.1);color:var(--jc-grn)}#os-root .jv-control-card.warn .jv-control-icon{background:rgba(251,191,36,.1);color:var(--jc-amber)}#os-root .jv-control-copy{min-width:0;flex:1}#os-root .jv-control-title{display:flex;justify-content:space-between;gap:8px;align-items:center}#os-root .jv-control-title b{font-size:12px}#os-root .jv-control-title span{font-size:8.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--jc-mut)}#os-root .jv-control-copy>strong{display:block;font-size:17px;margin-top:8px;font-variant-numeric:tabular-nums}#os-root .jv-control-copy p{font-size:10.5px;line-height:1.5;color:var(--jc-mut);margin:5px 0}#os-root .jv-control-copy small{font-size:9px;color:var(--jc-cyan)}',
     '@media(max-width:800px){#os-root .jv-controls-grid{grid-template-columns:1fr}}',
     '#os-root .jv-report-group{margin-bottom:26px}#os-root .jv-report-list{display:grid;gap:9px}#os-root .jv-report-item{border-top:1px solid var(--jc-line);padding:13px 2px 2px}#os-root .jv-report-item:first-child{border-top:0}#os-root .jv-report-item summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;cursor:pointer;list-style:none}#os-root .jv-report-item summary::-webkit-details-marker{display:none}#os-root .jv-report-item h3{font-size:13px;margin:0}#os-root .jv-report-item .report-meta{font-size:10px;color:var(--jc-mut);margin-top:3px}#os-root .jv-report-body{max-width:75ch;color:#b8c4d8;font-size:12px;line-height:1.65;padding:12px 0 6px;white-space:pre-wrap}',
-    '@media(max-width:900px){#os-root .jv-decisions-layout{grid-template-columns:1fr}}',
+    '@media(max-width:900px){#os-root .jv-decisions-layout{grid-template-columns:1fr}#os-root .jv-decision-brief{grid-template-columns:repeat(2,1fr)}}',
     '#os-root .jv-simple-list{display:grid;gap:8px}',
     '#os-root .jv-simple-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--jc-line);border-radius:10px;background:rgba(255,255,255,.015)}',
     '#os-root .jv-simple-row .body{flex:1;min-width:0}#os-root .jv-simple-row .body b{display:block;font-size:12.5px}#os-root .jv-simple-row .body span{display:block;font-size:10.5px;color:var(--jc-mut);margin-top:2px}',
@@ -499,6 +513,7 @@ function jvCSS() {
     '#os-root .jv-hi{font-size:23px;font-weight:700;letter-spacing:-.01em}',
     '#os-root .jv-hi span{color:var(--jc-cyan)}',
     '#os-root .jv-hud-date{font-size:12px;color:var(--jc-mut);margin-top:3px}',
+    '#os-root .jv-hud-date.attention{color:var(--jc-amber)}',
     '#os-root .jv-clock{text-align:right}',
     '#os-root .jv-clock .t{font-size:25px;font-weight:700;font-variant-numeric:tabular-nums}',
     '#os-root .jv-clock .w{font-size:11px;color:var(--jc-mut)}',
@@ -553,7 +568,7 @@ function jvCSS() {
     '#os-root .jv-cards{position:relative;padding-left:14px;border-left:1px dashed rgba(120,140,180,.28)}',
     '@keyframes jvflow{to{border-left-color:rgba(167,139,250,.25);transform:translateY(4px)}}',
     '#os-root .jv-holo-shell{position:relative;min-height:calc(100vh - 150px);overflow:hidden;border:1px solid rgba(82,205,255,.16);border-radius:24px;background:radial-gradient(circle at 50% 48%,rgba(45,126,255,.14),transparent 27%),radial-gradient(circle at 50% 50%,#0a1424 0,#060a12 58%,#030509 100%);box-shadow:inset 0 0 90px rgba(22,111,255,.08),0 28px 90px rgba(0,0,0,.42)}',
-    '#os-root .jv-holo-shell::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.18;background-image:linear-gradient(rgba(78,182,255,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(78,182,255,.16) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(circle,#000 15%,transparent 78%)}',
+    '#os-root .jv-holo-shell::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;background:radial-gradient(ellipse at 50% 52%,rgba(78,182,255,.12),transparent 54%),radial-gradient(circle at 14% 20%,rgba(151,100,255,.08),transparent 24%)}',
     '#os-root .jv-holo-head{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px 0;gap:20px}',
     '#os-root .jv-holo-title b{display:block;font-size:19px;letter-spacing:-.02em}#os-root .jv-holo-title span{display:block;color:#7f98b8;font-size:11px;margin-top:4px}',
     '#os-root .jv-holo-stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}',
@@ -588,7 +603,7 @@ function jvCSS() {
     '#os-root .jv-ai-close{width:44px;height:44px;border:1px solid rgba(120,160,205,.18);border-radius:9px;background:transparent;color:#8ca0bb;cursor:pointer}#os-root .jv-ai-close:hover,#os-root .jv-ai-close:focus-visible{color:#fff;border-color:#5ed9ff;outline:none}',
     '#os-root .jv-ai-body{padding:16px 18px 20px}#os-root .jv-ai-section{padding:13px 0;border-bottom:1px solid rgba(120,160,205,.12)}#os-root .jv-ai-section:last-child{border-bottom:0}',
     '#os-root .jv-ai-label{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#7088a6;margin-bottom:7px}#os-root .jv-ai-copy{font-size:11.5px;line-height:1.55;color:#c5d0df}',
-    '#os-root .jv-ai-now{padding:11px 12px;border-left:2px solid #5ed9ff;background:rgba(94,217,255,.055);border-radius:0 10px 10px 0}#os-root .jv-ai-now b{display:block;color:#e8f8ff;font-size:11.5px}#os-root .jv-ai-now span{display:block;color:#8095af;font-size:10px;margin-top:4px}',
+    '#os-root .jv-ai-now{padding:11px 12px;border:1px solid rgba(94,217,255,.14);background:rgba(94,217,255,.055);border-radius:10px;box-shadow:inset 0 1px rgba(160,230,255,.08)}#os-root .jv-ai-now b{display:block;color:#e8f8ff;font-size:11.5px}#os-root .jv-ai-now span{display:block;color:#8095af;font-size:10px;margin-top:4px}',
     '#os-root .jv-ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#os-root .jv-ai-metric{padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.035)}#os-root .jv-ai-metric span{display:block;color:#7188a5;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em}#os-root .jv-ai-metric b{display:block;margin-top:4px;color:#e7f2ff;font-size:11px}',
     '#os-root .jv-ai-tags{display:flex;flex-wrap:wrap;gap:5px}#os-root .jv-ai-tags span{padding:4px 7px;border:1px solid rgba(120,160,205,.15);border-radius:7px;color:#9cafc5;font-size:9.5px;background:rgba(255,255,255,.025)}',
     '#os-root .jv-ai-action{width:100%;margin-top:12px;padding:9px 12px;border-radius:10px;border:1px solid rgba(94,217,255,.3);background:rgba(94,217,255,.08);color:#bdefff;cursor:pointer;font-size:10.5px;font-weight:650}#os-root .jv-ai-action:hover,#os-root .jv-ai-action:focus-visible{background:rgba(94,217,255,.14);outline:none}',
@@ -597,7 +612,7 @@ function jvCSS() {
     '@media(max-width:1100px){#os-root .jv-holo-map{grid-template-columns:1fr 1fr;grid-template-rows:auto;gap:14px;padding:270px 18px 24px}#os-root .jv-holo-core{top:120px}#os-root .jv-holo-lines{display:none}#os-root .jv-holo-area:nth-of-type(n){grid-column:auto;grid-row:auto}}',
     '@media(max-width:680px){#os-root .jv{display:block}#os-root .jv-side{width:100%;padding:7px 8px;border-right:0;border-bottom:1px solid var(--jc-line);overflow:hidden}#os-root .jv-logo,#os-root .jv-lbl,#os-root .jv-mini{display:none}#os-root .jv-nav{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none}#os-root .jv-nav::-webkit-scrollbar{display:none}#os-root .jv-nav button{flex:0 0 auto;width:auto;white-space:nowrap;margin:0;padding:7px 9px}#os-root .jv-main{padding:14px 10px}#os-root .jv-top{margin-bottom:12px}#os-root .jv-holo-head{display:block;padding:18px 16px 0}#os-root .jv-holo-stats{justify-content:flex-start;margin-top:12px}#os-root .jv-holo-map{grid-template-columns:1fr;padding:310px 12px 18px}#os-root .jv-holo-core{top:135px}#os-root .jv-holo-area:nth-of-type(n){grid-column:1}#os-root .jv-agent-inspector{position:fixed;left:10px;right:10px;top:78px;width:auto;max-height:calc(100dvh - 92px)}}',
     '@media(prefers-reduced-motion:reduce){#os-root .jv-holo-lines path,#os-root .jv-core-ring,#os-root .jv-core-reactor{animation:none!important}}',
-    '#os-root .jv-org-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;min-height:620px}#os-root .jv-org-canvas{position:relative;min-width:0;overflow:auto;border:1px solid rgba(80,145,205,.18);border-radius:14px;background-color:#07101c;background-image:linear-gradient(rgba(83,148,205,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(83,148,205,.035) 1px,transparent 1px);background-size:24px 24px;padding:18px 18px 12px}#os-root .jv-org-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}#os-root .jv-org-toolbar h1{font-size:19px;margin:0}#os-root .jv-org-toolbar p{font-size:10.5px;color:var(--jc-mut);margin:3px 0 0}#os-root .jv-org-counts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}#os-root .jv-org-counts span{font-size:9px;color:#8ba0bc;border-left:1px solid rgba(94,217,255,.24);padding:3px 7px}#os-root .jv-org-counts b{color:#e7f5ff;font-size:12px;margin-right:3px}',
+    '#os-root .jv-org-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;min-height:620px}#os-root .jv-org-canvas{position:relative;min-width:0;overflow:auto;border:1px solid rgba(80,145,205,.18);border-radius:14px;background:radial-gradient(ellipse at 50% 24%,rgba(57,154,220,.075),transparent 48%),linear-gradient(160deg,#081322,#050b14);padding:18px 18px 12px}#os-root .jv-org-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}#os-root .jv-org-toolbar h1{font-size:19px;margin:0}#os-root .jv-org-toolbar p{font-size:10.5px;color:var(--jc-mut);margin:3px 0 0}#os-root .jv-org-counts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}#os-root .jv-org-counts span{font-size:9px;color:#8ba0bc;border-left:1px solid rgba(94,217,255,.24);padding:3px 7px}#os-root .jv-org-counts b{color:#e7f5ff;font-size:12px;margin-right:3px}',
     '#os-root .jv-org-tree{min-width:660px;padding:4px 0 58px;transform-origin:top center}#os-root .jv-org-root{position:relative;width:230px;margin:0 auto 50px;--oc:var(--jc-purple)}#os-root .jv-org-root::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:28px;background:linear-gradient(180deg,#49c7ff,rgba(73,199,255,.18),#49c7ff);background-size:100% 220%;box-shadow:0 0 8px rgba(73,199,255,.45);animation:jvOrgFlowY 2.2s linear infinite}#os-root .jv-org-command{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:8px}#os-root .jv-org-command:has(>:only-child){grid-template-columns:1fr}#os-root .jv-org-command .jv-org-node{padding:6px 7px}#os-root .jv-org-command .jv-org-node .ico{width:20px;height:20px}#os-root .jv-org-command .jv-org-node b{font-size:8.5px}#os-root .jv-org-command .jv-org-node small{font-size:6.5px}#os-root .jv-org-depts{position:relative;display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:12px}#os-root .jv-org-depts::before{content:"";position:absolute;left:12.5%;right:12.5%;top:-22px;height:1px;background:linear-gradient(90deg,rgba(73,199,255,.2),#49c7ff,rgba(73,199,255,.2),#49c7ff);background-size:220% 100%;box-shadow:0 0 8px rgba(73,199,255,.25);animation:jvOrgFlowX 3.8s linear infinite}#os-root .jv-org-dept{position:relative;--oc:var(--jc-cyan)}#os-root .jv-org-dept::before{content:"";position:absolute;left:50%;top:-22px;width:1px;height:22px;background:linear-gradient(180deg,rgba(73,199,255,.25),var(--oc),rgba(73,199,255,.2));background-size:100% 220%;animation:jvOrgFlowY 2.8s linear infinite}#os-root .jv-org-dept-label{width:100%;border:0;background:transparent;min-height:44px;display:flex;align-items:center;gap:5px;color:var(--oc);font:inherit;font-size:7.5px;letter-spacing:.11em;text-transform:uppercase;margin-bottom:5px;padding:0 4px;cursor:pointer;text-align:left}#os-root .jv-org-dept-label:hover,#os-root .jv-org-dept-label:focus-visible{color:#eafaff;outline:none}#os-root .jv-org-dept-label span{flex:1}#os-root .jv-org-dept-label b{color:#7188a5;font-weight:600}#os-root .jv-org-node{position:relative;width:100%;border:1px solid color-mix(in srgb,var(--oc) 62%,#20304a);background:linear-gradient(145deg,color-mix(in srgb,var(--oc) 7%,#0b1524),#09111d);color:#dcecff;border-radius:7px;padding:9px 10px;min-height:44px;text-align:left;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.2);transition:border-color .16s,transform .16s,background .16s}#os-root .jv-org-node:hover,#os-root .jv-org-node:focus-visible,#os-root .jv-org-node[aria-pressed="true"]{border-color:var(--oc);background:color-mix(in srgb,var(--oc) 11%,#0a1422);transform:translateY(-1px);outline:none;box-shadow:0 0 18px color-mix(in srgb,var(--oc) 16%,transparent)}#os-root .jv-org-node .top{display:flex;align-items:center;gap:7px}#os-root .jv-org-node .ico{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--oc);background:color-mix(in srgb,var(--oc) 12%,transparent);flex:0 0 auto}#os-root .jv-org-node .copy{min-width:0;flex:1}#os-root .jv-org-node b{display:block;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-org-node small{display:block;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;color:#6f849e;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-org-node .dot{width:6px;height:6px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 7px var(--jc-grn);flex:0 0 auto}#os-root .jv-org-node .dot.wait{background:var(--jc-amber);box-shadow:0 0 7px var(--jc-amber)}#os-root .jv-org-root>.jv-org-node{padding:12px 13px}#os-root .jv-org-root>.jv-org-node b{font-size:12px}#os-root .jv-org-children{position:relative;display:grid;gap:6px;margin-top:18px;padding-left:12px}#os-root .jv-org-children::before{content:"";position:absolute;left:4px;top:-18px;bottom:19px;width:1px;background:linear-gradient(180deg,color-mix(in srgb,var(--oc) 65%,transparent),transparent,color-mix(in srgb,var(--oc) 65%,transparent));background-size:100% 180%;animation:jvOrgFlowY 3.1s linear infinite}#os-root .jv-org-children .jv-org-node::before{content:"";position:absolute;left:-9px;top:50%;width:8px;border-top:1px solid color-mix(in srgb,var(--oc) 58%,transparent)}@keyframes jvOrgFlowX{to{background-position:220% 0}}@keyframes jvOrgFlowY{to{background-position:0 220%}}#os-root .jv-org-zoom{position:absolute;left:16px;bottom:13px;display:flex;gap:5px;z-index:2}#os-root .jv-org-zoom button{border:1px solid rgba(94,217,255,.2);background:#091522;color:#a9bdd4;border-radius:7px;min-width:44px;min-height:44px;padding:6px 10px;font-size:9px;cursor:pointer}#os-root .jv-org-zoom button:hover,#os-root .jv-org-zoom button:focus-visible{border-color:#5ed9ff;color:#e9faff;outline:none}',
     '#os-root .jv-org-layout>.jv-agent-inspector{position:relative;right:auto;top:auto;width:auto;max-height:620px;overflow:auto;border-radius:14px;animation:jvInspectorIn .24s ease-out}#os-root .jv-org-empty-inspector{border:1px solid rgba(94,217,255,.16);border-radius:14px;background:linear-gradient(155deg,rgba(13,25,43,.96),rgba(5,10,18,.98));display:grid;place-items:center;text-align:center;padding:28px;color:#7188a5;font-size:11px}',
     '@media(max-width:1080px){#os-root .jv-org-layout{grid-template-columns:1fr}#os-root .jv-org-layout>.jv-agent-inspector{position:fixed;left:auto;right:12px;top:74px;width:min(360px,calc(100% - 24px));max-height:calc(100dvh - 88px);z-index:20}}@media(max-width:720px){#os-root .jv-org-layout{display:block}#os-root .jv-org-canvas{border-radius:10px;padding:12px 10px}#os-root .jv-org-tree{min-width:610px}#os-root .jv-org-counts{display:none}}@media(prefers-reduced-motion:reduce){#os-root .jv-org-root::after,#os-root .jv-org-depts::before,#os-root .jv-org-dept::before,#os-root .jv-org-children::before{animation:none!important}}',
@@ -623,21 +638,25 @@ function jvCSS() {
     '#os-root textarea.jv-ein{min-height:52px;resize:vertical}',
     '#os-root .jv-ein:focus{border-color:var(--jc-purple)}',
     // DNA map (Knowledge Vault)
-    '#os-root .jv-vault-wrap{position:relative;height:640px;margin-top:8px;border:1px solid var(--jc-line);border-radius:14px;overflow:hidden;background:radial-gradient(circle at 50% 46%,rgba(20,30,60,.45),var(--jc-bg) 72%)}',
+    '#os-root .jv-vault-wrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(650px,1fr) auto;margin-top:18px;border:1px solid var(--jc-line);border-radius:14px;overflow:hidden;background:radial-gradient(circle at 46% 48%,rgba(20,30,60,.45),var(--jc-bg) 72%)}',
+    '#os-root .jv-vcanvas{position:relative;grid-column:1;grid-row:2;min-width:0;min-height:650px;overflow:hidden;border-top:1px solid var(--jc-line);border-right:1px solid var(--jc-line)}',
     '#os-root .jv-vstage{position:absolute;inset:0;width:100%;height:100%}',
     '#os-root .jv-vnode{cursor:pointer}',
-    '#os-root .jv-vnode circle{transition:.15s}',
-    '#os-root .jv-vnode:hover circle{filter:brightness(1.35)}',
-    '#os-root .jv-vnode.sel circle{filter:brightness(1.45)}',
+    '#os-root .jv-vnode circle{transition:transform .18s ease,filter .18s ease;transform-box:fill-box;transform-origin:center}',
+    '#os-root .jv-vnode:hover circle,#os-root .jv-vnode:focus-visible circle{filter:brightness(1.35);transform:scale(1.16)}',
+    '#os-root .jv-vnode.sel circle{filter:brightness(1.5);stroke-width:3px;transform:scale(1.12)}',
+    '#os-root .jv-vnode:focus-visible{outline:none}',
     '#os-root .jv-vnode text{user-select:none}',
-    '#os-root .jv-vcount{position:absolute;top:14px;right:14px;display:flex;gap:8px;z-index:3}',
+    '#os-root .jv-vlabel{opacity:0;pointer-events:none;transition:opacity .16s ease}.jv-vnode:hover .jv-vlabel,.jv-vnode:focus-visible .jv-vlabel,.jv-vnode.sel .jv-vlabel{opacity:1}',
+    '#os-root .jv-vgroup-label{font:700 9px Inter,ui-sans-serif,sans-serif;letter-spacing:.13em;text-transform:uppercase}.jv-vgroup-count{font:8px Inter,ui-sans-serif,sans-serif;fill:#6f858c}',
+    '#os-root .jv-vcount{grid-column:1/-1;grid-row:1;display:flex;gap:0;justify-content:flex-end;z-index:3;padding:13px 16px}',
     '#os-root .jv-vcount .cbox{background:var(--jc-card);border:1px solid var(--jc-line);border-radius:10px;padding:6px 12px;text-align:center}',
     '#os-root .jv-vcount .n{font-size:16px;font-weight:750;color:var(--jc-cyan);font-variant-numeric:tabular-nums}',
     '#os-root .jv-vcount .l{font-size:8.5px;letter-spacing:.08em;color:var(--jc-mut);text-transform:uppercase}',
-    '#os-root .jv-vlegend{position:absolute;left:14px;bottom:14px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:12px;padding:10px 12px;z-index:3}',
-    '#os-root .jv-vlegend .li{display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0;color:var(--jc-mut)}',
+    '#os-root .jv-vlegend{grid-column:1/-1;grid-row:3;display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--jc-card);border-top:1px solid var(--jc-line);padding:10px 14px;z-index:3}',
+    '#os-root .jv-vlegend .li{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--jc-mut)}',
     '#os-root .jv-vlegend .sw{width:10px;height:10px;border-radius:50%}',
-    '#os-root .jv-vpanel{position:absolute;right:14px;top:70px;width:262px;background:var(--jc-card);border:1px solid var(--jc-line);border-radius:14px;padding:16px;z-index:3;max-height:540px;overflow:auto}',
+    '#os-root .jv-vpanel{grid-column:2;grid-row:2;position:relative;width:auto;background:var(--jc-card);border:0;border-top:1px solid var(--jc-line);padding:24px 22px;z-index:3;max-height:650px;overflow:auto}',
     '#os-root .jv-vp-ic{margin-bottom:2px}',
     '#os-root .jv-vpanel h3{font-size:15px;margin:4px 0 2px}',
     '#os-root .jv-vp-lay{font-size:10px;letter-spacing:.1em;text-transform:uppercase}',
@@ -645,10 +664,11 @@ function jvCSS() {
     '#os-root .jv-vp-meta{margin-top:12px;display:flex;flex-wrap:wrap;gap:6px}',
     '#os-root .jv-vp-meta .tag{font-size:10px;padding:3px 8px;border-radius:8px;background:rgba(120,140,180,.14);color:var(--jc-tx)}',
     '#os-root .jv-vp-run{margin-top:12px;font-size:11px;color:var(--jc-mut);border-top:1px solid var(--jc-line);padding-top:10px}',
-    '#os-root .jv-vhint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:10.5px;color:var(--jc-mut);z-index:2;pointer-events:none}',
-    '@media(max-width:1000px){#os-root .jv-vpanel{position:static;width:auto;max-height:none;margin-top:10px}#os-root .jv-vault-wrap{height:auto;padding-bottom:10px}#os-root .jv-vstage{position:relative;height:440px}#os-root .jv-vcount{position:static;justify-content:flex-end;padding:10px 10px 0}#os-root .jv-vlegend{position:static;margin:10px}}',
+    '#os-root .jv-vhint{position:absolute;left:50%;bottom:13px;width:calc(100% - 28px);transform:translateX(-50%);font-size:10px;color:var(--jc-mut);z-index:2;pointer-events:none;text-align:center}',
+    '@media(max-width:1100px){#os-root .jv-vault-wrap{grid-template-columns:1fr;grid-template-rows:auto 560px auto auto}#os-root .jv-vcanvas{grid-column:1;grid-row:2;min-height:560px;border-right:0}#os-root .jv-vpanel{grid-column:1;grid-row:3;max-height:none;border-top:1px solid var(--jc-line)}#os-root .jv-vlegend{grid-row:4}}',
+    '@media(max-width:680px){#os-root .jv-vault-wrap{grid-template-rows:auto 470px auto auto;margin-top:14px}#os-root .jv-vcanvas{min-height:470px}#os-root .jv-vstage{width:100%;height:100%}#os-root .jv-vcount{justify-content:flex-start;overflow-x:auto}#os-root .jv-vcount .cbox{min-width:84px}#os-root .jv-vlegend{gap:9px}#os-root .jv-vlabel{display:none}}',
     // JARVIS cinematic system — shared across command, team, work, schedule and memory.
-    '#os-root .jv{--jc-bg:#030910;--jc-side:#050b12;--jc-card:#07121b;--jc-line:rgba(118,190,201,.17);--jc-tx:#edf6f4;--jc-mut:#7f969d;--jc-purple:#4fd8c1;--jc-cyan:#38d7c1;--jc-pink:#f2a34a;--jc-grn:#39ddb1;--jc-amber:#e9ae4c;--jc-blue:#49a8e8;border-radius:0;min-height:calc(100dvh - 92px);background-color:var(--jc-bg);background-image:radial-gradient(circle at 72% 8%,rgba(27,126,132,.12),transparent 32%),linear-gradient(rgba(77,155,166,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(77,155,166,.025) 1px,transparent 1px);background-size:auto,32px 32px,32px 32px;font-family:Inter,ui-sans-serif,system-ui,sans-serif}',
+    '#os-root .jv{--jc-bg:#030910;--jc-side:#050b12;--jc-card:#07121b;--jc-line:rgba(118,190,201,.17);--jc-tx:#edf6f4;--jc-mut:#7f969d;--jc-purple:#4fd8c1;--jc-cyan:#38d7c1;--jc-pink:#f2a34a;--jc-grn:#39ddb1;--jc-amber:#e9ae4c;--jc-blue:#49a8e8;border-radius:0;min-height:calc(100dvh - 92px);background:radial-gradient(circle at 72% 8%,rgba(27,126,132,.12),transparent 32%),radial-gradient(ellipse at 20% 80%,rgba(40,90,112,.055),transparent 44%),var(--jc-bg);font-family:Inter,ui-sans-serif,system-ui,sans-serif}',
     '#os-root .jv-side{width:184px;padding:21px 13px;background:rgba(3,9,15,.93);border-right-color:rgba(99,178,187,.2)}#os-root .jv-logo{padding:0 8px 24px;gap:11px}#os-root .jv-logo .m{width:29px;height:29px;border-radius:50%;background:radial-gradient(circle,#58e6ce 0 12%,transparent 14%),conic-gradient(from 30deg,transparent,#41d9c2,transparent,#41d9c2,transparent);box-shadow:0 0 22px rgba(57,221,177,.2)}#os-root .jv-logo b{font-family:Georgia,serif;font-size:15px;letter-spacing:.12em;text-transform:uppercase}#os-root .jv-nav button{border-radius:2px;padding:10px 10px;border-left:2px solid transparent;font-size:11.5px}#os-root .jv-nav button.on{background:linear-gradient(90deg,rgba(57,221,177,.13),transparent);border-left-color:var(--jc-grn);color:#cffff0}#os-root .jv-lbl{margin-top:24px;color:#526a72}#os-root .jv-mini{border-radius:3px;padding:7px 9px;font-size:10.5px}#os-root .jv-mini.on{background:rgba(57,221,177,.08);border-color:rgba(57,221,177,.22)}',
     '#os-root .jv-main{padding:19px 26px 28px}#os-root .jv-top{padding:0 0 14px;border-bottom:1px solid rgba(112,183,193,.15);margin-bottom:22px}#os-root .jv-eyebrow{color:#49d8c0;font-size:8.5px}#os-root .jv-page-title,#os-root .jv-org-toolbar h1,#os-root .jv-cmd-title{font-family:Georgia,"Times New Roman",serif;font-weight:400;letter-spacing:-.035em;color:#f0f5f2}#os-root .jv-page-title{font-size:38px;line-height:1.05}#os-root .jv-lead{font-size:11.5px;margin-top:8px;color:#81959c}#os-root .jv-op{border-radius:3px;text-transform:uppercase;letter-spacing:.08em;font-size:8.5px}',
     '#os-root .jv-command-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:20px}#os-root .jv-cmd-title{font-size:42px;line-height:1;margin:5px 0 0}#os-root .jv-cmd-clock{text-align:right}#os-root .jv-cmd-clock b{display:block;font-family:Georgia,serif;font-size:25px;font-weight:400}#os-root .jv-cmd-clock span{display:block;color:var(--jc-mut);font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin-top:3px}',
@@ -656,11 +676,15 @@ function jvCSS() {
     '#os-root .jv-command-grid{display:grid;grid-template-columns:1.25fr .95fr .9fr;gap:10px;margin-bottom:10px}#os-root .jv-instrument{min-height:218px;border:1px solid var(--jc-line);background:linear-gradient(145deg,rgba(9,24,32,.86),rgba(4,12,19,.7));padding:16px 17px;position:relative;overflow:hidden}#os-root .jv-instrument::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(66,214,191,.028),transparent);transform:translateX(-100%);animation:jvScan 8s linear infinite;pointer-events:none}@keyframes jvScan{to{transform:translateX(100%)}}#os-root .jv-inst-label{font-size:8.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--jc-grn);margin-bottom:14px}#os-root .jv-directive{font-family:Georgia,serif;font-size:21px;line-height:1.25;max-width:470px}#os-root .jv-directive-list{margin-top:17px;display:grid;gap:8px}#os-root .jv-directive-list div{font-size:10px;color:#a8babd;padding-left:15px;position:relative}#os-root .jv-directive-list div::before{content:"";position:absolute;left:0;top:5px;width:5px;height:5px;border:1px solid var(--jc-grn)}',
     '#os-root .jv-live-agent{display:grid;grid-template-columns:72px 1fr;gap:14px;align-items:center;margin-top:20px}#os-root .jv-radar{width:70px;height:70px;border-radius:50%;border:1px solid rgba(57,221,177,.35);background:repeating-radial-gradient(circle,transparent 0 11px,rgba(57,221,177,.12) 12px 13px),conic-gradient(from 0deg,transparent 0 76%,rgba(57,221,177,.34));animation:jvspin 8s linear infinite}#os-root .jv-live-agent b{font-family:Georgia,serif;font-size:19px;font-weight:400}#os-root .jv-live-agent span{display:block;color:var(--jc-mut);font-size:10px;line-height:1.45;margin-top:5px}#os-root .jv-health{display:grid;gap:0}#os-root .jv-health div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--jc-line);padding:8px 0;font-size:9.5px;color:#98abb0}#os-root .jv-health b{color:var(--jc-grn);font-size:8px;text-transform:uppercase;letter-spacing:.08em}',
     '#os-root .jv-command-areas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}#os-root .jv-command-area{border:1px solid var(--jc-line);padding:13px 14px;min-height:100px;background:rgba(6,16,23,.72)}#os-root .jv-command-area header{display:flex;justify-content:space-between;gap:8px;color:#dbe8e6;font-size:10px;text-transform:uppercase;letter-spacing:.09em}#os-root .jv-command-area header i{width:6px;height:6px;border-radius:50%;background:var(--jc-grn);box-shadow:0 0 8px var(--jc-grn)}#os-root .jv-command-area p{font-size:9.5px;color:var(--jc-mut);line-height:1.5;margin-top:12px}',
+    '#os-root .jv-recovery{margin-top:16px;border:1px solid rgba(233,174,76,.3);background:rgba(233,174,76,.035)}#os-root .jv-recovery-head{display:flex;align-items:end;justify-content:space-between;gap:18px;padding:16px 18px;border-bottom:1px solid rgba(233,174,76,.2)}#os-root .jv-recovery-head h2{font-family:Georgia,serif;font-size:24px;font-weight:400;margin:5px 0 0}#os-root .jv-recovery-head p{max-width:520px;margin:0;color:#8ea2a6;font-size:10px;line-height:1.5}#os-root .jv-recovery-list{display:grid}#os-root .jv-recovery-row{display:grid;grid-template-columns:32px minmax(160px,.8fr) minmax(240px,1.5fr) auto;gap:13px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(233,174,76,.13)}#os-root .jv-recovery-row:last-child{border-bottom:0}#os-root .jv-recovery-rank{font:19px Georgia,serif;color:var(--jc-amber)}#os-root .jv-recovery-row b{display:block;font-size:10px;color:#eef5f2}#os-root .jv-recovery-row small{display:block;color:#71868c;font-size:8px;margin-top:4px}#os-root .jv-recovery-row p{margin:0;color:#9fb0b2;font-size:9.5px;line-height:1.5}#os-root .jv-recovery-row button{border:1px solid rgba(233,174,76,.34);background:rgba(233,174,76,.07);color:#f2c474;padding:7px 10px;font:700 8.5px Inter,ui-sans-serif,sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer}#os-root .jv-recovery-row button:hover{background:rgba(233,174,76,.13)}',
     '#os-root .jv-work-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:0;border:1px solid var(--jc-line)}#os-root .jv-work-layout>.jv-work-table{border:0;border-radius:0}#os-root .jv-work-row{border-radius:0;background:rgba(5,14,21,.52);border-color:rgba(111,179,188,.12);cursor:pointer}#os-root .jv-work-row:not(.head):hover,#os-root .jv-work-row.selected{background:rgba(57,221,177,.065);box-shadow:inset 2px 0 var(--jc-grn)}#os-root .jv-work-inspector{border-left:1px solid var(--jc-line);padding:18px;background:rgba(5,14,21,.86);min-width:0}#os-root .jv-work-inspector h2{font-family:Georgia,serif;font-size:20px;font-weight:400;margin:8px 0}#os-root .jv-work-inspector p{font-size:10.5px;color:#91a4aa;line-height:1.55}#os-root .jv-ins-block{border-top:1px solid var(--jc-line);padding-top:12px;margin-top:14px}#os-root .jv-ins-block label{display:block;color:var(--jc-grn);font-size:8px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}#os-root .jv-work-summary{border-top:1px solid var(--jc-line);border-bottom:1px solid var(--jc-line);gap:0}#os-root .jv-work-stat{border:0;border-right:1px solid var(--jc-line);border-radius:0;background:transparent}#os-root .jv-work-stat:last-child{border-right:0}',
     '#os-root .jv-schedule-layout{display:grid;grid-template-columns:minmax(0,1fr) 310px;border:1px solid var(--jc-line)}#os-root .jv-schedule-board{min-width:0}#os-root .jv-schedule-head,#os-root .jv-schedule-row{display:grid;grid-template-columns:128px repeat(4,minmax(130px,1fr))}#os-root .jv-schedule-head span{padding:10px;border-right:1px solid var(--jc-line);color:#6f858c;font-size:8px;text-transform:uppercase;letter-spacing:.1em}#os-root .jv-schedule-row{min-height:104px;border-top:1px solid var(--jc-line)}#os-root .jv-schedule-lane{padding:13px;border-right:1px solid var(--jc-line);font-family:Georgia,serif;font-size:15px}#os-root .jv-schedule-cell{padding:8px;border-right:1px solid rgba(111,179,188,.1);display:flex;flex-direction:column;gap:5px}#os-root .jv-slot{border:1px solid color-mix(in srgb,var(--slot) 48%,transparent);background:color-mix(in srgb,var(--slot) 8%,transparent);color:#d9e8e6;padding:7px 8px;text-align:left;font:inherit;cursor:pointer}#os-root .jv-slot b{display:block;font-size:9px}#os-root .jv-slot span{display:block;color:#789096;font-size:8px;margin-top:3px}#os-root .jv-slot:hover,#os-root .jv-slot.on{border-color:var(--slot);box-shadow:0 0 18px color-mix(in srgb,var(--slot) 14%,transparent)}',
     '#os-root .jv-readiness{margin-top:24px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-ready-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;padding:18px 20px;border-bottom:1px solid var(--jc-line)}#os-root .jv-ready-head h2{font-family:Georgia,serif;font-size:24px;font-weight:400;margin:4px 0 0}#os-root .jv-ready-head p{max-width:540px;color:#81959c;font-size:10px;line-height:1.5;margin:0}#os-root .jv-ready-summary{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--jc-line)}#os-root .jv-ready-summary div{padding:13px 18px;border-right:1px solid var(--jc-line)}#os-root .jv-ready-summary b{display:block;font:24px Georgia,serif;color:#eff8f5}#os-root .jv-ready-summary span{font-size:8px;color:#6f858c;text-transform:uppercase;letter-spacing:.1em}#os-root .jv-ready-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#os-root .jv-ready-row{display:grid;grid-template-columns:minmax(130px,1fr) 94px 76px;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(111,179,188,.1);border-right:1px solid rgba(111,179,188,.1);cursor:pointer}#os-root .jv-ready-row:hover{background:rgba(52,221,188,.04)}#os-root .jv-ready-row b{display:block;font-size:10px}#os-root .jv-ready-row small{display:block;color:#71868c;font-size:8px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#os-root .jv-ready-score{font:16px Georgia,serif;color:#49d8c0}#os-root .jv-ready-score.warn{color:#e8ae54}#os-root .jv-ready-pill{font-size:7.5px;text-transform:uppercase;letter-spacing:.07em;color:#49d8c0;border:1px solid rgba(73,216,192,.3);padding:5px 7px;text-align:center}#os-root .jv-ready-pill.warn{color:#e8ae54;border-color:rgba(232,174,84,.35)}',
-    '#os-root .jv-vault-wrap{border-radius:0;background-color:#040b11;background-image:linear-gradient(rgba(70,150,158,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(70,150,158,.03) 1px,transparent 1px),radial-gradient(circle at 45% 48%,rgba(24,112,113,.18),transparent 50%);background-size:30px 30px,30px 30px,auto}#os-root .jv-vpanel,#os-root .jv-vcount .cbox,#os-root .jv-vlegend{border-radius:2px;background:rgba(4,13,19,.94)}#os-root .jv-vpanel h3{font-family:Georgia,serif;font-size:20px;font-weight:400}',
-    '@media(max-width:1050px){#os-root .jv-command-grid{grid-template-columns:1fr 1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:1/-1}#os-root .jv-command-kpis{grid-template-columns:repeat(3,1fr)}#os-root .jv-command-areas{grid-template-columns:repeat(2,1fr)}#os-root .jv-work-layout,#os-root .jv-schedule-layout{grid-template-columns:1fr}#os-root .jv-work-inspector{border-left:0;border-top:1px solid var(--jc-line)}}@media(max-width:700px){#os-root .jv-page-title,#os-root .jv-cmd-title{font-size:31px}#os-root .jv-command-kpis{grid-template-columns:1fr 1fr}#os-root .jv-command-grid,#os-root .jv-command-areas,#os-root .jv-ready-list{grid-template-columns:1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:auto}#os-root .jv-ready-head{display:block}#os-root .jv-ready-head p{margin-top:9px}#os-root .jv-ready-row{grid-template-columns:minmax(120px,1fr) 58px 70px}#os-root .jv-schedule-board{overflow:auto}#os-root .jv-schedule-head,#os-root .jv-schedule-row{min-width:720px}}',
+    '#os-root .jv-role-manager{margin-top:12px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-role-manager>summary{padding:13px 16px;color:#dce9e6;font-size:10px;font-weight:750;cursor:pointer;list-style-position:inside}#os-root .jv-role-manager[open]>summary{border-bottom:1px solid var(--jc-line)}#os-root .jv-role-row{display:grid;grid-template-columns:minmax(150px,1.15fr) minmax(150px,1fr) minmax(150px,1fr) auto;gap:10px;align-items:end;padding:13px 16px;border-bottom:1px solid rgba(111,179,188,.1)}#os-root .jv-role-row:last-child{border-bottom:0}#os-root .jv-role-title b{display:block;font-size:10px;color:#eaf4f1}#os-root .jv-role-title small{display:block;color:#789097;font-size:8px;line-height:1.45;margin-top:4px}#os-root .jv-role-field label{display:block;color:#789097;font-size:8px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}#os-root .jv-role-field select{width:100%;min-height:34px;border:1px solid var(--jc-line);background:#061019;color:#dce9e6;padding:7px 9px;font:10px Inter,ui-sans-serif,sans-serif}#os-root .jv-role-attest{grid-column:2/-1;display:flex;align-items:flex-start;gap:8px;color:#a7bbb9;font-size:9px;line-height:1.5;cursor:pointer;max-width:760px}#os-root .jv-role-attest input{width:15px;height:15px;margin:0;accent-color:var(--jc-grn);flex:0 0 auto}#os-root .jv-role-field select:focus-visible,#os-root .jv-role-save:focus-visible,#os-root .jv-role-attest input:focus-visible{outline:2px solid var(--jc-grn);outline-offset:2px}#os-root .jv-role-save{min-height:34px;border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:7px 12px;font:750 9px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-role-save:hover{background:rgba(57,221,177,.14)}#os-root .jv-role-save:disabled{opacity:.45;cursor:not-allowed}#os-root .jv-role-msg{grid-column:2/-1;font-size:9px;line-height:1.45;color:var(--jc-grn)}#os-root .jv-role-msg.err{color:#ff8f8f}',
+    '#os-root .jv-integration-detail{margin-top:12px;border:1px solid var(--jc-line);background:rgba(3,12,17,.68)}#os-root .jv-integration-detail>summary{padding:13px 16px;color:#dce9e6;font-size:10px;font-weight:750;cursor:pointer}#os-root .jv-integration-detail[open]>summary{border-bottom:1px solid var(--jc-line)}#os-root .jv-integration-row{display:grid;grid-template-columns:minmax(110px,.7fr) 82px minmax(210px,1.8fr) minmax(130px,1fr);gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid rgba(111,179,188,.1)}#os-root .jv-integration-row:last-child{border-bottom:0}#os-root .jv-integration-row b{font-size:10px}#os-root .jv-integration-row span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--jc-grn)}#os-root .jv-integration-row span.warn{color:var(--jc-amber)}#os-root .jv-integration-row p,#os-root .jv-integration-row small{margin:0;font-size:9px;line-height:1.45;color:#8ba0a5}#os-root .jv-integration-row small{color:#698087}',
+    '#os-root .jv-fin-evidence{margin-top:9px;padding-top:8px;border-top:1px solid var(--jc-line)}#os-root .jv-fin-evidence>small{margin-left:8px;color:#71868c;font-size:8px}#os-root .jv-fin-evidence details{margin-top:8px}#os-root .jv-fin-evidence summary{color:var(--jc-grn);font-size:8.5px;cursor:pointer;list-style-position:inside}#os-root .jv-fin-supports{display:grid;gap:5px;margin-top:8px}#os-root .jv-fin-support{border:1px solid rgba(111,179,188,.12);padding:7px 8px;background:rgba(3,12,17,.55)}#os-root .jv-fin-support>a{color:#bff7e7;font-size:9px;text-decoration:none}#os-root .jv-fin-support>span{display:block;color:#71868c;font-size:7.5px;margin-top:3px}#os-root .jv-fin-verify{display:grid;grid-template-columns:1fr auto auto;gap:5px;margin-top:6px}#os-root .jv-fin-verify input{min-width:0;border:1px solid var(--jc-line);background:#050e15;color:#dce9e6;padding:6px 7px;font:8px Inter,ui-sans-serif,sans-serif}#os-root .jv-fin-verify button{border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:5px 7px;font:750 7.5px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-fin-verify button.reject{border-color:rgba(255,143,143,.35);background:rgba(255,143,143,.06);color:#ffaaaa}#os-root .jv-fin-evidence-form{display:grid;grid-template-columns:130px 1fr;gap:7px;margin-top:8px}#os-root .jv-fin-evidence-form input,#os-root .jv-fin-evidence-form select,#os-root .jv-fin-evidence-form textarea{min-width:0;border:1px solid var(--jc-line);background:#050e15;color:#dce9e6;padding:7px 8px;font:9px Inter,ui-sans-serif,sans-serif}#os-root .jv-fin-evidence-form input[type=url],#os-root .jv-fin-evidence-form textarea{grid-column:1/-1}#os-root .jv-fin-evidence-form textarea{min-height:52px;resize:vertical}#os-root .jv-fin-evidence-form button{justify-self:start;border:1px solid rgba(57,221,177,.38);background:rgba(57,221,177,.08);color:#bff7e7;padding:7px 11px;font:750 8px Inter,ui-sans-serif,sans-serif;cursor:pointer}#os-root .jv-fin-evidence-form button:disabled{opacity:.45;cursor:not-allowed}',
+    '#os-root .jv-vault-wrap{border-radius:0;background:radial-gradient(circle at 45% 48%,rgba(24,112,113,.18),transparent 50%),linear-gradient(155deg,#061018,#03080d)}#os-root .jv-vpanel,#os-root .jv-vcount .cbox,#os-root .jv-vlegend{border-radius:2px;background:rgba(4,13,19,.94)}#os-root .jv-vpanel h3{font-family:Georgia,serif;font-size:20px;font-weight:400}',
+    '@media(max-width:1050px){#os-root .jv-command-grid{grid-template-columns:1fr 1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:1/-1}#os-root .jv-command-kpis{grid-template-columns:repeat(3,1fr)}#os-root .jv-command-areas{grid-template-columns:repeat(2,1fr)}#os-root .jv-work-layout,#os-root .jv-schedule-layout{grid-template-columns:1fr}#os-root .jv-work-inspector{border-left:0;border-top:1px solid var(--jc-line)}#os-root .jv-role-row{grid-template-columns:1fr 1fr}#os-root .jv-role-title{grid-column:1/-1}#os-root .jv-role-msg{grid-column:1/-1}#os-root .jv-integration-row{grid-template-columns:110px 78px 1fr}#os-root .jv-integration-row small{grid-column:3}#os-root .jv-recovery-row{grid-template-columns:28px minmax(150px,.75fr) minmax(200px,1.25fr) auto}}@media(max-width:700px){#os-root .jv-page-title,#os-root .jv-cmd-title{font-size:31px}#os-root .jv-command-kpis{grid-template-columns:1fr 1fr}#os-root .jv-command-grid,#os-root .jv-command-areas,#os-root .jv-ready-list{grid-template-columns:1fr}#os-root .jv-command-grid>.jv-instrument:last-child{grid-column:auto}#os-root .jv-ready-head,#os-root .jv-recovery-head{display:block}#os-root .jv-ready-head p,#os-root .jv-recovery-head p{margin-top:9px}#os-root .jv-ready-row{grid-template-columns:minmax(120px,1fr) 58px 70px}#os-root .jv-role-row,#os-root .jv-integration-row,#os-root .jv-recovery-row{grid-template-columns:1fr}#os-root .jv-recovery-rank{font-size:15px}#os-root .jv-role-title{grid-column:auto}#os-root .jv-role-msg,#os-root .jv-integration-row small{grid-column:auto}#os-root .jv-schedule-board{overflow:auto}#os-root .jv-schedule-head,#os-root .jv-schedule-row{min-width:720px}}',
   ].join('\n');
   document.head.appendChild(st);
 }
@@ -674,7 +698,7 @@ async function jvLoad(force) {
   if (jvRole() !== 'admin') { JV.err = 'Solo administradores.'; JV.loaded = true; return; }
   JV.loading = true; JV.err = null;
   try {
-    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates] = await Promise.all([
+    const [reg, props, audit, auditEvidence, reports, memories, runs, crit, mem, cap, ns, occupancy, lineage, policies, roleCoverage, roleCandidates, financialActions, financialEvidenceStatus, financialEvidence, businessCoverage, handoffs] = await Promise.all([
       sb.from('agent_registry').select('id,nombre,proceso,empresa,area,capa,squad,linea,equipo,responsabilidad,skills,tareas,disparadores,nivel_riesgo,estado,dueno,dueno_humano,eval_score,eval_fecha,parent_id,orden').is('deleted_at', null).order('orden', { nullsFirst: false }),
       sb.from('agent_proposals').select('id,agent_id,tipo_accion,property_id,payload,evidencia,estado,approved_by,approved_at,created_at,last_validated_at').is('deleted_at', null).order('created_at', { ascending: false }).limit(300),
       sb.from('agent_audit_log').select('id,agent_id,proposal_id,input,resultado,output,ts').order('ts', { ascending: false }).limit(160),
@@ -689,8 +713,13 @@ async function jvLoad(force) {
       sb.from('v_ocupacion').select('unidades_rentables,ocupadas,disponibles,mantenimiento,reservadas,ocupacion_pct').maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar ocupación.' } })),
       sb.from('lineage_coverage_runs').select('run_at,pantallas,numeros_vistos,con_linaje,sin_linaje,ok').order('run_at', { ascending: false }).limit(1).maybeSingle().then(r => r).catch(() => ({ data: null, error: { message: 'No se pudo consultar linaje.' } })),
       sb.from('agent_decision_policies').select('tipo_accion,categoria,rol_primario,rol_respaldo,rol_escalamiento,sla_hours,auto_execute,requiere_evidencia').then(r => r).catch(() => ({ data: null })),
-      sb.from('v_operational_role_coverage').select('role_code,role_name,area,criticality,primary_ready,backup_ready,verified_at').then(r => r).catch(() => ({ data: null })),
+      sb.from('v_operational_role_coverage').select('role_code,role_name,area,criticality,primary_profile_id,backup_profile_id,primary_ready,backup_ready,verified_at').then(r => r).catch(() => ({ data: null })),
       sb.from('v_operational_role_candidates').select('role_code,role_name,profile_id,candidate_name,email,suitability_score,access_evidence').order('suitability_score', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+      sb.from('v_financial_findings_actionable').select('id,check_id,empresa,titulo,fuente,impacto_usd,severidad,dias_abierto,frente,responsable,evidencia_requerida,siguiente_accion,prioridad_operativa').order('impacto_usd', { ascending: false }).limit(100).then(r => r).catch(() => ({ data: null })),
+      sb.from('v_financial_finding_evidence_status').select('finding_id,evidence_count,verified_count,pending_verification_count,rejected_count,last_evidence_at,closure_state').then(r => r).catch(() => ({ data: null })),
+      sb.from('financial_finding_evidence').select('id,finding_id,evidence_type,title,artifact_url,notes,source_date,status,submitted_by,submitted_at,verified_at,verification_note').order('submitted_at', { ascending: false }).limit(300).then(r => r).catch(() => ({ data: null })),
+      sb.from('v_business_agent_coverage').select('slug,name,agentes,capacidades_cubiertas,capacidades_faltantes,cobertura_completa').order('name').then(r => r).catch(() => ({ data: null })),
+      sb.from('v_agent_handoff_queue').select('proposal_id,from_agent_id,from_agent,from_area,tipo_accion,subject_key,to_role,backup_role,escalation_role,sla_hours,opened_at,evidence_at,age_hours,handoff_state,evidence_present,requested_action').order('age_hours', { ascending: false }).then(r => r).catch(() => ({ data: null })),
     ]);
     if (reg.error) throw reg.error;
     JV.agents = reg.data || [];
@@ -701,6 +730,11 @@ async function jvLoad(force) {
     JV.decisionPolicies = ((policies && policies.data) || []).reduce((out, row) => { out[row.tipo_accion] = row; return out; }, {});
     JV.roleCoverage = (roleCoverage && roleCoverage.data) || [];
     JV.roleCandidates = (roleCandidates && roleCandidates.data) || [];
+    JV.financialActions = (financialActions && financialActions.data) || [];
+    JV.financialEvidenceStatus = ((financialEvidenceStatus && financialEvidenceStatus.data) || []).reduce((out, row) => { out[row.finding_id] = row; return out; }, {});
+    JV.financialEvidence = (financialEvidence && financialEvidence.data) || [];
+    JV.businessCoverage = (businessCoverage && businessCoverage.data) || [];
+    JV.handoffs = (handoffs && handoffs.data) || [];
     JV.runsTotal = runs.count || 0;
     JV.crit = crit.error ? [] : (crit.data || []);
     JV.critImpact = JV.crit.reduce((s, f) => s + (+f.impacto_usd || 0), 0);
@@ -752,13 +786,22 @@ async function jvLoad(force) {
   if (window.osRender) osRender();
 }
 window.jvLoad = jvLoad;
-function jvNav(tab) { JV.tab = tab; if (window.osRender) osRender(); }
+function jvNav(tab) { JV.tab = tab; if (tab === 'manual' && window.opmLoad) opmLoad(); if (window.osRender) osRender(); }
 // Filtro del Mapa de Agentes por escuadra/línea (sidebar "Escuadras")
 function jvFilterLinea(linea) { JV.filterLinea = (JV.filterLinea === linea) ? null : linea; JV.tab = 'network'; if (window.osRender) osRender(); }
 window.jvFilterLinea = jvFilterLinea;
 function jvFilterClear() { JV.filterLinea = null; JV.tab = 'network'; if (window.osRender) osRender(); }
 window.jvFilterClear = jvFilterClear;
 window.jvNav = jvNav;
+if (!window.__jvDelegatedNavigation) {
+  window.__jvDelegatedNavigation = true;
+  document.addEventListener('click', function (event) {
+    const trigger = event.target && event.target.closest ? event.target.closest('[data-jv-nav]') : null;
+    if (!trigger || !document.getElementById('os-root')?.contains(trigger)) return;
+    event.preventDefault();
+    jvNav(trigger.getAttribute('data-jv-nav') || 'network');
+  });
+}
 
 // ════════════════════════════════════════════════════════════════
 // SHELL
@@ -773,7 +816,7 @@ function jvView() {
 window.jvView = jvView;
 
 function jvSidebar() {
-  const nav = JV_NAV.map(n => '<button type="button" class="' + (JV.tab === n.k ? 'on' : '') + '" onclick="jvNav(\'' + n.k + '\')">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</button>').join('');
+  const nav = JV_NAV.map(n => '<button type="button" class="' + (JV.tab === n.k ? 'on' : '') + '" data-jv-nav="' + n.k + '">' + osIcon(n.ic, { size: 15 }) + ' ' + n.t + '</button>').join('');
   const todos = '<div class="jv-mini jv-mini-all' + (JV.filterLinea == null ? ' on' : '') + '" onclick="jvFilterClear()" style="cursor:pointer"><div class="ic">' + osIcon('list', { size: 13 }) + '</div>Todo el equipo<span class="stt idle" style="visibility:hidden"></span></div>';
   const minis = JV_LINEAS.filter(L => L.linea !== 'Comando' && L.linea.indexOf('Transversal') !== 0 && (JV.agents.some(a => a.linea === L.linea && !jvIsLegacy(a)) || JV_LINEA_PLANNED.includes(L.linea))).map(L => {
     const st = jvLineaStatus(L.linea);
@@ -783,9 +826,20 @@ function jvSidebar() {
     + '<nav class="jv-nav">' + nav + '</nav>'
     + '<div class="jv-lbl">Áreas</div>' + todos + minis + '</aside>';
 }
+function jvSystemPosture() {
+  const report = JV.reports.find(r => r.tipo === 'continuidad_ausencia_6_meses');
+  const payload = report && report.payload && typeof report.payload === 'object' ? report.payload : null;
+  const passed = payload ? Number(payload.compuertas_aprobadas || 0) : 0;
+  const total = payload ? Number(payload.compuertas_totales || 8) : 8;
+  const ready = !!payload && payload.estado === 'listo' && passed === total;
+  if (ready) return { ready: true, label: 'Operación verificada', detail: passed + ' de ' + total + ' controles aprobados' };
+  if (payload) return { ready: false, label: 'Operación con atención', detail: passed + ' de ' + total + ' controles aprobados · ' + Math.max(0, total - passed) + ' requieren atención' };
+  return { ready: false, label: 'Verificación pendiente', detail: 'Todavía no existe una certificación reciente de continuidad' };
+}
 function jvTopBar() {
   const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-  return '<div class="jv-top"><div class="jv-eyebrow">Rental Profitss · Agentic OS</div><div class="jv-op"><span class="d"></span> Sistema Operativo · ' + now + '</div></div>';
+  const posture = jvSystemPosture();
+  return '<div class="jv-top"><div class="jv-eyebrow">Rental Profitss · Agentic OS</div><div class="jv-op' + (posture.ready ? '' : ' attention') + '" title="' + OS_E(posture.detail) + '"><span class="d"></span> ' + OS_E(posture.label) + ' · ' + now + '</div></div>';
 }
 function jvTabBody() {
   switch (JV.tab) {
@@ -797,6 +851,7 @@ function jvTabBody() {
     case 'horarios': return jvHorariosView();
     case 'vault': return jvVaultGraphView();
     case 'reportes': return jvReportesView();
+    case 'manual': return window.opmView ? opmView() : '<div class="jv-empty">Manual operativo no disponible.</div>';
     default: return jvMapaView();
   }
 }
@@ -1079,6 +1134,28 @@ function jvReadinessPanel() {
     + '<div class="jv-ready-summary"><div><b>' + ready + '/' + rows.length + '</b><span>puestos listos</span></div><div><b>' + evidence + '</b><span>con evidencia reciente</span></div><div><b>' + blocked + '</b><span>requieren atención</span></div></div>'
     + '<div class="jv-ready-list">' + list + '</div></section>';
 }
+function jvRecoveryPlan() {
+  const report = JV.reports.find(r => r.tipo === 'continuidad_ausencia_6_meses');
+  const payload = report && report.payload && typeof report.payload === 'object' ? report.payload : null;
+  const gates = payload && payload.compuertas && typeof payload.compuertas === 'object' ? payload.compuertas : {};
+  const definitions = {
+    integridad_financiera: { order: 1, title: 'Cerrar hallazgos financieros críticos', owner: 'Controller + Auditor de Integridad', tab: 'reportes', action: 'Abrir reportes', evidence: g => jvNum(g.hallazgos_criticos || JV.financialActions.length) + ' hallazgo(s) requieren soporte y conciliación.' },
+    cobertura_humana: { order: 2, title: 'Confirmar titulares y respaldos', owner: 'Dirección', tab: 'command', action: 'Gestionar cobertura', evidence: g => String(g.evidencia || 'Cobertura humana incompleta.') },
+    decisiones: { order: 3, title: 'Resolver decisiones fuera de SLA', owner: 'Responsables de cada área', tab: 'propuestas', action: 'Abrir decisiones', evidence: g => jvNum(g.fuera_de_sla || jvPendingDecisions().length) + ' decisión(es) fuera del tiempo acordado.' },
+    integraciones: { order: 4, title: 'Recuperar conexiones bloqueadas', owner: 'Continuidad + administrador', tab: 'command', action: 'Ver diagnóstico', evidence: g => {
+      const detail = Array.isArray(g.detalle) ? g.detalle.filter(x => !x || !x.ok).map(x => x && x.sistema).filter(Boolean) : [];
+      return detail.length ? 'Bloqueadas: ' + detail.join(', ') + '.' : jvNum(Math.max(0, Number(g.vigiladas || 0) - Number(g.saludables || 0))) + ' conexión(es) sin evidencia saludable.';
+    } },
+    trabajo_aprobado: { order: 5, title: 'Confirmar ejecución de trabajo aprobado', owner: 'Responsables de ejecución', tab: 'work', action: 'Abrir trabajo', evidence: g => jvNum(g.pendientes_ejecucion || 0) + ' aprobación(es) todavía no tienen evidencia de ejecución.' },
+    automatizaciones_sin_fallos: { order: 6, title: 'Revisar fallos programados', owner: 'Continuidad', tab: 'horarios', action: 'Abrir horarios', evidence: g => jvNum(g.fallos_7d || 0) + ' fallo(s) durante los últimos siete días.' },
+    automatizaciones_con_senal: { order: 7, title: 'Recuperar automatizaciones sin señal', owner: 'Continuidad', tab: 'horarios', action: 'Abrir horarios', evidence: g => jvNum(g.requieren_atencion || 0) + ' automatización(es) no demostraron un resultado reciente.' },
+  };
+  const rows = Object.keys(gates).filter(key => gates[key] && gates[key].ok === false && definitions[key]).map(key => ({ key, gate: gates[key], ...definitions[key] })).sort((a, b) => a.order - b.order);
+  if (!rows.length) return '';
+  return '<section class="jv-recovery"><div class="jv-recovery-head"><div><div class="jv-eyebrow">Plan de recuperación verificable</div><h2>Qué debe ocurrir para delegar la operación.</h2></div><p>Ordenado por riesgo. Cada frente conserva responsable, evidencia y destino; Jarvis no asigna personas, borra hallazgos ni aprueba dinero por su cuenta.</p></div><div class="jv-recovery-list">'
+    + rows.map((x, i) => '<article class="jv-recovery-row"><span class="jv-recovery-rank">' + String(i + 1).padStart(2, '0') + '</span><div><b>' + OS_E(x.title) + '</b><small>Responsable: ' + OS_E(x.owner) + '</small></div><p>' + OS_E(x.evidence(x.gate)) + '</p><button type="button" data-jv-nav="' + x.tab + '">' + OS_E(x.action) + '</button></article>').join('')
+    + '</div></section>';
+}
 function jvDashboard() {
   jvClockStart();
   const pending = jvPendingDecisions().length;
@@ -1107,11 +1184,62 @@ function jvDashboard() {
     + '<article class="jv-instrument"><div class="jv-inst-label">Razonamiento en curso</div><div class="jv-live-agent"><div class="jv-radar"></div><div><b>' + OS_E(activeAgent ? activeAgent.nombre : 'Sin agente activo') + '</b><span>' + OS_E(audit.title) + '<br>' + OS_E(audit.detail) + '</span></div></div></article>'
     + '<article class="jv-instrument"><div class="jv-inst-label">Salud del sistema</div><div class="jv-health"><div><span>Agentes IA</span><b>' + live.length + '/' + current.length + '</b></div><div><span>Ocupación reconciliada</span><b>' + ((JV.controls || {}).occupancy ? 'con lectura' : 'sin lectura') + '</b></div><div><span>Linaje de datos</span><b>' + ((JV.controls || {}).lineage ? 'con evidencia' : 'sin corrida') + '</b></div><div><span>Decisiones humanas</span><b>' + pending + ' pendientes</b></div><div><span>Bitácora</span><b>' + JV.audit.length + ' eventos</b></div></div></article></section>'
     + '<section class="jv-command-areas">' + areaHTML + '</section>'
+    + jvRecoveryPlan()
     + jvControlsPanel()
     + jvReadinessPanel()
     + '<div style="margin-top:14px">' + jvChatUI() + '</div>'
     + jvWorkPulse();
 }
+
+function jvRoleOptions(role, selectedId, otherId) {
+  const candidates = (JV.roleCandidates || []).filter(c => c.role_code === role.role_code);
+  return '<option value="">Seleccionar persona…</option>' + candidates.map(c => {
+    const disabled = otherId && c.profile_id === otherId;
+    return '<option value="' + OS_E(c.profile_id) + '"' + (c.profile_id === selectedId ? ' selected' : '')
+      + (disabled ? ' disabled' : '') + '>' + OS_E(c.candidate_name) + ' · ' + OS_E(c.access_evidence) + '</option>';
+  }).join('');
+}
+
+async function jvSaveRoleCoverage(roleCode) {
+  if (jvRole() !== 'admin' || JV.roleBusy) return;
+  const primary = document.getElementById('jv-role-primary-' + roleCode);
+  const backup = document.getElementById('jv-role-backup-' + roleCode);
+  const attestation = document.getElementById('jv-role-attest-' + roleCode);
+  const primaryId = primary && primary.value;
+  const backupId = backup && backup.value;
+  if (!primaryId || !backupId) {
+    JV.roleMessages[roleCode] = { error: true, text: 'Seleccioná titular y respaldo antes de confirmar.' };
+    osRender(); return;
+  }
+  if (primaryId === backupId) {
+    JV.roleMessages[roleCode] = { error: true, text: 'Titular y respaldo deben ser personas distintas.' };
+    osRender(); return;
+  }
+  if (!attestation || !attestation.checked) {
+    JV.roleMessages[roleCode] = { error: true, text: 'Confirmá experiencia, disponibilidad y aceptación de titular y respaldo.' };
+    osRender(); return;
+  }
+  JV.roleBusy = roleCode;
+  JV.roleMessages[roleCode] = { error: false, text: 'Guardando y verificando permisos…' };
+  osRender();
+  const saved = await sb.rpc('assign_operational_role', {
+    p_role_code: roleCode,
+    p_primary_profile_id: primaryId,
+    p_backup_profile_id: backupId,
+    p_attested: true,
+    p_reason: 'Confirmación administrativa desde Jarvis'
+  });
+  if (saved.error) {
+    JV.roleBusy = null;
+    JV.roleMessages[roleCode] = { error: true, text: 'No se pudo guardar: ' + saved.error.message + ' Revisá permisos y volvé a intentar.' };
+    osRender(); return;
+  }
+  JV.roleBusy = null;
+  JV.roleMessages[roleCode] = { error: false, text: 'Cobertura confirmada, revisada y registrada en el historial.' };
+  JV.loaded = false;
+  await jvLoad(true);
+}
+window.jvSaveRoleCoverage = jvSaveRoleCoverage;
 
 function jvControlsPanel() {
   const c = JV.controls || {};
@@ -1146,20 +1274,77 @@ function jvControlsPanel() {
     ? 'La matriz de responsabilidades todavía no está disponible.'
     : rolesOk ? 'Cada rol crítico tiene titular, respaldo y permisos de área verificados.'
       : (roles.length - coveredRoles) + ' rol(es) todavía no tienen titular y respaldo con permisos confirmados. Jarvis no los presenta como delegados.';
-  const candidateRows = roles.filter(r => !r.primary_ready || !r.backup_ready).map(r => {
+  const businesses = JV.businessCoverage || [];
+  const coveredBusinesses = businesses.filter(x => x.cobertura_completa).length;
+  const businessesOk = businesses.length > 0 && coveredBusinesses === businesses.length;
+  const businessValue = businesses.length ? coveredBusinesses + ' / ' + businesses.length + ' empresas cubiertas' : 'Sin matriz disponible';
+  const businessDetail = !businesses.length
+    ? 'No existe una comprobación contra el registro canónico de empresas.'
+    : businessesOk ? 'Cada empresa activa tiene dirección, ejecución, finanzas, optimización, reportes e integridad.'
+      : businesses.filter(x => !x.cobertura_completa).map(x => x.name + ': falta ' + (x.capacidades_faltantes || []).join(', ')).join(' · ');
+  const candidateRows = roles.map(r => {
     const candidates = (JV.roleCandidates || []).filter(c => c.role_code === r.role_code).slice(0, 3);
-    return '<div class="jv-detail-row"><span><b>' + OS_E(r.role_name) + '</b><small>Requiere titular y respaldo confirmados</small></span><strong>'
-      + (candidates.length ? candidates.map(c => OS_E(c.candidate_name) + ' · ' + OS_E(c.access_evidence)).join('<br>') : 'Sin candidato con acceso compatible')
-      + '</strong></div>';
+    const msg = JV.roleMessages[r.role_code];
+    const busy = JV.roleBusy === r.role_code;
+    return '<div class="jv-role-row"><div class="jv-role-title"><b>' + OS_E(r.role_name) + '</b><small>'
+      + OS_E(r.area) + ' · ' + OS_E(r.criticality) + ' · ' + (r.primary_ready && r.backup_ready ? 'cobertura verificada' : 'requiere confirmación')
+      + (candidates.length ? '<br>' + candidates.length + ' candidato(s) con acceso compatible' : '<br>Sin candidato con acceso compatible') + '</small></div>'
+      + '<div class="jv-role-field"><label for="jv-role-primary-' + OS_E(r.role_code) + '">Titular</label><select id="jv-role-primary-' + OS_E(r.role_code) + '">'
+      + jvRoleOptions(r, r.primary_profile_id, r.backup_profile_id) + '</select></div>'
+      + '<div class="jv-role-field"><label for="jv-role-backup-' + OS_E(r.role_code) + '">Respaldo</label><select id="jv-role-backup-' + OS_E(r.role_code) + '">'
+      + jvRoleOptions(r, r.backup_profile_id, r.primary_profile_id) + '</select></div>'
+      + '<button class="jv-role-save" type="button" onclick="jvSaveRoleCoverage(\'' + OS_E(r.role_code) + '\')"' + (busy || candidates.length < 2 ? ' disabled' : '') + '>'
+      + (busy ? 'Guardando…' : (r.primary_ready && r.backup_ready ? 'Actualizar' : 'Confirmar cobertura')) + '</button>'
+      + '<label class="jv-role-attest" for="jv-role-attest-' + OS_E(r.role_code) + '"><input id="jv-role-attest-' + OS_E(r.role_code) + '" type="checkbox">Confirmo que ambas personas aceptaron el rol, tienen disponibilidad y cuentan con la experiencia necesaria.</label>'
+      + (msg ? '<div class="jv-role-msg ' + (msg.error ? 'err' : '') + '">' + OS_E(msg.text) + '</div>' : '') + '</div>';
   }).join('');
   const absenceValue = absence ? absencePassed + ' / ' + absenceTotal + ' compuertas' : 'Sin certificación disponible';
   const absenceDetail = absence ? (absenceOk ? 'Los controles de continuidad están verificados para una ausencia prolongada.' : String(absence.bloqueo_principal || 'Hay compuertas pendientes.')) : 'Todavía no existe una corrida de preparación para ausencia prolongada.';
+  const integrationReport = JV.reports.find(r => r.tipo === 'salud_integraciones');
+  const integration = integrationReport && integrationReport.payload && typeof integrationReport.payload === 'object' ? integrationReport.payload : null;
+  const connections = integration && Array.isArray(integration.conexiones) ? integration.conexiones : [];
+  const healthyConnections = connections.filter(x => x && x.ok).length;
+  const integrationsOk = connections.length > 0 && healthyConnections === connections.length;
+  const brokenNames = connections.filter(x => !x || !x.ok).map(x => x && x.sistema).filter(Boolean);
+  const integrationValue = connections.length ? healthyConnections + ' / ' + connections.length + ' conexiones sanas' : 'Sin revisión disponible';
+  const integrationDetail = !connections.length
+    ? 'No existe evidencia reciente para certificar las conexiones operativas.'
+    : integrationsOk ? 'Todas las conexiones vigiladas tienen evidencia reciente y una ejecución real confirmada.'
+      : 'Bloqueadas: ' + brokenNames.join(', ') + '. Jarvis mantiene visibles los fallos y evita tratarlos como sincronizaciones exitosas.';
+  const recoveryBySystem = {
+    ClickUp: 'Renovar la credencial rechazada y exigir una sincronización completa sin errores antes de reactivar acciones.',
+    WhatsApp: 'Renovar la credencial de Meta, configurar META_APP_SECRET para validar webhooks y confirmar una entrega real con identificador de evidencia.',
+    Airtable: 'Reconciliar las entidades con diferencia y repetir la comprobación de paridad.',
+    QuickBooks: 'Actualizar el espejo contable y confirmar antigüedad y conteos contra la fuente.',
+    RentCast: 'Verificar cuota, respuesta reciente y trazabilidad de la consulta antes de usar los datos.'
+  };
+  const integrationRows = connections.map(x => '<div class="jv-integration-row"><b>' + OS_E(x.sistema || 'Integración') + '</b><span class="' + (x.ok ? '' : 'warn') + '">' + (x.ok ? 'operativa' : 'bloqueada') + '</span><p>' + OS_E(x.evidencia || 'Sin evidencia registrada.') + '</p><small>' + OS_E(x.ok ? ('Responsable: ' + (x.responsable || 'Continuidad')) : (recoveryBySystem[x.sistema] || 'Revisar credenciales, ejecutar una prueba real y conservar la evidencia.')) + '</small></div>').join('');
+  const automationReport = JV.reports.find(r => r.tipo === 'salud_automatizaciones');
+  const automationHealth = automationReport && automationReport.payload && typeof automationReport.payload === 'object' ? automationReport.payload : null;
+  const automationKpis = automationHealth && automationHealth.kpis && typeof automationHealth.kpis === 'object' ? automationHealth.kpis : {};
+  const automationFindings = automationHealth && Array.isArray(automationHealth.hallazgos) ? automationHealth.hallazgos : [];
+  const watchedAutomations = n(automationKpis.vigiladas);
+  const healthyAutomations = n(automationKpis.saludables);
+  const automationsOk = watchedAutomations > 0 && healthyAutomations === watchedAutomations && automationFindings.length === 0;
+  const automationValue = watchedAutomations ? healthyAutomations + ' / ' + watchedAutomations + ' resultados confirmados' : 'Sin revisión disponible';
+  const automationDetail = !watchedAutomations
+    ? 'No existe una revisión reciente de los resultados automáticos.'
+    : automationsOk ? 'Cada tarea vigilada tiene una corrida y un resultado real dentro del plazo esperado.'
+      : automationFindings.length + ' tarea(s) requieren atención. Jarvis diferencia entre iniciar una tarea y terminarla correctamente.';
+  const automationRows = automationFindings.map(x => '<div class="jv-integration-row"><b>' + OS_E(jvHumanize(x.automatizacion || 'Automatización')) + '</b><span class="warn">requiere atención</span><p>'
+    + OS_E(x.causa || ('Estado verificado: ' + jvHumanize(x.estado || 'sin evidencia'))) + '</p><small>Responsable: '
+    + OS_E(x.responsable || 'Continuidad') + ' · Evidencia: ' + OS_E(x.fuente_evidencia || 'no registrada')
+    + (x.evidencia_fecha ? ' · ' + OS_E(jvFmtTs(x.evidencia_fecha)) : '') + '</small></div>').join('');
   return '<section class="jv-controls"><div class="jv-section-title">Controles de integridad <span>evidencia viva</span></div><div class="jv-controls-grid">'
     + card('home', 'Ocupación reconciliada', occOk, occValue, occDetail, 'v_ocupacion')
     + card('git-branch', 'Linaje de datos', lineOk, lineValue, lineDetail, 'lineage_coverage_runs')
     + card('users', 'Cobertura humana', rolesOk, rolesValue, rolesDetail, 'v_operational_role_coverage')
+    + card('building', 'Cobertura por empresa', businessesOk, businessValue, businessDetail, 'v_business_agent_coverage')
+    + card('plug', 'Integraciones operativas', integrationsOk, integrationValue, integrationDetail, 'salud_integraciones')
+    + card('activity', 'Trabajo automático', automationsOk, automationValue, automationDetail, 'salud_automatizaciones')
     + card('shield-check', 'Ausencia de 6 meses', absenceOk, absenceValue, absenceDetail, 'continuidad_ausencia_6_meses')
-    + '</div>' + (!rolesOk ? '<details class="jv-decision-more" style="margin-top:12px"><summary>Ver candidatos por acceso vigente</summary><div class="jv-detail-list">' + candidateRows + '</div><div class="jv-needs-info">Estos nombres son candidatos técnicos por permisos. Un administrador debe confirmar experiencia, disponibilidad, aceptación y respaldo antes de asignarlos.</div></details>' : '') + '</section>';
+    + '</div><details class="jv-integration-detail"' + (!automationsOk ? ' open' : '') + '><summary>Resultados automáticos que requieren atención</summary>' + (automationRows || '<div class="jv-needs-info" style="margin:12px 16px">No hay fallos de resultado registrados. La próxima revisión actualizará esta evidencia.</div>') + '</details><details class="jv-integration-detail"' + (!integrationsOk ? ' open' : '') + '><summary>Diagnóstico y recuperación de integraciones</summary>' + (integrationRows || '<div class="jv-needs-info" style="margin:12px 16px">Ejecutá la revisión de salud para obtener evidencia por conexión.</div>') + '</details><details class="jv-role-manager"' + (!rolesOk ? ' open' : '') + '><summary>Gestionar titulares y respaldos</summary>' + candidateRows
+    + '<div class="jv-needs-info" style="margin:12px 16px 16px">Los candidatos se filtran por permisos vigentes. Antes de confirmar, el administrador debe validar experiencia, disponibilidad y aceptación de ambas personas. Jarvis nunca asigna responsabilidades por inferencia.</div></details></section>';
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1178,7 +1363,8 @@ function jvWorkItems() {
   const proposalItems = visibleProposals.map(p => {
     const info = jvProposalInfo(p);
     const state = p.estado === 'propuesta' ? 'waiting' : (p.estado === 'aprobada' ? 'running' : 'done');
-    return { id: 'p-' + p.id, kind: 'Decisión', agentId: p.agent_id, area: jvProposalArea(p), title: info.title, detail: info.summary, state, ts: p.created_at, source: info.source || 'agent_proposals' };
+    const handoff = JV.handoffs.find(h => h.proposal_id === p.id) || null;
+    return { id: 'p-' + p.id, proposalId: p.id, kind: 'Decisión', agentId: p.agent_id, area: jvProposalArea(p), title: info.title, detail: info.summary, state, ts: p.created_at, source: info.source || 'agent_proposals', handoff };
   });
   const auditItems = JV.audit.map(r => {
     const info = jvAuditWorkInfo(r), a = jvAgent(r.agent_id);
@@ -1202,12 +1388,14 @@ function jvWorkView() {
   const states = [['Todos', 'Todo'], ['waiting', 'Necesita decisión'], ['running', 'En cola'], ['done', 'Completado'], ['failed', 'Revisar']];
   let rows = all.filter(x => (JV.workArea === 'Todas' || x.area === JV.workArea) && (JV.workState === 'Todos' || x.state === JV.workState) && (!JV.workAgentId || x.agentId === JV.workAgentId));
   const counts = { waiting: all.filter(x => x.state === 'waiting').length, running: all.filter(x => x.state === 'running').length, done: all.filter(x => x.state === 'done').length, failed: all.filter(x => x.state === 'failed').length };
+  const overdueHandoffs = JV.handoffs.filter(h => h.handoff_state === 'overdue').length;
   const filters = '<div class="jv-work-toolbar"><div class="jv-filter-tabs">' + states.map(s => '<button class="' + (JV.workState === s[0] ? 'on' : '') + '" onclick="jvWorkState(\'' + s[0] + '\')">' + s[1] + '</button>').join('') + '</div><select onchange="jvWorkArea(this.value)" aria-label="Filtrar trabajo por área">' + areas.map(a => '<option value="' + OS_E(a) + '"' + (JV.workArea === a ? ' selected' : '') + '>' + OS_E(a) + '</option>').join('') + '</select>' + (JV.workAgentId ? '<button class="jv-filter-x" onclick="jvWorkAgent(null)">Agente: ' + OS_E(jvAgentName(JV.workAgentId)) + ' ×</button>' : '') + '</div>';
   if (!JV.workSelectedId || !rows.some(x => x.id === JV.workSelectedId)) JV.workSelectedId = rows[0] ? rows[0].id : null;
   const selected = rows.find(x => x.id === JV.workSelectedId) || null;
-  const table = rows.length ? '<div class="jv-work-table"><div class="jv-work-row head"><span>Estado</span><span>Trabajo</span><span>Responsable</span><span>Evidencia</span><span>Hora</span></div>' + rows.slice(0, 120).map(x => '<article class="jv-work-row' + (x.id === JV.workSelectedId ? ' selected' : '') + '" onclick="jvSelectWork(\'' + x.id + '\')"><span class="jv-work-state ' + x.state + '">' + OS_E(jvWorkStateLabel(x.state)) + '</span><div class="jv-work-task"><b>' + OS_E(x.title) + '</b><span>' + OS_E(x.detail) + '</span></div><div class="jv-work-owner"><b>' + OS_E(jvAgentName(x.agentId)) + '</b><span>' + OS_E(x.area) + '</span></div><span class="jv-chip">' + OS_E(x.source) + '</span><span class="jv-work-time">' + OS_E(jvFmtTs(x.ts)) + '</span></article>').join('') + '</div>' : '<div class="jv-card"><b>No hay trabajo en este filtro</b><div class="jv-empty">Cambia el área o el estado. Jarvis no completa la cola con actividad simulada.</div></div>';
-  const inspector = selected ? '<aside class="jv-work-inspector"><div class="jv-eyebrow">Trabajo seleccionado</div><h2>' + OS_E(selected.title) + '</h2><span class="jv-work-state ' + selected.state + '">' + OS_E(jvWorkStateLabel(selected.state)) + '</span><div class="jv-ins-block"><label>Resumen</label><p>' + OS_E(selected.detail) + '</p></div><div class="jv-ins-block"><label>Responsable</label><p><b>' + OS_E(jvAgentName(selected.agentId)) + '</b><br>' + OS_E(selected.area) + '</p></div><div class="jv-ins-block"><label>Evidencia</label><p>Fuente: <b>' + OS_E(selected.source) + '</b><br>Registrada ' + OS_E(jvFmtTs(selected.ts)) + '.</p></div><div class="jv-ins-block"><label>Límite humano</label><p>' + (selected.state === 'waiting' ? 'Este trabajo necesita una decisión explícita antes de avanzar.' : 'Una bitácora real confirma el estado visible; Jarvis no presume que una aprobación ya fue ejecutada.') + '</p></div><button class="jv-ai-action" onclick="jvWorkAgent(\'' + (selected.agentId || '') + '\')">Ver todo el trabajo del agente →</button></aside>' : '<aside class="jv-work-inspector"><div class="jv-empty">Seleccioná un trabajo para inspeccionar su evidencia.</div></aside>';
-  return '<h1 class="jv-page-title">Cola de trabajo.</h1><div class="jv-lead">Todo lo que hicieron y todo lo que falta, con dueño, área, hora y evidencia.</div><div class="jv-work-summary"><div class="jv-work-stat"><b>' + all.length + '</b><span>Total visible</span></div><div class="jv-work-stat"><b>' + counts.done + '</b><span>Completadas</span></div><div class="jv-work-stat"><b>' + counts.running + '</b><span>En cola</span></div><div class="jv-work-stat"><b>' + (counts.waiting + counts.failed) + '</b><span>Requieren atención</span></div></div>' + filters + '<div class="jv-work-layout">' + table + inspector + '</div>';
+  const table = rows.length ? '<div class="jv-work-table"><div class="jv-work-row head"><span>Estado</span><span>Trabajo</span><span>Responsable</span><span>Evidencia</span><span>Hora</span></div>' + rows.slice(0, 120).map(x => '<article class="jv-work-row' + (x.id === JV.workSelectedId ? ' selected' : '') + '" onclick="jvSelectWork(\'' + x.id + '\')"><span class="jv-work-state ' + x.state + '">' + OS_E(jvWorkStateLabel(x.state)) + '</span><div class="jv-work-task"><b>' + OS_E(x.title) + '</b><span>' + OS_E(x.detail) + '</span></div><div class="jv-work-owner"><b>' + OS_E(jvAgentName(x.agentId)) + '</b><span>' + OS_E(x.handoff ? ('→ ' + x.handoff.to_role) : x.area) + '</span></div><span class="jv-chip">' + OS_E(x.source) + '</span><span class="jv-work-time">' + OS_E(jvFmtTs(x.ts)) + '</span></article>').join('') + '</div>' : '<div class="jv-card"><b>No hay trabajo en este filtro</b><div class="jv-empty">Cambia el área o el estado. Jarvis no completa la cola con actividad simulada.</div></div>';
+  const handoffBlock = selected && selected.handoff ? '<div class="jv-ins-block"><label>Traspaso verificable</label><p><b>' + OS_E(selected.handoff.from_agent) + '</b> → <b>' + OS_E(selected.handoff.to_role) + '</b><br>Respaldo: ' + OS_E(selected.handoff.backup_role) + '<br>Escala a: ' + OS_E(selected.handoff.escalation_role) + '<br>SLA: ' + jvNum(selected.handoff.sla_hours) + ' h · ' + (selected.handoff.handoff_state === 'overdue' ? 'fuera de plazo' : 'dentro del plazo') + '.</p></div>' : '';
+  const inspector = selected ? '<aside class="jv-work-inspector"><div class="jv-eyebrow">Trabajo seleccionado</div><h2>' + OS_E(selected.title) + '</h2><span class="jv-work-state ' + selected.state + '">' + OS_E(jvWorkStateLabel(selected.state)) + '</span><div class="jv-ins-block"><label>Resumen</label><p>' + OS_E(selected.detail) + '</p></div><div class="jv-ins-block"><label>Responsable</label><p><b>' + OS_E(jvAgentName(selected.agentId)) + '</b><br>' + OS_E(selected.area) + '</p></div>' + handoffBlock + '<div class="jv-ins-block"><label>Evidencia</label><p>Fuente: <b>' + OS_E(selected.source) + '</b><br>Registrada ' + OS_E(jvFmtTs(selected.handoff ? selected.handoff.evidence_at : selected.ts)) + '.</p></div><div class="jv-ins-block"><label>Límite humano</label><p>' + (selected.state === 'waiting' ? 'Este trabajo necesita una decisión explícita antes de avanzar.' : 'Una bitácora real confirma el estado visible; Jarvis no presume que una aprobación ya fue ejecutada.') + '</p></div><button class="jv-ai-action" onclick="jvWorkAgent(\'' + (selected.agentId || '') + '\')">Ver todo el trabajo del agente →</button></aside>' : '<aside class="jv-work-inspector"><div class="jv-empty">Seleccioná un trabajo para inspeccionar su evidencia.</div></aside>';
+  return '<h1 class="jv-page-title">Cola de trabajo.</h1><div class="jv-lead">Todo lo que hicieron y todo lo que falta, con origen, destino, respaldo, SLA y evidencia.</div><div class="jv-work-summary"><div class="jv-work-stat"><b>' + all.length + '</b><span>Total visible</span></div><div class="jv-work-stat"><b>' + counts.done + '</b><span>Completadas</span></div><div class="jv-work-stat"><b>' + counts.running + '</b><span>En cola</span></div><div class="jv-work-stat"><b>' + overdueHandoffs + '</b><span>Traspasos vencidos</span></div></div>' + filters + '<div class="jv-work-layout">' + table + inspector + '</div>';
 }
 function jvSelectWork(id) { JV.workSelectedId = id || null; if (window.osRender) osRender(); }
 function jvWorkState(state) { JV.workState = state || 'Todos'; if (window.osRender) osRender(); }
@@ -1240,7 +1428,8 @@ function jvHudHeader() {
   const d = new Date();
   const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Chicago' });
   const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'America/Chicago' });
-  return '<div class="jv-hud-hdr"><div><div class="jv-hi">Buen día, <span>' + OS_E(jvGreetName()) + '</span> 👋</div><div class="jv-hud-date">' + OS_E(fecha.charAt(0).toUpperCase() + fecha.slice(1)) + ' · todo bajo control</div></div>'
+  const posture = jvSystemPosture();
+  return '<div class="jv-hud-hdr"><div><div class="jv-hi">Buen día, <span>' + OS_E(jvGreetName()) + '</span></div><div class="jv-hud-date' + (posture.ready ? '' : ' attention') + '">' + OS_E(fecha.charAt(0).toUpperCase() + fecha.slice(1)) + ' · ' + OS_E(posture.detail) + '</div></div>'
     + '<div class="jv-clock"><div class="t" id="jv-clock">' + hora + '</div><div class="w">Austin, TX</div></div></div>';
 }
 function jvClockStart() {
@@ -1411,7 +1600,8 @@ function jvLanesHTML() {
     const ownerStage = escalated ? 'Escalamiento final' : overdue ? 'Turno del respaldo' : 'Responsable actual';
     const meta = [jvProposalArea(p), jvAgentName(p.agent_id), info.source, info.cut].filter(Boolean).join(' · ');
     return '<article class="jv-decision' + (alert ? ' alert' : '') + '"><div class="jv-decision-head"><span class="jv-chip">' + OS_E(jvProposalArea(p)) + '</span><span>' + OS_E(jvHumanize(p.tipo_accion || 'revisión')) + '</span>' + (overdue ? '<span class="badge b-red">SLA vencido · ' + Math.floor(ageHours) + ' h</span>' : '') + (evidence.fresh ? '<span class="badge b-green">evidencia vigente</span>' : '<span class="badge b-red">evidencia vencida · requiere nueva corrida</span>') + '</div><h4>' + OS_E(info.title) + '</h4><p>' + OS_E(info.summary) + '</p>'
-      + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique la propiedad, el impacto y la acción.</div>')
+      + (detail.html ? '<details class="jv-decision-more"><summary>Ver información para decidir</summary><div class="jv-detail-list">' + detail.html + '</div></details>' : '')
+      + (!detail.sufficient ? '<div class="jv-needs-info">Falta información concreta. No la apruebes hasta que el agente explique el hallazgo, el impacto y la acción.</div>' : '')
       + (p._groupCount > 1 ? '<div class="jv-needs-info">Decisión consolidada: reúne ' + p._groupCount + ' actualizaciones del mismo control. Estás viendo la más reciente.</div>' : '')
       + '<div class="jv-detail-list"><div class="jv-detail-row"><span>' + OS_E(ownerStage) + '</span><b>' + OS_E(currentOwner) + '</b></div><div class="jv-detail-row"><span>Ruta de reemplazo</span><b>' + OS_E(policy.rol_primario) + ' → ' + OS_E(policy.rol_respaldo) + ' → ' + OS_E(policy.rol_escalamiento) + '</b></div><div class="jv-detail-row"><span>Plazo</span><b>' + OS_E(String(policy.sla_hours)) + ' horas' + (overdue ? ' · vencido hace ' + Math.max(0, Math.floor(ageHours - Number(policy.sla_hours || 24))) + ' h' : '') + '</b></div><div class="jv-detail-row"><span>Evidencia verificada</span><b>' + OS_E(evidence.ts ? jvFmtTs(evidence.ts) : 'sin verificación') + ' · máximo ' + evidence.maxHours + ' h</b></div></div>'
       + '<div class="who">' + OS_E(meta) + '</div>'
@@ -1422,10 +1612,22 @@ function jvLanesHTML() {
   const filters = '<div class="jv-filter-tabs">' + areas.map(a => '<button class="' + (JV.decisionArea === a ? 'on' : '') + '" onclick="jvDecisionArea(\'' + OS_E(a).replace(/'/g, "\\'") + '\')">' + OS_E(a) + ' <span>' + (a === 'Todas' ? allPending.length : allPending.filter(p => jvProposalArea(p) === a).length) + '</span></button>').join('') + '</div>';
   const pending = JV.decisionArea === 'Todas' ? allPending : allPending.filter(p => jvProposalArea(p) === JV.decisionArea);
   const overdueCount = pending.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) / 3600000 > Number(jvDecisionPolicy(p).sla_hours || 24)).length;
+  const decisionReady = p => jvProposalDetails(p).sufficient && jvProposalEvidenceStatus(p).fresh;
+  const ready = pending.filter(decisionReady);
+  const waiting = pending.filter(p => !decisionReady(p));
+  const escalatedCount = pending.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) / 3600000 > Number(jvDecisionPolicy(p).sla_hours || 24) * 2).length;
+  const highRiskCount = pending.filter(p => ['financiera', 'comunicacion'].includes(jvDecisionPolicy(p).categoria)).length;
+  const ordered = ready.concat(waiting);
+  const shown = ordered.slice(0, JV.decisionLimit);
+  const shownReady = shown.filter(decisionReady);
+  const shownWaiting = shown.filter(p => !decisionReady(p));
   const approvedWork = lanes.aprobada.sort((a, b) => new Date(a.approved_at || a.created_at || 0) - new Date(b.approved_at || b.created_at || 0));
   const history = lanes.ejecutada.sort((a, b) => new Date(b.executed_at || b.created_at || 0) - new Date(a.executed_at || a.created_at || 0));
-  return filters + '<div class="jv-status-strip"><span>' + pending.length + ' asuntos agrupados</span><span>' + overdueCount + ' fuera de plazo</span><span>Orden: riesgo financiero y comunicación primero</span></div><div class="jv-decisions-layout"><section><div class="jv-section-title">Pendientes <span>' + pending.length + '</span></div>'
-    + (pending.length ? pending.slice(0, JV.decisionLimit).map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>')
+  const brief = '<div class="jv-decision-brief"><div class="jv-decision-metric ready"><b>' + ready.length + '</b><span>Listas para decidir</span></div><div class="jv-decision-metric overdue"><b>' + overdueCount + '</b><span>Fuera de plazo</span></div><div class="jv-decision-metric"><b>' + highRiskCount + '</b><span>Finanzas y comunicación</span></div><div class="jv-decision-metric"><b>' + escalatedCount + '</b><span>Escalamiento final</span></div></div>';
+  return filters + brief + '<div class="jv-status-strip"><span>' + pending.length + ' asuntos reales agrupados</span><span>' + waiting.length + ' esperando evidencia</span><span>Orden: listas y de mayor riesgo primero</span></div><div class="jv-decisions-layout"><section><div class="jv-section-title">Listas para decidir <span>' + ready.length + '</span></div>'
+    + (shownReady.length ? shownReady.map(p => card(p, jvIsAlert(p), true)).join('') : '<div class="jv-empty">No hay asuntos con evidencia vigente en esta área.</div>')
+    + (shownWaiting.length ? '<div class="jv-section-title" style="margin-top:18px">Esperando nueva evidencia <span>' + waiting.length + '</span></div>' + shownWaiting.map(p => card(p, jvIsAlert(p), true)).join('') : '')
+    + (!pending.length ? '<div class="jv-card"><b>Todo al día</b><div class="jv-empty">No hay decisiones pendientes en esta área.</div></div>' : '')
     + (pending.length > JV.decisionLimit ? '<button class="jv-btn ghost" style="width:100%;justify-content:center" onclick="jvMoreDecisions()">Ver ' + Math.min(40, pending.length - JV.decisionLimit) + ' decisiones más · faltan ' + (pending.length - JV.decisionLimit) + '</button>' : '') + '</section>'
     + '<aside><div class="jv-section-title">Aprobadas pendientes <span>' + approvedWork.length + '</span></div>'
     + (approvedWork.length ? approvedWork.slice(0, 8).map(p => card(p, true, false)).join('') : '<div class="jv-empty">No hay aprobaciones esperando ejecución.</div>')
@@ -1506,6 +1708,17 @@ window.jvSchedulePick = jvSchedulePick;
 const JV_CAPA_COL = { Command: '#a78bfa', Finance: '#38bdf8', Ops: '#f472b6', Integrity: '#34d399', Report: '#60a5fa', Signal: '#f87171' };
 const JV_CAPA_LABEL = { Command: 'Comando', Finance: 'Finance · Contable & Datos', Ops: 'Ops · Operación', Integrity: 'Integrity · Verificadores', Report: 'Report · Reporteros', Signal: 'Signal · Sabueso' };
 const JV_EMP_COL = '#fbbf24', JV_SRC_COL = '#8492ac';
+function jvVaultLayer(agent) {
+  const exact = String((agent && agent.capa) || '').trim();
+  if (JV_CAPA_COL[exact]) return exact;
+  const text = jvKey([agent && agent.capa, agent && agent.proceso, agent && agent.nombre].filter(Boolean).join(' '));
+  if (/report|reporte|briefing|informe/.test(text)) return 'Report';
+  if (/integrity|integridad|verific|auditor|gobernanza|calidad de datos/.test(text)) return 'Integrity';
+  if (/signal|senal|sabueso|alerta|deteccion/.test(text)) return 'Signal';
+  if (/finance|finanz|financier|contab|controller|capital|inversionista|underwriting|dato/.test(text)) return 'Finance';
+  if (/ops|operacion|operativ|ejecucion|optimiz|calidad|cronograma|continuidad|coordinacion/.test(text)) return 'Ops';
+  return 'Command';
+}
 function jvSvgIcon(name, x, y, size, color) {
   const inner = (window.OS_ICONS && OS_ICONS[name]) || '';
   const h = size / 2;
@@ -1533,6 +1746,12 @@ function jvVaultPick(id) {
   const g = root.querySelector('.jv-vnode[data-nid="' + id + '"]'); if (g) g.classList.add('sel');
 }
 window.jvVaultPick = jvVaultPick;
+function jvVaultKey(event, id) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  jvVaultPick(id);
+}
+window.jvVaultKey = jvVaultKey;
 
 function jvVaultView() {
   const sourceEvidence = f => {
@@ -1558,53 +1777,83 @@ function jvVaultView() {
 }
 
 function jvVaultGraphView() {
-  const cx = 600, cy = 400;
+  const cx = 610, cy = 380;
   const nodes = {}, lines = [];
   const cerebro = JV.agents.find(a => a.nombre === 'Cerebro Ejecutivo') || JV.agents.find(a => a.capa === 'Command');
   const cId = cerebro ? cerebro.id : 'cerebro';
   const order = ['Finance', 'Ops', 'Integrity', 'Report', 'Signal', 'Command'];
-  const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a)).sort((a, b) => order.indexOf(a.capa) - order.indexOf(b.capa));
+  const ring = JV.agents.filter(a => a.id !== cId).map(a => Object.assign({}, a, { _vaultLayer: jvVaultLayer(a) })).sort((a, b) => order.indexOf(a._vaultLayer) - order.indexOf(b._vaultLayer));
   const emps = JV_EMPRESAS.map(e => Object.assign({}, e));
   const fus = JV_FUENTES.map(f => Object.assign({}, f));
-  const place = (arr, rad, start) => { const n = arr.length; arr.forEach((it, k) => { const ang = (start + k / n * 360) * Math.PI / 180; it._x = cx + rad * Math.cos(ang); it._y = cy + rad * Math.sin(ang); }); };
-  place(ring, 250, -90); place(emps, 365, -50); place(fus, 365, 130);
+  const groupCenters = {
+    Command: { _x: 610, _y: 105 }, Finance: { _x: 900, _y: 205 }, Ops: { _x: 940, _y: 500 },
+    Integrity: { _x: 690, _y: 645 }, Report: { _x: 385, _y: 545 }, Signal: { _x: 330, _y: 240 }
+  };
+  const grouped = order.reduce((out, capa) => { out[capa] = ring.filter(a => a._vaultLayer === capa); return out; }, {});
+  order.forEach(capa => {
+    const arr = grouped[capa], center = groupCenters[capa];
+    if (!arr.length || !center) return;
+    const firstRing = Math.min(arr.length, 7);
+    arr.forEach((it, k) => {
+      const outer = k >= firstRing;
+      const localIndex = outer ? k - firstRing : k;
+      const localCount = outer ? arr.length - firstRing : firstRing;
+      const radius = outer ? 92 : (arr.length === 1 ? 0 : 58);
+      const angle = (-90 + (localIndex / Math.max(1, localCount)) * 360 + (outer ? 18 : 0)) * Math.PI / 180;
+      it._x = center._x + radius * Math.cos(angle);
+      it._y = center._y + radius * Math.sin(angle);
+    });
+  });
+  fus.forEach((f, i) => { f._x = 82; f._y = 255 + i * 82; });
+  emps.forEach((e, i) => { e._x = 380 + i * (470 / Math.max(1, emps.length - 1)); e._y = 770; });
   const cNode = { _x: cx, _y: cy };
   const L = (a, b, col) => lines.push('<line x1="' + a._x + '" y1="' + a._y + '" x2="' + b._x + '" y2="' + b._y + '" stroke="' + col + '" stroke-width="1" stroke-opacity="0.22"/>');
-  ring.forEach(a => L(cNode, a, JV_CAPA_COL[a.capa] || '#888'));
-  fus.forEach(f => L(cNode, f, JV_SRC_COL));
+  order.forEach(capa => {
+    const center = groupCenters[capa], arr = grouped[capa];
+    if (!center || !arr.length) return;
+    L(cNode, center, JV_CAPA_COL[capa] || '#888');
+    arr.forEach(a => L(center, a, JV_CAPA_COL[capa] || '#888'));
+  });
+  fus.forEach(f => L(f, cNode, JV_SRC_COL));
   emps.forEach(emp => {
-    const v = ring.find(a => a.capa === 'Integrity' && a.area === emp.area);
-    const r = ring.find(a => a.capa === 'Report' && a.area === emp.area && !a.squad);
+    const v = ring.find(a => a._vaultLayer === 'Integrity' && a.area === emp.area);
+    const r = ring.find(a => a._vaultLayer === 'Report' && a.area === emp.area && !a.squad);
     if (v) L(v, emp, JV_EMP_COL); if (r) L(r, emp, JV_EMP_COL);
   });
   const rentasEmp = emps.find(e => e.area === 'rentas');
   if (rentasEmp) ring.filter(a => a.squad === 'Rentas').forEach(a => L(a, rentasEmp, JV_EMP_COL));
   const linkCount = lines.length;
   let svg = '';
-  const nodeG = (id, x, y, r, icon, col) => {
+  const nodeG = (id, x, y, r, icon, col, label) => {
     const isSel = id === (JV.vaultSel || cId);
-    return '<g class="jv-vnode' + (isSel ? ' sel' : '') + '" data-nid="' + id + '" onclick="jvVaultPick(\'' + id + '\')">'
+    return '<g class="jv-vnode' + (isSel ? ' sel' : '') + '" data-nid="' + id + '" role="button" tabindex="0" aria-label="Inspeccionar ' + OS_E(label || id) + '" onclick="jvVaultPick(\'' + id + '\')" onkeydown="jvVaultKey(event,\'' + id + '\')"><title>' + OS_E(label || id) + '</title>'
       + '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#0e1220" stroke="' + col + '" stroke-width="' + (id === cId ? 3 : 1.6) + '"/>'
       + (id === cId ? '<circle cx="' + x + '" cy="' + y + '" r="' + (r + 8) + '" fill="none" stroke="' + col + '" stroke-opacity="0.4"/>' : '')
       + jvSvgIcon(icon, x, y, Math.round(r * 0.85), col) + '</g>';
   };
-  const lbl = (x, y, r, t) => '<text x="' + x + '" y="' + (y + r + 13) + '" text-anchor="middle" font-size="10" fill="#c7d0e0">' + OS_E(t.length > 15 ? t.slice(0, 14) + '…' : t) + '</text>';
+  const lbl = (x, y, r, t, always) => '<text class="' + (always ? '' : 'jv-vlabel') + '" x="' + x + '" y="' + (y + r + 13) + '" text-anchor="middle" font-size="10" fill="#c7d0e0">' + OS_E(t.length > 18 ? t.slice(0, 17) + '…' : t) + '</text>';
+  order.forEach(capa => {
+    const center = groupCenters[capa], arr = grouped[capa];
+    if (!center || !arr.length) return;
+    svg += '<text class="jv-vgroup-label" x="' + center._x + '" y="' + (center._y - 77) + '" text-anchor="middle" fill="' + (JV_CAPA_COL[capa] || '#888') + '">' + OS_E(JV_CAPA_LABEL[capa] || capa) + '</text>'
+      + '<text class="jv-vgroup-count" x="' + center._x + '" y="' + (center._y - 63) + '" text-anchor="middle">' + arr.length + ' agentes</text>';
+  });
   // cerebro
   nodes[cId] = { kind: 'cerebro', label: cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', icon: 'brain', color: JV_CAPA_COL.Command, capaLabel: 'Comando · Orquestador', proceso: cerebro ? cerebro.proceso : '', riesgo: cerebro && cerebro.nivel_riesgo, estado: cerebro && cerebro.estado, area: 'holding', squad: null, run: cerebro ? jvAgentLastRun(cerebro) : null };
-  svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command) + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo');
+  svg += nodeG(cId, cx, cy, 40, 'brain', JV_CAPA_COL.Command, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo') + lbl(cx, cy, 40, cerebro ? cerebro.nombre : 'Cerebro Ejecutivo', true);
   ring.forEach(a => {
-    const col = JV_CAPA_COL[a.capa] || '#888', ic = jvAgentIcon(a);
-    nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a.capa] || a.capa, proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: jvAgentLastRun(a) };
-    svg += nodeG(a.id, a._x, a._y, 19, ic, col) + lbl(a._x, a._y, 19, a.nombre);
+    const col = JV_CAPA_COL[a._vaultLayer], ic = jvAgentIcon(a);
+    nodes[a.id] = { kind: 'agent', label: a.nombre, icon: ic, color: col, capaLabel: JV_CAPA_LABEL[a._vaultLayer], proceso: a.proceso, riesgo: a.nivel_riesgo, estado: a.estado, area: a.area, squad: a.squad, run: jvAgentLastRun(a) };
+    svg += nodeG(a.id, a._x, a._y, 16, ic, col, a.nombre) + lbl(a._x, a._y, 16, a.nombre, false);
   });
   emps.forEach(e => {
     const id = 'emp-' + e.area;
     nodes[id] = { kind: 'empresa', label: e.name, icon: e.icon, color: JV_EMP_COL, capaLabel: 'Empresa · property_id', proceso: 'La casa como clave común (property_id): una propiedad fluye Fix&Flip → Remodelación → Rentas con la misma identidad.', area: e.area, squad: null, run: null };
-    svg += nodeG(id, e._x, e._y, 20, e.icon, JV_EMP_COL) + lbl(e._x, e._y, 20, e.name);
+    svg += nodeG(id, e._x, e._y, 20, e.icon, JV_EMP_COL, e.name) + lbl(e._x, e._y, 20, e.name, true);
   });
   fus.forEach(f => {
     nodes[f.id] = { kind: 'fuente', label: f.label, icon: f.icon, color: JV_SRC_COL, capaLabel: 'Fuente de verdad', proceso: f.desc, area: null, squad: null, run: null };
-    svg += nodeG(f.id, f._x, f._y, 20, f.icon, JV_SRC_COL) + lbl(f._x, f._y, 20, f.label);
+    svg += nodeG(f.id, f._x, f._y, 20, f.icon, JV_SRC_COL, f.label) + lbl(f._x, f._y, 20, f.label, true);
   });
   JV.vaultNodes = nodes;
   if (!JV.vaultSel || !nodes[JV.vaultSel]) JV.vaultSel = cId;
@@ -1615,16 +1864,45 @@ function jvVaultGraphView() {
   const recent = JV.memories.slice(0, 6).map(m => '<div class="jv-simple-row"><div class="jv-av">' + osIcon('library', { size: 14 }) + '</div><div class="body"><b>' + OS_E(jvHumanize(m.tipo || 'aprendizaje')) + '</b><span>' + OS_E(m.texto || 'Memoria sin contenido visible.') + '</span></div><span class="jv-chip">' + OS_E(m.fuente || 'fuente no declarada') + '</span></div>').join('');
   return '<h1 class="jv-page-title">Memoria compartida.</h1><div class="jv-lead">Lo que el negocio aprendió, quién lo aportó y cómo se conecta con agentes, empresas y fuentes reales.</div>'
     + '<div class="jv-vault-wrap">' + counters
-    + '<svg class="jv-vstage" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">' + lines.join('') + svg + '</svg>'
+    + '<div class="jv-vcanvas"><svg class="jv-vstage" viewBox="0 0 1200 840" preserveAspectRatio="xMidYMid meet">' + lines.join('') + svg + '</svg>'
+    + '<div class="jv-vhint">Seleccioná un nodo para ver su función · las etiquetas aparecen al explorar</div></div>'
     + '<div class="jv-vlegend">' + legend + '</div>'
     + '<div class="jv-vpanel" id="jv-vault-panel">' + jvVaultFicha(nodes[JV.vaultSel]) + '</div>'
-    + '<div class="jv-vhint">Tocá un nodo para inspeccionarlo</div></div>'
+    + '</div>'
     + '<section style="margin-top:18px"><div class="jv-section-title">Aprendizajes recientes</div><div class="jv-simple-list">' + (recent || '<div class="jv-empty">Todavía no hay aprendizajes guardados.</div>') + '</div></section>';
 }
 
 // ════════════════════════════════════════════════════════════════
 // VIEW · REPORTES (informes de los agentes)
 // ════════════════════════════════════════════════════════════════
+function jvFinancialEvidenceControls(item) {
+  const status = JV.financialEvidenceStatus[item.id] || {};
+  const state = status.closure_state || 'sin_soporte';
+  const label = state === 'soporte_verificado_fuente_pendiente'
+    ? 'Soporte verificado · falta corrida limpia'
+    : (state === 'pendiente_verificacion' ? 'Soporte pendiente de verificar' : (state === 'soporte_rechazado' ? 'Soporte rechazado · reemplazar' : 'Sin soporte adjunto'));
+  const cls = state === 'soporte_verificado_fuente_pendiente' ? 'b-ok' : 'b-wait';
+  const id = String(item.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!id) return '';
+  const supports = JV.financialEvidence.filter(row => row.finding_id === item.id);
+  const supportRows = supports.map(row => {
+    const supportId = String(row.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    const canVerify = row.status === 'submitted' && row.submitted_by !== jvUserId();
+    return '<div class="jv-fin-support"><a href="' + OS_E(row.artifact_url || '#') + '" target="_blank" rel="noopener noreferrer">' + OS_E(row.title || 'Soporte') + '</a><span>' + OS_E(jvHumanize(row.evidence_type || 'otro')) + ' · ' + OS_E(jvHumanize(row.status || 'submitted')) + '</span>'
+      + (canVerify ? '<div class="jv-fin-verify"><input id="jv-fe-verify-note-' + supportId + '" maxlength="300" placeholder="Nota de verificación (mín. 10 caracteres)" aria-label="Nota de verificación"><button type="button" onclick="jvVerifyFinancialEvidence(\'' + supportId + '\',true)">Verificar</button><button type="button" class="reject" onclick="jvVerifyFinancialEvidence(\'' + supportId + '\',false)">Rechazar</button></div>' : '') + '</div>';
+  }).join('');
+  return '<div class="jv-fin-evidence"><span class="jv-badge ' + cls + '">' + OS_E(label) + '</span>'
+    + '<small>' + jvNum(status.verified_count || 0) + ' verificados · ' + jvNum(status.pending_verification_count || 0) + ' por revisar · ' + jvNum(status.rejected_count || 0) + ' rechazados</small>'
+    + (supportRows ? '<div class="jv-fin-supports">' + supportRows + '</div>' : '')
+    + '<details><summary>Adjuntar soporte al expediente</summary><div class="jv-fin-evidence-form">'
+    + '<select id="jv-fe-type-' + id + '" aria-label="Tipo de soporte"><option value="statement">Statement</option><option value="factura">Factura</option><option value="recibo">Recibo</option><option value="payoff">Payoff</option><option value="extension">Extensión</option><option value="ledger">Ledger</option><option value="nomina">Nómina</option><option value="conciliacion">Conciliación</option><option value="otro">Otro</option></select>'
+    + '<input id="jv-fe-title-' + id + '" maxlength="160" placeholder="Qué demuestra este soporte" aria-label="Título del soporte">'
+    + '<input id="jv-fe-url-' + id + '" type="url" placeholder="https:// enlace al documento" aria-label="Enlace https al soporte">'
+    + '<textarea id="jv-fe-notes-' + id + '" maxlength="600" placeholder="Nota opcional para quien lo verificará" aria-label="Nota del soporte"></textarea>'
+    + '<button type="button" onclick="jvRegisterFinancialEvidence(\'' + id + '\')"' + (JV.busyId === id ? ' disabled' : '') + '>' + (JV.busyId === id ? 'Guardando…' : 'Guardar en expediente') + '</button>'
+    + '</div></details></div>';
+}
+
 function jvReportesView() {
   const informes = JV.reports;
   const areaOf = r => { const k = jvKey([r.tipo, r.generado_por, r.titulo].join(' ')); if (/renta/.test(k)) return 'Rentas'; if (/remodel|obra/.test(k)) return 'Remodelación'; if (/\bff\b|fix.*flip|pipeline/.test(k)) return 'Fix & Flip'; if (/educa|estudiant|mentor/.test(k)) return 'Educación'; return 'Dirección'; };
@@ -1641,14 +1919,44 @@ function jvReportesView() {
     const obj = payload && typeof payload === 'object' ? payload : {};
     if (report && report.tipo === 'triage_excepciones_financieras') {
       const kpis = obj.kpis || {};
-      const priorityRows = Array.isArray(obj.prioridades) ? obj.prioridades.map(item =>
-        '<div class="jv-simple-row"><div class="jv-av">' + OS_E(String(item.prioridad || '—')) + '</div><div class="body"><b>'
+      const livePriorities = JV.financialActions.length ? JV.financialActions.slice().sort((a, b) => {
+        const order = { inmediata: 0, vencida: 1, prioritaria: 2, seguimiento: 3 };
+        return (order[a.prioridad_operativa] ?? 9) - (order[b.prioridad_operativa] ?? 9) || Math.abs(Number(b.impacto_usd || 0)) - Math.abs(Number(a.impacto_usd || 0));
+      }).slice(0, 20) : (Array.isArray(obj.prioridades) ? obj.prioridades : []);
+      const packetMap = JV.financialActions.reduce((out, item) => {
+        const owner = item.responsable || 'Auditor de Integridad Financiera y Datos';
+        const front = item.frente || 'Control financiero';
+        const key = owner + '|' + front;
+        if (!out[key]) out[key] = { owner, front, items: [], impact: 0, critical: 0, oldest: 0, evidence: item.evidencia_requerida || '' };
+        out[key].items.push(item);
+        out[key].impact += Math.abs(Number(item.impacto_usd || 0));
+        out[key].critical += item.severidad === 'critica' ? 1 : 0;
+        out[key].oldest = Math.max(out[key].oldest, Number(item.dias_abierto || 0));
+        return out;
+      }, {});
+      const packetRows = Object.values(packetMap).sort((a, b) => b.critical - a.critical || b.impact - a.impact).map(packet => {
+        const sample = packet.items.slice().sort((a, b) => Math.abs(Number(b.impacto_usd || 0)) - Math.abs(Number(a.impacto_usd || 0))).slice(0, 3);
+        return '<details class="jv-report-item"><summary><div><h3>' + OS_E(packet.front) + '</h3><div class="report-meta">'
+          + OS_E(packet.owner) + ' · ' + jvNum(packet.items.length) + ' casos · ' + jvMoney(packet.impact)
+          + ' · ' + jvNum(packet.oldest) + ' días máx.</div></div><span class="jv-badge ' + (packet.critical ? 'b-wait' : 'b-ok') + '">'
+          + jvNum(packet.critical) + ' críticos</span></summary><div class="jv-report-body"><div class="jv-review-summary"><b>Evidencia para cerrar</b><span>'
+          + OS_E(packet.evidence || 'Fuente original, corrección confirmada y nueva corrida limpia.') + '</span></div><div class="jv-simple-list">'
+          + sample.map(item => '<div class="jv-simple-row"><div class="jv-av">' + OS_E(item.check_id || 'C') + '</div><div class="body"><b>'
+            + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>' + jvMoney(item.impacto_usd) + ' · Fuente: '
+            + OS_E(item.fuente || 'no declarada') + '</span><span>Acción: ' + OS_E(item.siguiente_accion || 'Validar y conciliar con soporte.')
+            + '</span>' + jvFinancialEvidenceControls(item) + '</div></div>').join('') + '</div></div></details>';
+      }).join('');
+      const priorityRows = livePriorities.map((item, index) =>
+        '<div class="jv-simple-row"><div class="jv-av">' + OS_E(String(item.prioridad || index + 1)) + '</div><div class="body"><b>'
         + OS_E(item.titulo || 'Hallazgo financiero') + '</b><span>'
         + OS_E(jvHumanize(item.empresa || 'holding')) + ' · ' + jvMoney(item.impacto_usd) + ' · '
         + jvNum(item.dias_abierto) + ' días abierto</span><span>Responsable: ' + OS_E(item.responsable || 'por asignar')
-        + ' · Fuente: ' + OS_E(item.fuente || 'no declarada') + '</span></div><span class="jv-badge b-wait">'
-        + OS_E(jvHumanize(item.severidad || 'revisión')) + '</span></div>'
-      ).join('') : '';
+        + ' · Fuente: ' + OS_E(item.fuente || 'no declarada') + '</span>'
+        + (item.siguiente_accion ? '<span>Acción: ' + OS_E(item.siguiente_accion) + '</span>' : '')
+        + (item.evidencia_requerida ? '<span>Evidencia para cerrar: ' + OS_E(item.evidencia_requerida) + '</span>' : '')
+        + '</div><span class="jv-badge b-wait">'
+        + OS_E(jvHumanize(item.prioridad_operativa || item.severidad || 'revisión')) + '</span></div>'
+      ).join('');
       const fronts = Array.isArray(obj.hallazgos_por_frente) ? obj.hallazgos_por_frente.map(front =>
         '<div class="jv-detail-row"><span>' + OS_E(front.categoria || 'Control financiero') + '<small style="display:block;margin-top:4px">'
         + OS_E(front.siguiente_accion || '') + '</small></span><b>' + jvNum(front.criticos) + ' críticos · '
@@ -1659,6 +1967,7 @@ function jvReportesView() {
         + '<div class="jv-kpi"><div class="n">' + jvMoney(kpis.impacto_critico_usd) + '</div><div class="l">impacto señalado</div></div>'
         + '<div class="jv-kpi"><div class="n">' + jvNum(kpis.antiguedad_max_dias) + ' días</div><div class="l">antigüedad máxima</div></div></div>'
         + '<div class="jv-section-title" style="margin-top:18px">Frentes de trabajo</div><div class="jv-detail-list">' + fronts + '</div>'
+        + '<div class="jv-section-title" style="margin-top:18px">Paquetes por responsable</div><div class="jv-report-list">' + (packetRows || '<div class="jv-empty">No hay paquetes financieros abiertos.</div>') + '</div>'
         + '<div class="jv-section-title" style="margin-top:18px">Prioridades verificadas</div><div class="jv-simple-list">' + priorityRows + '</div>'
         + '<div class="jv-needs-info" style="margin-top:14px">' + OS_E(obj.limite || 'Solo observación; requiere soporte antes de corregir.') + '</div>';
     }
@@ -1683,6 +1992,47 @@ function jvReportesView() {
   return '<h1 class="jv-page-title">Reportes del equipo</h1><div class="jv-lead">Organizados por área. Abre cualquiera para leer el resultado completo y saber qué agente lo generó.</div>' + filters + (groups || '<div class="jv-empty">Todavía no hay reportes en esta área.</div>');
 }
 function jvReportArea(area) { JV.reportArea = area; if (window.osRender) osRender(); }
+async function jvRegisterFinancialEvidence(id) {
+  if (!id || JV.busyId) return;
+  const type = document.getElementById('jv-fe-type-' + id)?.value || 'otro';
+  const title = document.getElementById('jv-fe-title-' + id)?.value.trim() || '';
+  const url = document.getElementById('jv-fe-url-' + id)?.value.trim() || '';
+  const notes = document.getElementById('jv-fe-notes-' + id)?.value.trim() || '';
+  if (title.length < 3) { if (window.toast) toast('Explica qué demuestra el soporte.', 'error'); return; }
+  if (!/^https:\/\//i.test(url)) { if (window.toast) toast('Usa un enlace https verificable al documento.', 'error'); return; }
+  JV.busyId = id; if (window.osRender) osRender();
+  try {
+    const { error } = await sb.rpc('register_financial_finding_evidence', {
+      p_finding_id: id, p_evidence_type: type, p_title: title,
+      p_artifact_url: url, p_notes: notes || null, p_source_date: null,
+    });
+    if (error) throw error;
+    if (window.toast) toast('Soporte guardado. Un administrador debe verificarlo y la fuente debe pasar una nueva corrida.', 'success');
+  } catch (e) {
+    if (window.toast) toast('No se pudo guardar el soporte: ' + (e.message || e), 'error');
+    else alert('No se pudo guardar el soporte: ' + (e.message || e));
+  } finally {
+    JV.busyId = null; await jvLoad(true); if (window.osRender) osRender();
+  }
+}
+async function jvVerifyFinancialEvidence(id, accept) {
+  if (!id || JV.busyId) return;
+  const note = document.getElementById('jv-fe-verify-note-' + id)?.value.trim() || '';
+  if (note.length < 10) { if (window.toast) toast('La verificación necesita una nota de al menos 10 caracteres.', 'error'); return; }
+  JV.busyId = id; if (window.osRender) osRender();
+  try {
+    const { error } = await sb.rpc('verify_financial_finding_evidence', {
+      p_evidence_id: id, p_accept: !!accept, p_verification_note: note,
+    });
+    if (error) throw error;
+    if (window.toast) toast(accept ? 'Soporte verificado. El hallazgo sigue abierto hasta que la fuente pase una nueva corrida.' : 'Soporte rechazado con trazabilidad.', accept ? 'success' : 'info');
+  } catch (e) {
+    if (window.toast) toast('No se pudo revisar el soporte: ' + (e.message || e), 'error');
+    else alert('No se pudo revisar el soporte: ' + (e.message || e));
+  } finally {
+    JV.busyId = null; await jvLoad(true); if (window.osRender) osRender();
+  }
+}
 window.jvReportArea = jvReportArea;
 
 // ════════════════════════════════════════════════════════════════

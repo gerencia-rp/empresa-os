@@ -111,9 +111,12 @@ Ahora guardá los secretos:
 ```bash
 supabase secrets set META_WHATSAPP_PHONE_ID="EL_PHONE_ID_DEL_PASO_4"
 supabase secrets set META_WHATSAPP_TOKEN="EL_TOKEN_TEMPORARY_DEL_PASO_4"
+supabase secrets set META_APP_SECRET="EL_APP_SECRET_DE_META"
 ```
 
 ✅ **Credenciales guardadas**
+
+`META_APP_SECRET` no es opcional: permite validar la firma HMAC de cada webhook. Sin ese secreto, Empresa OS rechaza los eventos entrantes y nunca cambia tareas a partir de un POST no autenticado.
 
 ---
 
@@ -239,6 +242,12 @@ supabase functions deploy edu-whatsapp-send-cloud --no-verify-jwt
 
 ### "Token expired"
 - Tu token temporary venció a las 24h → seguí el Paso 9 para crear token permanente
+
+### "Firma de Meta inválida o META_APP_SECRET no configurado"
+- Copiá **App settings → Basic → App Secret** en Meta Developers.
+- Guardalo como `META_APP_SECRET` en Supabase; nunca lo pegues en el código ni en el navegador.
+- Re-desplegá `whatsapp-webhook` y enviá un evento de prueba desde Meta.
+- La prueba solo pasa si el header `x-hub-signature-256` coincide con el cuerpo exacto recibido.
 
 ### "Template not found"
 - La template `META_WHATSAPP_TEMPLATE_NAME` que pusiste no existe o no está aprobada todavía

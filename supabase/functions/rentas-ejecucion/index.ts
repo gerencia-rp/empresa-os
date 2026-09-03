@@ -73,6 +73,15 @@ Deno.serve(async (req) => {
       return json({ ok: false, aborted: true, isolation_test: iso }, 500);
     }
 
+    // No generar trabajo desde un espejo viejo o una sincronización fallida.
+    const [sync] = await sql`select error,synced_at from clickup_sync_log order by synced_at desc limit 1`;
+    const clickupOk = !sync?.error && sync?.synced_at && (Date.now() - new Date(sync.synced_at).getTime()) < 2 * 3600 * 1000;
+    if (!clickupOk) {
+      const output = { skipped: "clickup_unhealthy", fuente: "clickup_sync_log", ultima_sincronizacion: sync?.synced_at || null, error: sync?.error || "sin sincronización reciente" };
+      await sql`insert into agent_audit_log (agent_id,input,output,resultado) values (${agent.id},${sql.json({ mode, accion: "skip" })},${sql.json(output)},'skipped')`;
+      return json({ ok: true, ...output });
+    }
+
     let created = 0, skipped = 0;
     const detail: Record<string, unknown> = { vencidas: 0, cobros_sin_dueno: 0, cuello: 0, recurrentes: 0, informe: "—" };
     // helper: inserta y cuenta según el trigger de dedup (RETURNING vacío = deduplicado)
@@ -121,10 +130,9 @@ Deno.serve(async (req) => {
         count(*) filter (where status='en ejecución' and due_date < now())::int vencidas,
         count(*) filter (where (status='sprint backlog recurrente' or is_recurring) and due_date is null)::int recurrentes_sin_fecha
         from clickup_tasks_mirror where space_id=${SPACE_RENTAS} and active`;
-      const okInf = await put("informe",
-        { tipo: "informe_ejecucion", corte },
-        { tipo: "informe_ejecucion", corte, abiertas: tot?.abiertas, sin_dueno: tot?.sin_dueno, vencidas: tot?.vencidas, recurrentes_sin_fecha: tot?.recurrentes_sin_fecha, cuellos: (detail.cuello as number), etapas_estancadas: "no computable (campo fase vacío en el espejo)", clickup_vs_airtable: "no computado (sin mapeo limpio tarea→casa; se evita falso positivo)", nota: "pulso automático (dry-run)", origen: "ejecutor rentas-ejecucion" });
-      detail.informe = okInf ? "creado" : "dedup (ya existe hoy)";
+      const report = { tipo: "informe_ejecucion", corte, abiertas: tot?.abiertas, sin_dueno: tot?.sin_dueno, vencidas: tot?.vencidas, recurrentes_sin_fecha: tot?.recurrentes_sin_fecha, cuellos: (detail.cuello as number), etapas_estancadas: "no computable (campo fase vacío en el espejo)", clickup_vs_airtable: "no computado (sin mapeo limpio tarea→casa; se evita falso positivo)", nota: "pulso automático (dry-run)", origen: "ejecutor rentas-ejecucion" };
+      await sql`select record_agent_report(${agent.id},'informe_ejecucion_rentas',${corte}::date,${'Ejecución de Rentas · ' + corte},${sql.json(report)})`;
+      detail.informe = "actualizado en Reportes";
     }
 
     await sql`insert into agent_audit_log (agent_id, input, output, resultado) values (${agent.id}, ${sql.json({ mode, corte, rol_db: "agentes_ia_exec" })}, ${sql.json({ created, skipped, detail, isolation_test: iso })}, 'ok')`;

@@ -9,7 +9,7 @@
 //
 // Body esperado:
 // {
-//   "action_type": "close_task" | "comment" | "assign" | "create_subtask" | "add_tag",
+//   "action_type": "close_task" | "comment" | "reschedule" | "assign" | "create_subtask" | "add_tag",
 //   "target_task_id": "abc123",
 //   "payload": { ... },                  // según action_type
 //   "automation_id": "uuid" | null,
@@ -20,6 +20,7 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAuth } from '../_shared/auth.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -44,6 +45,12 @@ async function clickupApi(endpoint: string, token: string, method = 'GET', body?
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
+  // Esta función cambia estado externo: solo administradores autenticados.
+  const auth = await requireAuth(req, { requireAdmin: true });
+  if (!auth.ok) return new Response(JSON.stringify({ ok: false, error: auth.error }), {
+    status: auth.status || 401, headers: { ...CORS, 'content-type': 'application/json' }
+  });
+
   const body = await req.json();
   const { action_type, target_task_id, payload, automation_id, proposal_id, executed_by } = body || {};
   const token = Deno.env.get('CLICKUP_TOKEN');
@@ -55,6 +62,20 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ ok: false, error: 'CLICKUP_TOKEN no configurado' }), {
       status: 500, headers: { ...CORS, 'content-type': 'application/json' }
     });
+  }
+
+  const { data: syncHealth } = await sb.from('clickup_sync_log')
+    .select('synced_at,error')
+    .order('synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const syncAgeMs = syncHealth?.synced_at ? Date.now() - new Date(syncHealth.synced_at).getTime() : Number.POSITIVE_INFINITY;
+  if (!syncHealth || syncHealth.error || syncAgeMs > 2 * 60 * 60 * 1000) {
+    return new Response(JSON.stringify({
+      ok: false,
+      error: 'ClickUp está bloqueado por continuidad: recuperá la conexión y completá una sincronización real antes de ejecutar cambios.',
+      evidence: { synced_at: syncHealth?.synced_at || null, error: syncHealth?.error || 'sin sincronización reciente' }
+    }), { status: 503, headers: { ...CORS, 'content-type': 'application/json' } });
   }
 
   // Log de inicio
@@ -81,6 +102,18 @@ serve(async (req: Request) => {
         comment_text: payload.comment || 'Sin texto',
         notify_all: payload.notify_all !== false
       });
+    } else if (action_type === 'reschedule') {
+      const dueAt = payload?.due_date ? new Date(payload.due_date).getTime() : NaN;
+      if (!Number.isFinite(dueAt)) {
+        result = { ok: false, status: 400, body: { err: 'reschedule requiere payload.due_date válido' } };
+      } else {
+        result = await clickupApi(`/task/${target_task_id}`, token, 'PUT', { due_date: dueAt });
+        if (result.ok && payload?.comment) {
+          await clickupApi(`/task/${target_task_id}/comment`, token, 'POST', {
+            comment_text: payload.comment, notify_all: false
+          });
+        }
+      }
     } else if (action_type === 'assign') {
       // payload.assignee_id es el ID de usuario ClickUp; payload.unassign_others=true para reasignación total
       const assignees = { add: [payload.assignee_id], rem: payload.unassign_others ? (payload.current_assignees || []) : [] };

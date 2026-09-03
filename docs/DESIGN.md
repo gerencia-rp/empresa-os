@@ -4,6 +4,21 @@
 
 Centro de control ejecutivo: denso pero legible, evidencia antes que decoración, una acción primaria por pantalla y detalles técnicos progresivos. El mapa de agentes y el Cerebro son la firma visual; las demás superficies priorizan decisiones y operación.
 
+## Quality Floor
+
+La excelencia funcional y visual es el mínimo de aceptación, no una fase opcional. Toda pantalla modificada debe quedar más clara, más confiable y más fácil de operar que antes, sin romper coherencia con el sistema completo.
+
+Una superficie solo está terminada cuando:
+
+- comunica propósito, estado, fuente de datos y próxima acción sin exigir interpretación técnica;
+- contempla carga, vacío, error, éxito, permisos y recuperación;
+- funciona en escritorio y móvil, con teclado, contraste y movimiento reducido;
+- usa los tokens y componentes canónicos y elimina ruido o duplicación dentro del alcance tocado;
+- muestra evidencia real y fechas de frescura; nunca maquilla ausencia, simulación o incertidumbre;
+- supera una comprobación visual posterior a las pruebas funcionales.
+
+La mejora continua no significa cambiar por cambiar: cada ajuste visual debe mejorar jerarquía, legibilidad, confianza o velocidad operativa.
+
 ## Typography
 
 Inter para interfaz, Fraunces para titulares y JetBrains Mono para cifras. Contenido operativo en medidas cortas y números tabulares.

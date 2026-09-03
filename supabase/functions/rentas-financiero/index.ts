@@ -92,12 +92,11 @@ Deno.serve(async (req) => {
 
     // ── DEDUP: cargar propuestas abiertas del Financiero ──
     const open = await sql`select tipo_accion, evidencia from agent_proposals where agent_id=${agent.id} and estado='propuesta' and deleted_at is null`;
-    const cobroKeys = new Set<string>(), descKeys = new Set<string>(), resKeys = new Set<string>();
+    const cobroKeys = new Set<string>(), descKeys = new Set<string>();
     for (const p of open) {
       const e = (p.evidencia || {}) as Record<string, unknown>;
       if (p.tipo_accion === "recordatorio_cobro") cobroKeys.add(((e.casa as string) || "") + "|" + ((e.inquilino as string) || ""));
       if (p.tipo_accion === "conciliacion") descKeys.add((e.casa as string) || "");
-      if (p.tipo_accion === "informe" && e.tipo === "resumen_cobranza_diario") resKeys.add((e.corte as string) || "");
     }
 
     let created = 0, refreshed = 0, skipped = 0;
@@ -159,11 +158,12 @@ Deno.serve(async (req) => {
         const [kpi] = await sql`select * from v_cartera_kpi`;
         const buckets = await sql`select case when mes_mas_viejo>='2026-07' then '0-30' when mes_mas_viejo='2026-06' then '31-60' when mes_mas_viejo<'2026-06' then '60+' else 's/d' end b, count(*) n, coalesce(sum(vencido_neto),0) v from v_cartera_inquilino where vencido_neto>0 group by 1`;
         const evid = { tipo: "resumen_cobranza_diario", corte, vencido_neto_total: kpi?.vencido_neto, pendiente_neto_total: kpi?.pendiente_neto_total, morosos_reales: kpi?.morosos_reales, aging: buckets, nota: "resumen automático del ejecutor (dry-run)", origen: "ejecutor rentas-financiero" };
-        const summaryOutcome = await recordProposal("informe", { tipo: "resumen_cobranza_diario", corte, dedup_key: "resumen_cobranza:" + corte }, evid);
-        if (summaryOutcome === "created") (detail.resumen_new as number)++; else (detail.resumen_skip as number)++;
+        await sql`select record_agent_report(${agent.id},'resumen_cobranza_diario',${corte}::date,${'Cobranza diaria · ' + corte},${sql.json(evid)})`;
+        detail.resumen_new = 1;
     } else if (mode === "servicios") {
       // Dedup: claves de descuadres de servicio abiertos (casa|servicio|mes|subtipo)
       const svcKeys = new Set<string>();
+      const svcSeen: string[] = [];
       for (const p of open) { const e = (p.evidencia || {}) as Record<string, unknown>; if (p.tipo_accion === "conciliacion" && e.tipo === "descuadre_servicio") svcKeys.add([e.casa, e.servicio, e.mes, e.subtipo].join("|")); }
       const found: Array<Record<string, unknown>> = [];
       // "Servicios públicos" es un bundle multi-fila y de alta varianza → se excluye de
@@ -196,9 +196,16 @@ Deno.serve(async (req) => {
         const key = [f.casa, f.servicio, f.mes, f.subtipo].join("|");
         (detail.por_tipo as Record<string, number>)[f.subtipo as string] = ((detail.por_tipo as Record<string, number>)[f.subtipo as string] || 0) + 1;
         const evid = { tipo: "descuadre_servicio", casa: f.casa, servicio: f.servicio, mes: f.mes, subtipo: f.subtipo, monto: f.monto ?? null, esperado: f.esperado ?? null, hallazgo: f.detalle, accion_propuesta: "Revisar en Airtable/QB y corregir el registro del servicio.", fuente: "pm_expenses", origen: "ejecutor rentas-financiero" };
-        await recordProposal("conciliacion", { requiere_aprobacion: true, dedup_key: "svc:" + key }, evid);
+        const dedupKey = "svc:" + key;
+        await recordProposal("conciliacion", { requiere_aprobacion: true, dedup_key: dedupKey }, evid);
         svcKeys.add(key);
+        svcSeen.push(dedupKey);
       }
+      // Esta corrida es un escaneo completo de los cuatro controles de servicios.
+      // Si una clave anterior ya no aparece, el hallazgo desapareció de la fuente:
+      // se oculta suavemente sin aprobar, rechazar ni ejecutar ninguna corrección.
+      const [svcRetired] = await sql`select reconcile_agent_proposal_set(${agent.id},'conciliacion','svc:',${svcSeen}::text[]) retired`;
+      detail.retirados = Number(svcRetired.retired || 0);
     } else if (mode === "cierre") {
       // Cierra el MES ANTERIOR (corteYm). Dedup: un borrador por tipo+corte.
       const [ex] = await sql`select id from pm_informes where tipo='financiero_mensual_rentas' and corte=${corteDate} and archived_at is null limit 1`;
