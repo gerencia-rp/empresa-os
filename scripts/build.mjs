@@ -106,7 +106,10 @@ const STATIC_COPY = [
   "os/inv-rendimiento.js",
   "os/inv-portal.js",
   "config.public.js",
-  "viral.html",
+  "growth-command.html",
+  "growth/data.js",
+  "growth/app.js",
+  "growth/growth-command.css",
   "viral-memory.js",
   "viral.js",
   "viral-opera.js",
@@ -238,6 +241,11 @@ async function main() {
   for (const f of STATIC_COPY) {
     if (await copyIfExists(path.join(ROOT, f), path.join(DIST, f))) copied++;
   }
+
+  // La fuente histórica viral.html se conserva intacta para rollback e investigación.
+  // Producción sirve la aplicación nueva en /viral y /growth mediante artefactos generados.
+  if (await copyIfExists(path.join(ROOT, "growth-command.html"), path.join(DIST, "viral.html"))) copied++;
+  if (await copyIfExists(path.join(ROOT, "growth-command.html"), path.join(DIST, "growth.html"))) copied++;
 
   // 6) Stats
   const bundleSizeKB = (Buffer.byteLength(bundleMin) / 1024).toFixed(1);

@@ -9,6 +9,7 @@
     "audit:coverage": "node scripts/audit-agent-coverage.mjs",
     "audit:jarvis": "node scripts/audit-jarvis-readiness.mjs",
     "test:jarvis:ui": "node scripts/test-jarvis-ui.mjs",
+    "test:growth:ui": "node scripts/test-growth-command.mjs",
     "test:cierre": "node scripts/test-cierre-engine.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs",
