@@ -117,21 +117,28 @@ for (const c of CASAS) {
     await sleep(500);
   }
   await sleep(1200);
+  // desde 03-sep-2026 "Todos los movimientos" viene AGRUPADO POR MES en acordeón (solo el mes
+  // más reciente abierto): para revisar todo el historial hay que expandirlo primero.
+  await page.evaluate(() => { if (window.ipMesTodos) window.ipMesTodos(true); });
+  await sleep(900);
 
   const d = await page.evaluate(mes => {
     const heads = [...document.querySelectorAll('table thead tr')].map(tr => [...tr.children].map(t => t.innerText.trim()).join(' | '));
     const filas = [...document.querySelectorAll('table tbody tr')].map(tr => [...tr.children].map(t => t.innerText.trim()));
     const deudaRows = filas.filter(f => /servicio de deuda/i.test(f.join(' ')));
-    // "Todos los movimientos": Fecha | Concepto | Categoría | Monto | Saldo | Fuente,
-    // ordenado del más nuevo al más viejo → la fila de ABAJO tiene el saldo anterior.
+    // "Todos los movimientos": Fecha | Concepto | Categoría | Monto | Saldo | Fuente.
+    // Las filas de encabezado de mes tienen una sola celda, así que quedan fuera de `movs`.
+    // ⚠ desde el agrupado por mes (03-sep-2026) el orden VISUAL es ingresos-arriba /
+    // gastos-abajo: el saldo anterior ya NO es "la fila de abajo" — hay que ordenar por FECHA.
     const movs = filas.filter(f => f.length >= 6);
+    const crono = movs.slice().sort((a, b) => String(a[0]).localeCompare(String(b[0])));
     const n = t => { const v = parseFloat(String(t || '').replace(/[^0-9.\-]/g, '')); return isNaN(v) ? null : v; };
     const saldoMueve = re => {
-      for (let i = 0; i < movs.length - 1; i++) {
-        if (!re.test(movs[i][1] || '')) continue;
-        const a = n(movs[i][4]), b = n(movs[i + 1][4]);
+      for (let i = 1; i < crono.length; i++) {
+        if (!re.test(crono[i][1] || '')) continue;
+        const a = n(crono[i][4]), b = n(crono[i - 1][4]);
         if (a == null || b == null) continue;
-        return { concepto: movs[i][1], saldo: movs[i][4], saldoPrevio: movs[i + 1][4], cambia: a !== b, pnlNo: /P&L NO/.test(movs[i][1] || '') };
+        return { concepto: crono[i][1], saldo: crono[i][4], saldoPrevio: crono[i - 1][4], cambia: a !== b, pnlNo: /P&L NO/.test(crono[i][1] || '') };
       }
       return null;
     };
