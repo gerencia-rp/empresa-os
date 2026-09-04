@@ -56,6 +56,7 @@ Los adaptadores futuros deberán implementar el mismo comportamiento y agregar c
 - **Etapa:** trabajo, dueño, SLA, estado y cantidad en cola.
 - **Equipo:** misión, entradas, entregas, cadencia, KPIs y ejecución.
 - **Pieza:** hipótesis creativa, avatar, ángulo, prueba, CTA, riesgo, canales y estado.
+- **Sistema de comunicación:** experiencia buscada, tensión, reencuadre, claridad repetible, traducción dato→beneficio→escena y control de credibilidad.
 - **Publicación planeada:** pieza, canal, día, hora y estado confirmado.
 - **Patrón:** señal, tamaño de muestra, decisión siguiente.
 - **Experimento:** hipótesis, métrica, estado y responsable.

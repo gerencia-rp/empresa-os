@@ -20,6 +20,7 @@ const originalFetch = globalThis.fetch;
 let expectedProvider = 'anthropic-direct';
 globalThis.fetch = async (url, options) => {
   const request = JSON.parse(options.body);
+  assert.match(request.system, /dato → beneficio → escena concreta/i, 'Cada agente debe recibir el sistema de comunicación');
   assert.equal(request.output_config.format.type, 'json_schema');
   assert.deepEqual(request.output_config.format.schema.required, ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']);
   assert.equal(/maxItems|maxLength/.test(JSON.stringify(request.output_config.format.schema)), false, 'El esquema no debe incluir restricciones rechazadas por Anthropic');

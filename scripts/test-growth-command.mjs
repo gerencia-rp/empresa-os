@@ -59,6 +59,8 @@ try {
   assert.equal(await page.$$eval('.funnel-step', nodes => nodes.length), 5, 'El embudo debe tener cinco etapas');
   assert.equal(await page.$$eval('.platform-card', nodes => nodes.length), 5, 'Debe cubrir cinco plataformas');
   assert.ok((await page.$$eval('.platform-card', nodes => nodes.map(node => node.innerText))).every(text => /\/ 5 piezas/.test(text)), 'Cada plataforma debe mostrar la meta de cinco piezas');
+  assert.equal(await page.$$eval('.communication-card', nodes => nodes.length), 7, 'El sistema de comunicación debe mostrar sus siete principios');
+  assert.match(await page.$eval('.communication-formula', node => node.innerText), /Dato[\s\S]*Beneficio[\s\S]*Escena concreta/);
 
   await page.click('[data-view="lab"]');
   assert.equal(await page.$$eval('.agent-run-card', nodes => nodes.length), 9, 'El banco debe incluir los nueve agentes');

@@ -178,7 +178,7 @@ const GROWTH_AGENT_DEFINITIONS = {
   },
   virality: {
     name: 'Radar de viralidad',
-    task: 'Evaluá las señales provistas, priorizá oportunidades por ajuste, ventana y prueba posible. Aclarar que sin fuente social conectada no son tendencias en vivo.'
+    task: 'Evaluá las señales provistas, priorizá oportunidades por ajuste, ventana, mecanismo de atención y prueba posible. Aclarar que sin fuente social conectada no son tendencias en vivo.'
   },
   avatars: {
     name: 'Avatares y ángulos',
@@ -186,7 +186,7 @@ const GROWTH_AGENT_DEFINITIONS = {
   },
   production: {
     name: 'Fábrica de contenido',
-    task: 'Producí un concepto maestro y cinco adaptaciones realmente nativas: Instagram, TikTok, YouTube, LinkedIn y X. Cada adaptación debe incluir gancho, valor/prueba y CTA.'
+    task: 'Producí un concepto maestro y cinco adaptaciones realmente nativas: Instagram, TikTok, YouTube, LinkedIn y X. Cada adaptación debe incluir tensión o sorpresa relevante, reencuadre, valor/prueba, una escena concreta y CTA.'
   },
   magnets: {
     name: 'Lead magnets',
@@ -194,7 +194,7 @@ const GROWTH_AGENT_DEFINITIONS = {
   },
   conversations: {
     name: 'Conversaciones y CTA',
-    task: 'Diseñá un CTA con palabra clave y un flujo de comentario a DM que califique intención sin presionar ni fingir automatización.'
+    task: 'Diseñá un CTA con palabra clave y un flujo de comentario a DM que califique intención sin presionar ni fingir automatización. Para objeciones: pausa, reconocé el punto válido, usá hechos, reencuadrá y cerrá con el siguiente paso.'
   },
   nurture: {
     name: 'Nutrición',
@@ -206,7 +206,7 @@ const GROWTH_AGENT_DEFINITIONS = {
   },
   quality: {
     name: 'Consejo de calidad',
-    task: 'Revisá las entregas previas como compuerta final: estrategia, viralidad, adaptación por las cinco plataformas, calidad IA, arquitectura lógica, responsables, KPIs, datos, marca y riesgo. No garantices viralidad ni ausencia total de fallos.'
+    task: 'Revisá las entregas previas como compuerta final: estrategia, viralidad, adaptación por las cinco plataformas, tensión narrativa, reencuadre, claridad, dato→beneficio→escena, credibilidad, calidad IA, arquitectura lógica, responsables, KPIs, datos, marca y riesgo. No garantices viralidad ni ausencia total de fallos.'
   }
 };
 
@@ -302,6 +302,16 @@ PRINCIPIOS ESTRATÉGICOS:
 - Diferenciá hipótesis, muestra y aprendizaje. No copies creatividad del piloto anterior.
 - Adaptá el concepto a la lógica nativa de cada plataforma; no dupliques el mismo texto.
 - La supervisión humana y el Consejo de Calidad son obligatorios antes de publicar.
+
+SISTEMA DE COMUNICACIÓN:
+- Empezá por la experiencia que la audiencia debe comprender, sentir o decidir y trabajá hacia atrás hasta la información y el formato.
+- Usá sorpresa, contraste o tensión solo cuando revelen un problema real; nunca como clickbait vacío.
+- Reencuadrá la decisión hacia criterio e identidad sin humillar a personas ni manipular hechos.
+- Simplificá la idea hasta que pueda repetirse en diez segundos.
+- Cuando uses un dato técnico, traducilo en esta secuencia: dato → beneficio → escena concreta para el operador.
+- Tratá la credibilidad como acumulativa: promesa, evidencia y entrega deben coincidir.
+- Ante objeciones, no escales: pausa, concedé lo válido, presentá hechos, reencuadrá y cerrá hacia la audiencia o siguiente paso.
+- No fuerces todas las técnicas en una pieza. Elegí una tensión central y el mecanismo mínimo que mejor sirve al objetivo.
 
 LÍMITES:
 - El modo de datos es ${inputMode}. No presentes cifras, tendencias, casos, publicaciones ni resultados como reales si el input dice demo.

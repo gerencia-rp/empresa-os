@@ -20,6 +20,27 @@
       target: '350 leads',
       confidence: 'hipótesis demo'
     },
+    communicationPlaybook: {
+      title: 'De información correcta a una idea que se recuerda',
+      thesis: 'La atención se gana con tensión relevante; la confianza se conserva cuando la promesa, la prueba y la entrega coinciden.',
+      source: 'Marco incorporado desde una transcripción externa analizada · septiembre 2026',
+      formula: ['Dato', 'Beneficio', 'Escena concreta'],
+      principles: [
+        { id: 'experience-backwards', name: 'Empezar por la experiencia', rule: 'Definir primero qué debe entender, sentir o decidir la audiencia; después elegir información, formato y tecnología.' },
+        { id: 'purposeful-surprise', name: 'Sorpresa con propósito', rule: 'Romper el patrón con un contraste, objeto, pregunta o demostración que revele el problema; nunca con ruido o engaño.' },
+        { id: 'identity-reframe', name: 'Reencuadre de identidad', rule: 'Mostrar la elección entre seguir operando por intuición o convertirse en alguien que decide con método, sin atacar a la persona.' },
+        { id: 'radical-clarity', name: 'Claridad repetible', rule: 'Reducir cada pieza a una idea que otra persona pueda explicar en diez segundos sin jerga ni contexto adicional.' },
+        { id: 'scene-translation', name: 'Del dato a la escena', rule: 'Traducir cada cifra o característica a un beneficio y luego a una situación visible de la vida del operador.' },
+        { id: 'credibility-bank', name: 'Banco de credibilidad', rule: 'Tratar cada promesa como deuda: mostrar evidencia, declarar límites y entregar al menos lo prometido.' },
+        { id: 'facts-over-force', name: 'Hechos sin presión', rule: 'Ante una objeción, pausar, reconocer lo válido, presentar hechos, reencuadrar y devolver la conversación a la audiencia.' }
+      ],
+      weeklyUse: [
+        'Una tensión central por pieza, no cinco mensajes compitiendo.',
+        'Una prueba visible antes del CTA.',
+        'Una escena concreta que haga tangible el beneficio.',
+        'Una revisión de credibilidad antes de aprobar.'
+      ]
+    },
     funnel: [
       { id: 'reach', label: 'Alcance', value: 218400, target: 300000, unit: '', conversion: null },
       { id: 'audience', label: 'Audiencia', value: 18940, target: 22000, unit: '', conversion: 8.7 },
@@ -38,7 +59,7 @@
       title: 'Poner la semana en marcha sin publicar por accidente',
       outcome: 'Al terminar, Nicolás tendrá una directiva revisada, señales priorizadas, piezas decididas, riesgos visibles y un paquete listo para entrega manual.',
       steps: [
-        { id: 'directive', order: 1, title: 'Confirmar la directiva semanal', detail: 'Validar foco, meta e hipótesis antes de producir.', owner: 'Nicolás', view: 'command', status: 'pending' },
+        { id: 'directive', order: 1, title: 'Confirmar la directiva semanal', detail: 'Validar foco, meta, hipótesis y tensión narrativa antes de producir.', owner: 'Nicolás', view: 'command', status: 'pending' },
         { id: 'radar', order: 2, title: 'Priorizar el radar de señales', detail: 'Elegir qué probar y qué descartar antes de que pierda vigencia.', owner: 'Radar de viralidad', view: 'radar', status: 'pending' },
         { id: 'agents', order: 3, title: 'Ejecutar y revisar los nueve agentes', detail: 'Probar cada misión y conservar evidencia de entradas, entregas y controles.', owner: 'Gerencia de crecimiento', view: 'lab', status: 'pending', calculated: 'agents' },
         { id: 'angles', order: 4, title: 'Revisar avatar y ángulo', detail: 'Confirmar dolor, objeción y promesa de cada apuesta.', owner: 'Avatares y ángulos', view: 'approval', status: 'pending' },
@@ -50,7 +71,7 @@
       ]
     },
     agentTest: {
-      brief: 'Prueba operativa sobre datos de demostración: diseñar una semana multiplataforma para atraer conversaciones calificadas con personas que analizan su primer Fix & Flip y suelen subestimar costos indirectos. El objetivo de la prueba es evaluar coordinación, claridad, adaptación nativa, CTA, riesgos y aprendizaje; no publicar ni presentar cifras ficticias como resultados reales.',
+      brief: 'Prueba operativa sobre datos de demostración: diseñar una semana multiplataforma para atraer conversaciones calificadas con personas que analizan su primer Fix & Flip y suelen subestimar costos indirectos. Aplicar el sistema de comunicación incluido en el snapshot: tensión relevante, reencuadre, claridad repetible, dato→beneficio→escena y credibilidad. El objetivo es evaluar coordinación, adaptación nativa, CTA, riesgos y aprendizaje; no publicar ni presentar cifras ficticias como resultados reales.',
       inputLabel: 'Escenario de prueba · datos demo',
       rule: 'Las salidas son propuestas para revisión humana. Ningún agente publica, agenda, envía mensajes ni escribe en sistemas externos.'
     },
@@ -240,6 +261,7 @@
         { id: 'orchestration', name: 'Orquestación de agentes', specialty: 'Misiones, contratos, reglas y transferencias', status: 'passed', finding: 'Todos los equipos muestran misión, entradas, entregas, horario y KPIs.', evidence: 'Directorio de equipos demo' },
         { id: 'project-management', name: 'Gerencia de proyecto', specialty: 'Responsables, cadencia, dependencias y bloqueos', status: 'passed', finding: 'Las decisiones pendientes tienen responsable y ventana de revisión.', evidence: 'Flujo y alertas demo' },
         { id: 'data-auditor', name: 'Auditor de datos y KPIs', specialty: 'Procedencia, completitud, atribución y aprendizaje', status: 'passed', finding: 'Las cifras están marcadas como demostración y los patrones declaran tamaño de muestra.', evidence: 'Embudo y aprendizaje demo' },
+        { id: 'communication-editor', name: 'Dirección de comunicación', specialty: 'Tensión, reencuadre, claridad, escenas y credibilidad', status: 'passed', finding: 'El sistema exige una idea central, prueba visible y traducción de datos a consecuencias humanas.', evidence: 'Sistema de comunicación · marco externo sintetizado' },
         { id: 'brand-risk', name: 'Marca, promesa y riesgo', specialty: 'Precisión, ética, accesibilidad y reputación', status: 'passed', finding: 'No hay promesas de viralidad ni de ausencia total de fallos.', evidence: 'Guardrails de contenido y mensajes de estado' }
       ]
     },

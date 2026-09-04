@@ -438,6 +438,15 @@
         </div>
       </section>
 
+      <section class="communication-system">
+        <div class="section-head"><div><span class="section-kicker">Sistema de comunicación</span><h2>${esc(data.communicationPlaybook.title)}</h2><p>${esc(data.communicationPlaybook.thesis)}</p></div><span class="source-chip">${icon('book-open', 12)} ${esc(data.communicationPlaybook.source)}</span></div>
+        <div class="communication-formula ui-card" aria-label="Fórmula para traducir información en comunicación">
+          ${data.communicationPlaybook.formula.map((step, index) => `<div><span>0${index + 1}</span><strong>${esc(step)}</strong></div>${index < data.communicationPlaybook.formula.length - 1 ? `<i aria-hidden="true">${icon('arrow-right', 13)}</i>` : ''}`).join('')}
+        </div>
+        <div class="communication-grid">${data.communicationPlaybook.principles.map(principle => `<article class="communication-card ui-card"><span>${esc(principle.name)}</span><p>${esc(principle.rule)}</p></article>`).join('')}</div>
+        <div class="weekly-communication ui-card"><strong>Aplicación esta semana</strong><div>${data.communicationPlaybook.weeklyUse.map(rule => `<span>${icon('check', 11)} ${esc(rule)}</span>`).join('')}</div></div>
+      </section>
+
       <section>
         <div class="section-head"><div><span class="section-kicker">Embudo completo</span><h2>De atención a ingreso</h2><p>Los porcentajes indican conversión desde la etapa anterior.</p></div><button class="text-action" type="button" data-action="go-learning">Ver aprendizaje ${icon('arrow-right', 13)}</button></div>
         <div class="funnel">${data.funnel.map(step => `

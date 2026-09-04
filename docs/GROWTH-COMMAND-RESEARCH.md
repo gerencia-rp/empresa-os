@@ -32,6 +32,7 @@ Sí deben transferirse los principios comprobables que aparecen a continuación.
 | `docs/marketing/PROMPT-CLAUDE-CODE-IMPLEMENTACION*.md` | Evolución v1-v3, criterios de alcance y decisiones descartadas | Registro de decisiones y advertencias |
 | `docs/marketing/REPORTE-NOCTURNO-2026-06-30.md` | OCR, RAG, umbrales de evidencia, degradación segura y limpieza de datos demo | Reglas para una capa de datos honesta |
 | Historial Git relacionado con `viral` | Secuencia real de construcción: producción, validación, memoria, métricas, OCR, insights y RAG | Evidencia de evolución, no código reutilizable |
+| `videoplayback (1).pdf` | Transcripción aportada por Nicolás sobre comunicación, puesta en escena, claridad, credibilidad, objeciones y traducción de datos | Marco analizado y abstraído; no se copian frases, historia ni estructura narrativa literal |
 
 ## Evolución de las decisiones
 
@@ -52,6 +53,12 @@ La arquitectura final del piloto concluyó que el usuario entra a producir y dec
 ### Cuarta hipótesis: aprendizaje desde resultados
 
 Las últimas iteraciones conectaron generación, publicación, captura de métricas, cruces analíticos, insights y recuperación de ejemplos relevantes. La regla más importante fue aprender la estructura de lo que funcionó sin copiar su creatividad. Un aprendizaje solo debía presentarse con suficiente evidencia y trazabilidad.
+
+### Quinta hipótesis: la comunicación también es un sistema
+
+La transcripción externa aportada en septiembre de 2026 refuerza que un mensaje memorable no depende de carisma espontáneo. La comunicación debe diseñarse, ensayarse y auditarse igual que una operación. Sus mecanismos transferibles son: tensión relevante, sorpresa con propósito, reencuadre, simplificación radical, traducción de datos a escenas, coherencia entre promesa y entrega y gestión serena de objeciones.
+
+Estos aprendizajes se incorporan como criterios, no como una estética que deba aplicarse a toda pieza. La aplicación debe elegir el mecanismo mínimo que sirve al objetivo y preservar la voz de Nicolás. Los relatos, frases y ejemplos históricos de la fuente no se reutilizan como creatividad.
 
 ## Núcleo de marca transferible
 
