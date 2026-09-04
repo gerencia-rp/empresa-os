@@ -42,7 +42,7 @@ try {
   }
 
   assert.match(await page.$eval('.demo-banner', element => element.innerText), /Datos y decisiones de demostración/);
-  assert.equal(await page.$$eval('.day-step', nodes => nodes.length), 8, 'La jornada inicial debe tener ocho pasos operables');
+  assert.equal(await page.$$eval('.day-step', nodes => nodes.length), 9, 'La jornada inicial debe tener nueve pasos operables');
   assert.equal(await page.$$eval('.connection-card', nodes => nodes.length), 4, 'Debe explicar el estado de las cuatro capas de integración');
   assert.match(await page.$eval('.today-side', node => node.innerText), /Preparar, no publicar/);
 
@@ -60,11 +60,20 @@ try {
   assert.equal(await page.$$eval('.platform-card', nodes => nodes.length), 5, 'Debe cubrir cinco plataformas');
   assert.ok((await page.$$eval('.platform-card', nodes => nodes.map(node => node.innerText))).every(text => /\/ 5 piezas/.test(text)), 'Cada plataforma debe mostrar la meta de cinco piezas');
 
-  for (const view of ['today', 'radar', 'teams', 'flow', 'approval', 'calendar', 'learning', 'quality']) {
+  await page.click('[data-view="lab"]');
+  assert.equal(await page.$$eval('.agent-run-card', nodes => nodes.length), 9, 'El banco debe incluir los nueve agentes');
+  assert.match(await page.$eval('.runtime-line', node => node.innerText), /Fixture exclusiva de localhost/);
+  await page.click('[data-action="run-all"]');
+  await page.waitForFunction(() => Number(document.querySelector('#agent-run-count')?.textContent || 0) === 9, { timeout: 20000 });
+  assert.equal(await page.$$eval('.agent-run-card.is-complete', nodes => nodes.length), 9, 'La batería local debe mostrar nueve entregas completas');
+  assert.ok((await page.$$eval('.run-foot > span', nodes => nodes.map(node => node.innerText))).every(text => /Fixture local/.test(text)), 'Las pruebas locales deben rotularse como fixtures');
+  assert.ok(await page.evaluate(() => JSON.parse(localStorage.getItem('empresa-os-growth-agent-runs-v1') || '[]').length === 9), 'Las entregas deben conservarse en el navegador');
+
+  for (const view of ['today', 'radar', 'teams', 'lab', 'flow', 'approval', 'calendar', 'learning', 'quality']) {
     await page.click(`[data-view="${view}"]`);
     await page.waitForSelector('#view-root > *');
     assert.equal(await page.$eval('#view-title', node => node.textContent.trim()), {
-      today: 'Qué hacer hoy', radar: 'Radar de oportunidades', teams: 'Equipos de agentes', flow: 'Flujo integral', approval: 'Aprobación semanal', calendar: 'Calendario editorial', learning: 'Aprendizaje', quality: 'Consejo de calidad'
+      today: 'Qué hacer hoy', radar: 'Radar de oportunidades', teams: 'Equipos de agentes', lab: 'Agentes en vivo', flow: 'Flujo integral', approval: 'Aprobación semanal', calendar: 'Calendario editorial', learning: 'Aprendizaje', quality: 'Consejo de calidad'
     }[view]);
     const accessibility = await page.evaluate(() => {
       const buttonsWithoutName = Array.from(document.querySelectorAll('button')).filter(button => !String(button.innerText || button.getAttribute('aria-label') || button.title || '').trim()).length;
@@ -122,7 +131,7 @@ try {
   assert.equal(mobile.width, mobile.viewport, 'La vista móvil no debe desbordar horizontalmente');
   assert.equal(mobile.navVisible, true, 'La navegación móvil debe quedar disponible');
   assert.ok(mobile.visibleNavItems >= 4, 'La navegación móvil debe mostrar varias áreas sin interacción previa');
-  assert.equal(mobile.steps, 8);
+  assert.equal(mobile.steps, 9);
 
   if (process.env.GROWTH_SCREENSHOTS_DIR) {
     await page.screenshot({ path: `${process.env.GROWTH_SCREENSHOTS_DIR}/growth-command-mobile.png`, fullPage: true });

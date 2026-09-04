@@ -35,6 +35,7 @@
 | 03-sep-2026 | Growth closure | Convertir `/viral` y `/growth` de tablero descriptivo a jornada guiada | El CEO necesita saber qué hacer hoy y qué sigue bloqueado, no reconstruir el proceso desde módulos separados. |
 | 03-sep-2026 | Growth closure | Separar `verificado`, `configurado`, `no configurado` y `demo` | La presencia de una variable o un estado ficticio no demuestra que un proveedor opere. |
 | 03-sep-2026 | Growth closure | Mantener publicación deshabilitada y ofrecer entrega manual marcada | Metricool y Drive no tienen credenciales disponibles; el producto debe degradar con honestidad. |
+| 04-sep-2026 | Growth agents | Ejecutar nueve agentes reales sobre un brief común y cerrar con el Consejo de Calidad | Permite comprobar entregables y método sin fingir conexiones, publicación ni datos en vivo. |
 
 ## Growth Command closure — 03-sep-2026
 
@@ -45,7 +46,7 @@ Este frente queda cerrado dentro del alcance del centro de crecimiento, sin camb
 - Microinteracciones: marcar/reabrir pasos, priorizar/descartar señales, aprobar/devolver piezas y revisar controles con feedback.
 - Mensaje recordable: “Preparar, no publicar” cuando no existen conexiones verificadas.
 - Rendimiento: solución estática sin framework adicional; un único chequeo autenticado y sin caché para preparación de conexiones.
-- Revisión final: ninguna ejecución, publicación, métrica o activo demo se presenta como hecho real.
+- Revisión final: la inferencia de agentes se presenta como real y trazable; publicación, métricas, activos y fuentes externas permanecen demo/no conectados.
 
 ## Next Actions
 
@@ -58,3 +59,5 @@ Este frente queda cerrado dentro del alcance del centro de crecimiento, sin camb
 - [x] Actualizar Chromium/Puppeteer juntos y reducir alertas compatibles con Node 20 (Codex, 24-ago-2026).
 - [x] Alinear runtime a Node 24.x y Puppeteer 25 según la decisión vigente D-004 (Codex, 03-sep-2026).
 - [ ] Completar auditoría UX por flujo y corregir severidad 4/3 (Codex).
+- [x] Implementar motor autenticado, contrato y laboratorio para los nueve agentes Growth (Codex, 04-sep-2026).
+- [ ] Ejecutar y revisar la batería real 9/9 en producción, con Consejo de Calidad al final (Codex).

@@ -40,13 +40,19 @@
       steps: [
         { id: 'directive', order: 1, title: 'Confirmar la directiva semanal', detail: 'Validar foco, meta e hipótesis antes de producir.', owner: 'Nicolás', view: 'command', status: 'pending' },
         { id: 'radar', order: 2, title: 'Priorizar el radar de señales', detail: 'Elegir qué probar y qué descartar antes de que pierda vigencia.', owner: 'Radar de viralidad', view: 'radar', status: 'pending' },
-        { id: 'angles', order: 3, title: 'Revisar avatar y ángulo', detail: 'Confirmar dolor, objeción y promesa de cada apuesta.', owner: 'Avatares y ángulos', view: 'approval', status: 'pending' },
-        { id: 'approval', order: 4, title: 'Decidir las piezas pendientes', detail: 'Aprobar o devolver con una razón concreta.', owner: 'Nicolás', view: 'approval', status: 'pending', calculated: 'approval' },
-        { id: 'quality', order: 5, title: 'Cerrar hallazgos del Consejo', detail: 'Ninguna entrega sale con controles abiertos.', owner: 'Consejo de calidad', view: 'quality', status: 'pending', calculated: 'quality' },
-        { id: 'connections', order: 6, title: 'Revisar conexiones externas', detail: 'Confirmar qué está verificado y qué exige configuración.', owner: 'Arquitectura', view: 'today', status: 'blocked', calculated: 'connections' },
-        { id: 'handoff', order: 7, title: 'Preparar la entrega semanal', detail: 'Exportar el paquete manual mientras Metricool y Drive no estén activos.', owner: 'Orquestador', view: 'calendar', status: 'pending' },
-        { id: 'learning', order: 8, title: 'Registrar la decisión de aprendizaje', detail: 'Dejar explícito qué repetir, detener o probar después.', owner: 'Analítica', view: 'learning', status: 'pending' }
+        { id: 'agents', order: 3, title: 'Ejecutar y revisar los nueve agentes', detail: 'Probar cada misión y conservar evidencia de entradas, entregas y controles.', owner: 'Gerencia de crecimiento', view: 'lab', status: 'pending', calculated: 'agents' },
+        { id: 'angles', order: 4, title: 'Revisar avatar y ángulo', detail: 'Confirmar dolor, objeción y promesa de cada apuesta.', owner: 'Avatares y ángulos', view: 'approval', status: 'pending' },
+        { id: 'approval', order: 5, title: 'Decidir las piezas pendientes', detail: 'Aprobar o devolver con una razón concreta.', owner: 'Nicolás', view: 'approval', status: 'pending', calculated: 'approval' },
+        { id: 'quality', order: 6, title: 'Cerrar hallazgos del Consejo', detail: 'Ninguna entrega sale con controles abiertos.', owner: 'Consejo de calidad', view: 'quality', status: 'pending', calculated: 'quality' },
+        { id: 'connections', order: 7, title: 'Revisar conexiones externas', detail: 'Confirmar qué está verificado y qué exige configuración.', owner: 'Arquitectura', view: 'today', status: 'blocked', calculated: 'connections' },
+        { id: 'handoff', order: 8, title: 'Preparar la entrega semanal', detail: 'Exportar el paquete manual mientras Metricool y Drive no estén activos.', owner: 'Orquestador', view: 'calendar', status: 'pending' },
+        { id: 'learning', order: 9, title: 'Registrar la decisión de aprendizaje', detail: 'Dejar explícito qué repetir, detener o probar después.', owner: 'Analítica', view: 'learning', status: 'pending' }
       ]
+    },
+    agentTest: {
+      brief: 'Prueba operativa sobre datos de demostración: diseñar una semana multiplataforma para atraer conversaciones calificadas con personas que analizan su primer Fix & Flip y suelen subestimar costos indirectos. El objetivo de la prueba es evaluar coordinación, claridad, adaptación nativa, CTA, riesgos y aprendizaje; no publicar ni presentar cifras ficticias como resultados reales.',
+      inputLabel: 'Escenario de prueba · datos demo',
+      rule: 'Las salidas son propuestas para revisión humana. Ningún agente publica, agenda, envía mensajes ni escribe en sistemas externos.'
     },
     signals: [
       { id: 'signal-1', platform: 'instagram', source: 'Exploración manual demo', pattern: 'Costo invisible explicado con objeto físico', window: '48 horas', fit: 'Alto', decision: 'pending', why: 'Une autoridad, prueba visible y una objeción frecuente.' },

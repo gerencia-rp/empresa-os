@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { growthIntegrationReadiness } from '../api/brain-chat.mjs';
+import { growthAgentCatalog, growthAgentRuntime, growthIntegrationReadiness, normalizeGrowthAgentOutput } from '../api/brain-chat.mjs';
 
 const empty = growthIntegrationReadiness({});
 assert.equal(empty.length, 4);
@@ -25,4 +25,34 @@ for (const secret of ['PRIVATE-SECRET', 'folder-secret', 'TOKEN-SECRET', 'user-s
 assert.match(responseShape, /GOOGLE_DRIVE_CLIENT_EMAIL/);
 assert.match(responseShape, /METRICOOL_API_TOKEN/);
 
-console.log('Growth readiness: estados honestos y no exposición de secretos verificados.');
+const catalog = growthAgentCatalog();
+assert.equal(catalog.length, 9, 'El equipo ejecutable debe contener nueve agentes');
+assert.ok(catalog.some(agent => agent.id === 'quality'));
+assert.ok(catalog.some(agent => agent.model.includes('haiku')), 'Los roles de volumen deben usar el modelo acotado');
+assert.equal(growthAgentRuntime({ ANTHROPIC_API_KEY: 'direct-key' }).provider, 'anthropic-direct');
+const gatewayRuntime = growthAgentRuntime({ ANTHROPIC_API_KEY: 'invalid-direct', VERCEL_OIDC_TOKEN: 'oidc-token' });
+assert.equal(gatewayRuntime.provider, 'vercel-ai-gateway');
+assert.equal(gatewayRuntime.model('management'), 'anthropic/claude-opus-4.8');
+assert.equal(gatewayRuntime.model('production'), 'anthropic/claude-haiku-4.5');
+const brokerRuntime = growthAgentRuntime({ VERCEL: '1', SUPABASE_URL: 'https://example.supabase.co' });
+assert.equal(brokerRuntime.provider, 'supabase-anthropic-broker');
+assert.equal(brokerRuntime.endpoint, 'https://example.supabase.co/functions/v1/growth-agent-inference');
+
+const normalized = normalizeGrowthAgentOutput({
+  verdict: 'usable', headline: 'Prueba', summary: 'Entrega controlada',
+  deliverables: [{ label: 'Salida', content: 'Contenido' }],
+  evidence: [{ source: 'Brief demo', note: 'No es un resultado real.' }],
+  assumptions: ['Datos ficticios'], risks: ['Revisión humana requerida'],
+  next_actions: [{ owner: 'Nicolás', action: 'Revisar', due: 'Hoy' }], quality_checks: []
+});
+assert.equal(normalized.score, 100);
+assert.equal(normalized.output.verdict, 'usable');
+
+const unsafe = normalizeGrowthAgentOutput({
+  verdict: 'usable', headline: 'Viralidad garantizada', summary: 'Será viral',
+  deliverables: [{ label: 'Salida', content: 'Resultado' }], evidence: [{ source: 'Ninguna', note: 'Sin evidencia' }],
+  assumptions: ['Ninguno'], risks: ['Ninguno'], next_actions: [{ owner: 'IA', action: 'Publicar', due: 'Ya' }]
+});
+assert.equal(unsafe.checks.find(check => check.id === 'no_false_guarantee').passed, false, 'Las garantías falsas deben fallar el control');
+
+console.log('Growth runtime: preparación, catálogo, contrato y no exposición de secretos verificados.');

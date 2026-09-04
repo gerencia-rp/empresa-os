@@ -6,6 +6,7 @@
     command: { eyebrow: 'Vista ejecutiva', title: 'Mando semanal' },
     radar: { eyebrow: 'Señales con criterio', title: 'Radar de oportunidades' },
     teams: { eyebrow: 'Sistema operativo', title: 'Equipos de agentes' },
+    lab: { eyebrow: 'Ejecuciones verificables', title: 'Agentes en vivo' },
     flow: { eyebrow: 'De señal a aprendizaje', title: 'Flujo integral' },
     approval: { eyebrow: 'Supervisión humana', title: 'Aprobación semanal' },
     calendar: { eyebrow: 'Cobertura multiplataforma', title: 'Calendario editorial' },
@@ -16,9 +17,10 @@
   const STATUS_LABELS = {
     draft: 'Borrador', pending: 'Pendiente', approved: 'Aprobada · demo', revision: 'Revisión', scheduled: 'Programada · demo',
     active: 'Activo · demo', attention: 'Atención · demo', supervised: 'Supervisado · demo', planned: 'Planeado', done: 'Listo · demo',
-    passed: 'Aprobado · demo', improve: 'Mejorar', blocked: 'Bloqueado', running: 'En curso · demo', review: 'Revisar · demo',
+    passed: 'Aprobado · demo', improve: 'Mejorar', blocked: 'Bloqueado', running: 'En curso', review: 'Revisar · demo',
     completed: 'Completado', test: 'Probar', discard: 'Descartada', verified: 'Verificado', configured: 'Configurado · sin prueba',
-    not_configured: 'No configurado', unverified: 'No verificado'
+    not_configured: 'No configurado', unverified: 'No verificado', idle: 'Sin ejecutar', error: 'Falló',
+    usable: 'Utilizable', needs_review: 'Requiere revisión'
   };
 
   const TEAM_ICONS = {
@@ -29,7 +31,8 @@
   const state = {
     view: 'today', mode: 'demo', snapshot: null, repository: null, loading: false,
     teamFilter: 'Todos', pieceFilter: 'Pendientes', qaFilter: 'Todos', signalFilter: 'Todos', authClient: null,
-    integrationCheck: { checkedAt: null, source: 'pending', error: null }
+    integrationCheck: { checkedAt: null, source: 'pending', error: null },
+    agentRuntime: { configured: false, fixture: false, catalog: [] }, agentRuns: [], agentClient: null, agentBrief: '', runningAll: false
   };
 
   const $ = selector => document.querySelector(selector);
@@ -53,7 +56,7 @@
   }
 
   function statusDot(status, label) {
-    const map = { active: 'ok', done: 'ok', approved: 'ok', scheduled: 'ok', passed: 'ok', completed: 'ok', verified: 'ok', supervised: 'warn', attention: 'warn', pending: 'warn', improve: 'warn', configured: 'warn', test: 'warn', revision: 'bad', blocked: 'bad', planned: 'off', draft: 'off', discard: 'off', not_configured: 'off', unverified: 'off' };
+    const map = { active: 'ok', done: 'ok', approved: 'ok', scheduled: 'ok', passed: 'ok', completed: 'ok', verified: 'ok', usable: 'ok', supervised: 'warn', attention: 'warn', pending: 'warn', improve: 'warn', configured: 'warn', test: 'warn', running: 'warn', needs_review: 'warn', revision: 'bad', blocked: 'bad', error: 'bad', planned: 'off', draft: 'off', discard: 'off', not_configured: 'off', unverified: 'off', idle: 'off' };
     return window.kitStatusDot ? window.kitStatusDot(map[status] || 'off', label || STATUS_LABELS[status] || status) : statusBadge(status);
   }
 
@@ -173,6 +176,8 @@
   }
 
   async function startApp() {
+    state.agentRuns = window.GrowthAgents.loadRuns();
+    state.agentClient = new window.GrowthAgents.GrowthAgentClient({ authClient: state.authClient, localPreview: isLocalPreview() });
     bindEvents();
     hydrateIcons(document);
     syncTheme();
@@ -243,6 +248,7 @@
     state.repository = window.GrowthData.createRepository(state.mode);
     try {
       state.snapshot = await state.repository.getSnapshot();
+      if (!state.agentBrief) state.agentBrief = state.snapshot.agentTest.brief;
       await loadIntegrationReadiness();
       $('#app-status').innerHTML = '';
       updateCounts();
@@ -268,9 +274,11 @@
     try {
       const result = await client.getReadiness(state.snapshot.integrations);
       state.snapshot.integrations = result.integrations;
+      state.agentRuntime = result.agentRuntime || { configured: false, fixture: false, catalog: [] };
       state.integrationCheck = { checkedAt: result.checkedAt, source: result.source, error: null };
     } catch (error) {
       state.integrationCheck = { checkedAt: null, source: 'failed', error: error.message };
+      state.agentRuntime = { configured: false, fixture: false, catalog: [] };
       state.snapshot.integrations = state.snapshot.integrations.map(item => ({ ...item, status: item.id === 'supabase-auth' ? 'verified' : 'unverified' }));
     }
     const allOperational = state.snapshot.integrations.filter(item => item.id !== 'supabase-auth').every(item => item.status === 'verified');
@@ -282,9 +290,12 @@
   function updateCounts() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
+    const completedAgents = window.GrowthAgents.CATALOG.filter(agent => latestRun(agent.id)?.status === 'completed').length;
+    snapshot.firstDay.steps = snapshot.firstDay.steps.map(step => step.calculated === 'agents' ? { ...step, status: completedAgents === window.GrowthAgents.CATALOG.length ? 'completed' : 'pending' } : step);
     $('#approval-count').textContent = snapshot.pieces.filter(piece => ['pending', 'revision'].includes(piece.status)).length;
     $('#quality-count').textContent = snapshot.qualityCouncil.reviewers.filter(item => item.status !== 'passed').length;
     $('#today-count').textContent = snapshot.firstDay.steps.filter(item => item.status !== 'completed').length;
+    $('#agent-run-count').textContent = completedAgents;
   }
 
   function render() {
@@ -300,7 +311,7 @@
         </div>`;
       return;
     }
-    const renderers = { today: renderToday, command: renderCommand, radar: renderRadar, teams: renderTeams, flow: renderFlow, approval: renderApproval, calendar: renderCalendar, learning: renderLearning, quality: renderQuality };
+    const renderers = { today: renderToday, command: renderCommand, radar: renderRadar, teams: renderTeams, lab: renderLab, flow: renderFlow, approval: renderApproval, calendar: renderCalendar, learning: renderLearning, quality: renderQuality };
     $('#view-root').innerHTML = renderers[state.view]();
   }
 
@@ -366,6 +377,52 @@
     </div>`;
   }
 
+  function latestRun(agentId) {
+    return state.agentRuns.find(run => run.agentId === agentId) || null;
+  }
+
+  function agentRunButton(agentId, compact) {
+    const run = latestRun(agentId);
+    const disabled = state.runningAll || run?.status === 'running' || (!state.agentRuntime.configured && !state.agentRuntime.fixture);
+    const label = run?.status === 'running' ? 'Ejecutando…' : run?.status === 'completed' ? 'Volver a probar' : 'Ejecutar prueba';
+    return `<button class="btn ${compact ? '' : 'btn-primary'}" type="button" data-action="run-agent" data-id="${esc(agentId)}" ${disabled ? 'disabled' : ''}>${run?.status === 'running' ? '<span class="ui-spinner" aria-hidden="true"></span>' : icon('play', 12)} ${label}</button>`;
+  }
+
+  function renderRunResult(agent, run) {
+    if (!run) return `<article class="agent-run-card ui-card"><div class="agent-run-head"><div><span class="section-kicker">${esc(agent.id)}</span><h3>${esc(agent.name)}</h3></div>${statusBadge('idle')}</div><p class="run-empty">Todavía no hay evidencia. Ejecutá una prueba para ver qué recibe, qué entrega y cómo pasa los controles.</p>${agentRunButton(agent.id)}</article>`;
+    if (run.status === 'running') return `<article class="agent-run-card ui-card is-running"><div class="agent-run-head"><div><span class="section-kicker">${esc(agent.id)}</span><h3>${esc(agent.name)}</h3></div>${statusBadge('running')}</div><div class="run-progress"><span class="ui-spinner" aria-hidden="true"></span><p>El agente está procesando el brief y las entregas previas. No ejecuta acciones externas.</p></div></article>`;
+    if (run.status === 'error') return `<article class="agent-run-card ui-card is-error"><div class="agent-run-head"><div><span class="section-kicker">${esc(agent.id)}</span><h3>${esc(agent.name)}</h3></div>${statusBadge('error')}</div><p class="run-error">${esc(run.error || 'La prueba no pudo completarse.')}</p>${agentRunButton(agent.id)}</article>`;
+    const output = run.output || {};
+    return `<article class="agent-run-card ui-card is-complete">
+      <div class="agent-run-head"><div><span class="section-kicker">${esc(agent.id)} · ${esc(run.model)}</span><h3>${esc(agent.name)}</h3></div>${statusBadge(output.verdict || 'needs_review')}</div>
+      <div class="run-score"><strong>${esc(run.score)}%</strong><span>controles<br>automáticos</span><small>${(Number(run.durationMs || 0) / 1000).toFixed(1)} s</small></div>
+      <h4>${esc(output.headline || 'Entrega sin titular')}</h4><p class="run-summary">${esc(output.summary || '')}</p>
+      <details class="run-details"><summary>Revisar entrega completa</summary>
+        <div class="run-section"><h5>Entregables</h5>${(output.deliverables || []).map(item => `<div class="run-deliverable"><strong>${esc(item.label)}</strong><p>${esc(item.content)}</p></div>`).join('') || '<p>Sin entregables.</p>'}</div>
+        <div class="run-columns"><div class="run-section"><h5>Fuentes y evidencia</h5><ul>${(output.evidence || []).map(item => `<li><strong>${esc(item.source)}:</strong> ${esc(item.note)}</li>`).join('')}</ul></div><div class="run-section"><h5>Supuestos</h5><ul>${(output.assumptions || []).map(item => `<li>${esc(item)}</li>`).join('')}</ul></div><div class="run-section"><h5>Riesgos</h5><ul>${(output.risks || []).map(item => `<li>${esc(item)}</li>`).join('')}</ul></div></div>
+        <div class="run-section"><h5>Siguientes acciones</h5><div class="next-action-list">${(output.next_actions || []).map(item => `<div><strong>${esc(item.owner)}</strong><span>${esc(item.action)}</span><small>${esc(item.due || 'Sin fecha')}</small></div>`).join('')}</div></div>
+        <div class="run-section"><h5>Control automático del contrato</h5><div class="check-list">${(run.checks || []).map(check => `<span class="${check.passed ? 'is-pass' : 'is-fail'}">${icon(check.passed ? 'check' : 'alert', 11)} ${esc(check.label)}</span>`).join('')}</div></div>
+      </details>
+      <div class="run-foot"><span>${run.fixture ? 'Fixture local · no IA' : `Ejecución IA real · ${esc(run.provider || 'proveedor configurado')} · datos ${esc(run.inputMode)}`}</span>${agentRunButton(agent.id, true)}</div>
+    </article>`;
+  }
+
+  function renderLab() {
+    const catalog = window.GrowthAgents.CATALOG;
+    const completed = catalog.filter(agent => latestRun(agent.id)?.status === 'completed').length;
+    const failed = catalog.filter(agent => latestRun(agent.id)?.status === 'error').length;
+    const realReady = state.agentRuntime.configured;
+    const canRun = realReady || state.agentRuntime.fixture;
+    return `<div class="stack">
+      <section class="agent-lab-hero ui-card">
+        <div><p class="eyebrow">Banco de pruebas controlado</p><h2>Hacé trabajar al equipo y revisá la evidencia</h2><p>Cada agente recibe el mismo brief, su misión y las entregas previas relevantes. La batería produce propuestas estructuradas; no publica, agenda ni escribe en servicios externos.</p><div class="runtime-line">${statusDot(completed ? 'verified' : realReady ? 'configured' : state.agentRuntime.fixture ? 'unverified' : 'blocked', completed ? 'Motor probado en este navegador' : realReady ? `Motor listo para probar · ${esc(state.agentRuntime.provider || 'proveedor configurado')}` : state.agentRuntime.fixture ? 'Fixture exclusiva de localhost' : 'Motor IA no disponible')}<span>${completed}/9 completados${failed ? ` · ${failed} fallaron` : ''}</span></div></div>
+        <div class="lab-primary-actions"><button class="btn btn-primary" type="button" data-action="run-all" ${!canRun || state.runningAll ? 'disabled' : ''}>${state.runningAll ? '<span class="ui-spinner" aria-hidden="true"></span> Ejecutando equipo…' : `${icon('play', 13)} Ejecutar los 9 agentes`}</button><button class="btn" type="button" data-action="export-runs" ${completed ? '' : 'disabled'}>${icon('download', 13)} Exportar resultados</button></div>
+      </section>
+      <section class="brief-panel ui-card"><div class="brief-copy"><span class="section-kicker">Entrada compartida</span><h2>Brief de la prueba</h2><p>${esc(state.snapshot.agentTest.inputLabel)}. Podés editarlo antes de ejecutar. Se envía al modelo, pero no se guarda en Supabase.</p></div><label for="agent-brief">Contexto y objetivo</label><textarea id="agent-brief" rows="5" maxlength="5000">${esc(state.agentBrief)}</textarea><div class="brief-foot"><span>${icon('lock', 12)} ${esc(state.snapshot.agentTest.rule)}</span><button class="text-action" type="button" data-action="reset-brief">Restaurar brief demo</button></div></section>
+      <section><div class="section-head"><div><span class="section-kicker">Evidencia por función</span><h2>Entradas, salidas y control</h2><p>Los resultados quedan solo en este navegador hasta que se active Supabase Growth.</p></div><button class="text-action" type="button" data-action="clear-runs" ${state.agentRuns.length ? '' : 'disabled'}>Limpiar resultados</button></div><div class="agent-run-grid">${catalog.map(agent => renderRunResult(agent, latestRun(agent.id))).join('')}</div></section>
+    </div>`;
+  }
+
   function renderCommand() {
     const data = state.snapshot;
     return `<div class="stack">
@@ -427,7 +484,7 @@
           <div class="team-card-top"><span class="team-icon">${icon(TEAM_ICONS[team.id] || 'bot', 17)}</span>${statusDot(team.status)}</div>
           <div><h3>${esc(team.name)}</h3><span class="team-area">${esc(team.area)}</span><p class="team-mission">${esc(team.mission)}</p></div>
           <div class="contract-grid"><div><h4>Entradas</h4><ul>${team.inputs.map(value => `<li>${esc(value)}</li>`).join('')}</ul></div><div><h4>Entregas</h4><ul>${team.outputs.map(value => `<li>${esc(value)}</li>`).join('')}</ul></div></div>
-          <div class="team-bottom"><span class="cadence">${icon('clock', 12)} ${esc(team.cadence)}</span><div class="kpi-tags">${team.kpis.map(kpi => `<span class="kpi-tag">${esc(kpi)}</span>`).join('')}</div><span class="cadence">Última: ${esc(team.lastRun)} · Próxima: ${esc(team.nextRun)}</span></div>
+          <div class="team-bottom"><span class="cadence">${icon('clock', 12)} ${esc(team.cadence)}</span><div class="kpi-tags">${team.kpis.map(kpi => `<span class="kpi-tag">${esc(kpi)}</span>`).join('')}</div><span class="cadence">Última: ${esc(team.lastRun)} · Próxima: ${esc(team.nextRun)}</span><div class="team-run-control">${agentRunButton(team.id, true)}${latestRun(team.id)?.status === 'completed' ? `<button class="text-action" type="button" data-action="open-step" data-view="lab">Ver resultado</button>` : ''}</div></div>
         </article>`).join('')}</section>
     </div>`;
   }
@@ -536,6 +593,68 @@
     </div>`;
   }
 
+  function captureAgentBrief() {
+    const field = $('#agent-brief');
+    if (field) state.agentBrief = field.value.trim();
+    return state.agentBrief;
+  }
+
+  function setLatestRun(agentId, run) {
+    state.agentRuns = [run, ...state.agentRuns.filter(item => item.agentId !== agentId)].slice(0, 9);
+  }
+
+  async function executeAgent(agentId, options) {
+    const brief = captureAgentBrief();
+    if (brief.length < 20) {
+      toast('Agregá un contexto concreto antes de ejecutar.', 'error');
+      return null;
+    }
+    const previous = state.agentRuns.filter(run => run.status === 'completed');
+    setLatestRun(agentId, { agentId, status: 'running', startedAt: new Date().toISOString() });
+    updateCounts();
+    render();
+    try {
+      const result = await state.agentClient.run(agentId, brief, state.snapshot, previous);
+      const completed = { ...result, status: 'completed' };
+      setLatestRun(agentId, completed);
+      window.GrowthAgents.saveRuns(state.agentRuns);
+      updateCounts();
+      render();
+      if (!options?.silent) toast(`${result.agentName} entregó una prueba para revisión.`);
+      return completed;
+    } catch (error) {
+      const failed = { agentId, status: 'error', error: error.message, completedAt: new Date().toISOString() };
+      setLatestRun(agentId, failed);
+      window.GrowthAgents.saveRuns(state.agentRuns);
+      updateCounts();
+      render();
+      if (!options?.silent) toast(error.message, 'error');
+      return failed;
+    }
+  }
+
+  async function executeAllAgents() {
+    if (state.runningAll) return;
+    captureAgentBrief();
+    if (state.agentBrief.length < 20) { toast('Agregá un contexto concreto antes de ejecutar.', 'error'); return; }
+    state.runningAll = true;
+    render();
+    try {
+      await executeAgent('management', { silent: true });
+      await Promise.all(['virality', 'avatars'].map(id => executeAgent(id, { silent: true })));
+      await Promise.all(['production', 'magnets'].map(id => executeAgent(id, { silent: true })));
+      await Promise.all(['conversations', 'nurture'].map(id => executeAgent(id, { silent: true })));
+      await executeAgent('analytics', { silent: true });
+      await executeAgent('quality', { silent: true });
+      const failures = state.agentRuns.filter(run => run.status === 'error').length;
+      toast(failures ? `La batería terminó con ${failures} fallos para revisar.` : 'Los 9 agentes terminaron. Revisá las entregas antes de usar.', failures ? 'error' : undefined);
+    } finally {
+      state.runningAll = false;
+      updateCounts();
+      render();
+    }
+  }
+
   async function handleViewAction(event) {
     const target = event.target.closest('[data-action]');
     if (!target) return;
@@ -558,6 +677,23 @@
     if (action === 'piece-filter') { state.pieceFilter = target.dataset.value; return render(); }
     if (action === 'qa-filter') { state.qaFilter = target.dataset.value; return render(); }
     if (action === 'signal-filter') { state.signalFilter = target.dataset.value; return render(); }
+    if (action === 'run-agent') return executeAgent(target.dataset.id);
+    if (action === 'run-all') return executeAllAgents();
+    if (action === 'reset-brief') { state.agentBrief = state.snapshot.agentTest.brief; render(); toast('Brief de demostración restaurado.'); return; }
+    if (action === 'clear-runs') {
+      state.agentRuns = [];
+      window.GrowthAgents.clearRuns();
+      updateCounts();
+      render();
+      toast('Resultados locales eliminados. Podés volver a ejecutar la batería.');
+      return;
+    }
+    if (action === 'export-runs') {
+      captureAgentBrief();
+      window.GrowthAgents.downloadRuns(state.agentRuns.filter(run => run.status === 'completed'), state.agentBrief);
+      toast('Resultados exportados. El archivo no autoriza publicación.');
+      return;
+    }
     if (action === 'export-week') {
       window.GrowthIntegrations.downloadCalendarExport(state.snapshot);
       toast('Paquete demo exportado. No autoriza publicación.');

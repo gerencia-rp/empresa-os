@@ -52,7 +52,7 @@ Fuente canónica: `ui/tokens.css`. Escala 4/8/16/24/32/48/64; azabache+cobalto; 
 | Interaction | Trigger/Rules/Feedback/Loops | Fix | Status |
 |---|---|---|---|
 | Guardar | clic / validar / feedback inmediato / estado persistido | Botón “Guardando…” y confirmación junto al objeto | pendiente |
-| Ejecutar agente | clic / autorización / progreso / evidencia final | Línea temporal de ejecución con fuente y resultado | pendiente |
+| Ejecutar agente | clic / autorización / progreso / evidencia final | Resultado estructurado con modelo, duración, score, evidencia y revisión | implementado en Growth |
 | Sincronizar | manual o cron / timeout / resumen / próxima corrida | Mostrar parcial, fallos por fuente y reintento seguro | pendiente |
 | Aprobar decisión | clic / impacto / aplicado / reversible | Resumen antes y opción deshacer cuando sea posible | pendiente |
 
@@ -71,3 +71,4 @@ La firma visual es el flujo vivo de nueve estaciones desde tendencia hasta apren
 | Calendario | Cinco plataformas visibles y detalle por pieza al seleccionar | definido |
 | Estados | Carga, vacío, error y éxito incluidos en el repositorio demo | definido |
 | Consejo de calidad | Dictamen, controles, hallazgo, evidencia y acción por especialidad | definido |
+| Laboratorio de agentes | Brief editable, corrida individual o completa, evidencia expandible y recuperación de error | implementado |

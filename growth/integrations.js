@@ -14,6 +14,7 @@
         return {
           checkedAt: null,
           source: 'local-preview',
+          agentRuntime: { configured: false, fixture: true, catalog: window.GrowthAgents ? window.GrowthAgents.CATALOG : [] },
           integrations: clone(fallback).map(item => ({ ...item, status: item.id === 'supabase-auth' ? 'unverified' : item.status }))
         };
       }
@@ -28,7 +29,7 @@
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'No pudimos revisar las conexiones.');
-      return { checkedAt: payload.checkedAt, source: 'server', integrations: payload.integrations || clone(fallback) };
+      return { checkedAt: payload.checkedAt, source: 'server', integrations: payload.integrations || clone(fallback), agentRuntime: payload.agentRuntime || { configured: false, catalog: [] } };
     }
   }
 
