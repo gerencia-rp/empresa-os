@@ -9,7 +9,7 @@
       "destination": "/api/brain-chat?resource=health"
     },
     {
-      "source": "/((?!api/|assets/|viral|diag|mi-plan|inversionista$|diagnostico|.*\\.).*)",
+      "source": "/((?!api/|assets/|growth|viral|diag|mi-plan|inversionista$|diagnostico|.*\\.).*)",
       "destination": "/"
     }
   ],

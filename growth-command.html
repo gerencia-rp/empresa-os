@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060812">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Centro de crecimiento | Empresa OS</title>
+  <meta name="description" content="Centro privado de mando para crecimiento, contenido, conversión y aprendizaje de Nicolás Lara.">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/ui/tokens.css?v=growth-v1">
+  <link rel="stylesheet" href="/growth/growth-command.css?v=growth-v2">
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Saltar al contenido</a>
+
+  <section id="auth-shell" class="auth-shell" aria-live="polite">
+    <div class="auth-card ui-card">
+      <div class="brand-mark" aria-hidden="true">OS</div>
+      <p class="eyebrow">Empresa OS privado</p>
+      <h1>Centro de crecimiento</h1>
+      <p id="auth-copy" class="muted">Comprobando tu sesión segura.</p>
+      <div id="auth-loading" class="auth-loading">
+        <span class="ui-spinner" aria-hidden="true"></span>
+        <span>Validando acceso</span>
+      </div>
+      <form id="auth-form" class="auth-form" hidden>
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" autocomplete="email" required>
+        <label for="auth-password">Contraseña</label>
+        <input id="auth-password" type="password" autocomplete="current-password" required>
+        <p id="auth-error" class="form-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-wide" type="submit">Entrar al centro</button>
+        <p class="form-help">Usá la misma cuenta autorizada de Empresa OS.</p>
+      </form>
+    </div>
+  </section>
+
+  <div id="growth-app" class="app-shell" hidden>
+    <aside class="sidebar" aria-label="Navegación principal">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">OS</div>
+        <div>
+          <span class="brand-name">Empresa OS</span>
+          <span class="brand-area">Growth Command</span>
+        </div>
+      </div>
+
+      <nav id="primary-nav" class="primary-nav">
+        <button class="nav-item is-active" type="button" data-view="today" aria-current="page" data-icon="play">Hoy <span id="today-count" class="nav-count nav-count-warn">0</span></button>
+        <button class="nav-item" type="button" data-view="command" data-icon="layout">Mando</button>
+        <button class="nav-item" type="button" data-view="radar" data-icon="compass">Radar</button>
+        <button class="nav-item" type="button" data-view="teams" data-icon="users">Equipos</button>
+        <button class="nav-item" type="button" data-view="flow" data-icon="network">Flujo</button>
+        <button class="nav-item" type="button" data-view="approval" data-icon="check-circle">Aprobación <span id="approval-count" class="nav-count">0</span></button>
+        <button class="nav-item" type="button" data-view="calendar" data-icon="calendar-days">Calendario</button>
+        <button class="nav-item" type="button" data-view="learning" data-icon="brain">Aprendizaje</button>
+        <button class="nav-item" type="button" data-view="quality" data-icon="shield-check">Consejo de calidad <span id="quality-count" class="nav-count nav-count-warn">0</span></button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="demo-stamp">
+          <span class="status-dot warn"><span class="dot"></span>Entorno demo</span>
+          <span>Decisiones demo · sin publicación automática</span>
+        </div>
+        <button id="back-to-os" class="text-action" type="button" data-icon="arrow-left">Volver a Empresa OS</button>
+      </div>
+    </aside>
+
+    <main id="workspace" class="workspace" tabindex="-1">
+      <header class="topbar">
+        <div class="topbar-heading">
+          <p id="view-eyebrow" class="eyebrow">Jornada guiada</p>
+          <h1 id="view-title">Qué hacer hoy</h1>
+        </div>
+        <div class="topbar-actions">
+          <label class="state-control" for="demo-state">
+            <span>Estado</span>
+            <select id="demo-state" aria-label="Simular estado de la aplicación">
+              <option value="demo">Demo</option>
+              <option value="empty">Vacío</option>
+              <option value="error">Error</option>
+            </select>
+          </label>
+          <button id="theme-toggle" class="icon-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
+          <div class="user-menu">
+            <span id="user-initials" class="avatar">NL</span>
+            <span class="user-copy"><strong>Nicolás</strong><small id="user-email">Sesión privada</small></span>
+          </div>
+          <button id="logout-btn" class="icon-btn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión" data-icon="log-out"></button>
+        </div>
+      </header>
+
+      <div class="demo-banner" role="status">
+        <span class="banner-icon" data-icon="flask"></span>
+        <div><strong>Datos y decisiones de demostración</strong><span>Los números, ejecuciones, señales y hallazgos son ficticios. Supabase solo valida el acceso; no hay publicación ni persistencia operativa conectada.</span></div>
+        <button id="reset-demo" class="text-action" type="button" data-icon="undo">Restaurar</button>
+      </div>
+
+      <section id="app-status" class="app-status" aria-live="polite"></section>
+      <section id="view-root" class="view-root" aria-live="polite"></section>
+      <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/config.public.js"></script>
+  <script src="/ui/icons.js?v=growth-v1"></script>
+  <script src="/growth/data.js?v=growth-v2"></script>
+  <script src="/growth/integrations.js?v=growth-v2"></script>
+  <script src="/growth/app.js?v=growth-v2"></script>
+</body>
+</html>

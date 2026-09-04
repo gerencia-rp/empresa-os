@@ -55,3 +55,19 @@ Fuente canónica: `ui/tokens.css`. Escala 4/8/16/24/32/48/64; azabache+cobalto; 
 | Ejecutar agente | clic / autorización / progreso / evidencia final | Línea temporal de ejecución con fuente y resultado | pendiente |
 | Sincronizar | manual o cron / timeout / resumen / próxima corrida | Mostrar parcial, fallos por fuente y reintento seguro | pendiente |
 | Aprobar decisión | clic / impacto / aplicado / reversible | Resumen antes y opción deshacer cuando sea posible | pendiente |
+
+## Growth Command Center Direction
+
+La nueva superficie se lee como un cockpit privado de crecimiento para un CEO. Diales: variación 6, movimiento 4 y densidad 8. Usa el sistema royal de Empresa OS (azabache, cobalto y mono para cifras) con una composición más operativa: barra lateral compacta, directiva semanal dominante, embudo horizontal, colas inspeccionables y panel lateral para decisiones.
+
+La firma visual es el flujo vivo de nueve estaciones desde tendencia hasta aprendizaje, con el consejo de calidad como compuerta visible. El movimiento sólo comunica selección, cambio de estado o transición de vista y se desactiva con `prefers-reduced-motion`.
+
+| Component | Decision | Status |
+|---|---|---|
+| Banner de demostración | Siempre visible; ninguna cifra demo puede parecer real | definido |
+| Embudo | Valor actual, meta y conversión; sin semáforo positivo sin evidencia | definido |
+| Equipo de agentes | Misión, entrada, entrega, horario, KPI y estado en la misma ficha | definido |
+| Revisión semanal | Aprobar, solicitar cambios o reprogramar con feedback inmediato | definido |
+| Calendario | Cinco plataformas visibles y detalle por pieza al seleccionar | definido |
+| Estados | Carga, vacío, error y éxito incluidos en el repositorio demo | definido |
+| Consejo de calidad | Dictamen, controles, hallazgo, evidencia y acción por especialidad | definido |
