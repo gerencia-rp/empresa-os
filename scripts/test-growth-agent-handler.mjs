@@ -22,6 +22,7 @@ globalThis.fetch = async (url, options) => {
   const request = JSON.parse(options.body);
   assert.equal(request.output_config.format.type, 'json_schema');
   assert.deepEqual(request.output_config.format.schema.required, ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']);
+  assert.equal(/maxItems|maxLength/.test(JSON.stringify(request.output_config.format.schema)), false, 'El esquema no debe incluir restricciones rechazadas por Anthropic');
   if (expectedProvider === 'vercel-ai-gateway') {
     assert.match(String(url), /ai-gateway\.vercel\.sh\/v1\/messages/);
     assert.equal(options.headers.authorization, 'Bearer test-oidc-token');

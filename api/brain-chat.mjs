@@ -215,25 +215,25 @@ const GROWTH_AGENT_OUTPUT_SCHEMA = {
   additionalProperties: false,
   properties: {
     verdict: { type: 'string', enum: ['usable', 'needs_review', 'blocked'] },
-    headline: { type: 'string', maxLength: 180 },
-    summary: { type: 'string', maxLength: 1200 },
+    headline: { type: 'string', description: 'Máximo 20 palabras.' },
+    summary: { type: 'string', description: 'Máximo 100 palabras.' },
     deliverables: {
-      type: 'array', maxItems: 6,
-      items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', maxLength: 100 }, content: { type: 'string', maxLength: 1800 } }, required: ['label', 'content'] }
+      type: 'array', description: 'Máximo 6 elementos.',
+      items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', description: 'Etiqueta breve.' }, content: { type: 'string', description: 'Máximo 120 palabras.' } }, required: ['label', 'content'] }
     },
     evidence: {
-      type: 'array', maxItems: 5,
-      items: { type: 'object', additionalProperties: false, properties: { source: { type: 'string', maxLength: 120 }, note: { type: 'string', maxLength: 600 } }, required: ['source', 'note'] }
+      type: 'array', description: 'Máximo 5 elementos.',
+      items: { type: 'object', additionalProperties: false, properties: { source: { type: 'string', description: 'Fuente breve.' }, note: { type: 'string', description: 'Nota breve.' } }, required: ['source', 'note'] }
     },
-    assumptions: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: 500 } },
-    risks: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: 500 } },
+    assumptions: { type: 'array', description: 'Máximo 5 elementos.', items: { type: 'string' } },
+    risks: { type: 'array', description: 'Máximo 5 elementos.', items: { type: 'string' } },
     next_actions: {
-      type: 'array', maxItems: 5,
-      items: { type: 'object', additionalProperties: false, properties: { owner: { type: 'string', maxLength: 100 }, action: { type: 'string', maxLength: 500 }, due: { type: 'string', maxLength: 100 } }, required: ['owner', 'action', 'due'] }
+      type: 'array', description: 'Máximo 5 elementos.',
+      items: { type: 'object', additionalProperties: false, properties: { owner: { type: 'string' }, action: { type: 'string' }, due: { type: 'string' } }, required: ['owner', 'action', 'due'] }
     },
     quality_checks: {
-      type: 'array', maxItems: 8,
-      items: { type: 'object', additionalProperties: false, properties: { criterion: { type: 'string', maxLength: 120 }, status: { type: 'string', enum: ['pass', 'warn', 'fail'] }, note: { type: 'string', maxLength: 500 } }, required: ['criterion', 'status', 'note'] }
+      type: 'array', description: 'Máximo 8 elementos.',
+      items: { type: 'object', additionalProperties: false, properties: { criterion: { type: 'string' }, status: { type: 'string', enum: ['pass', 'warn', 'fail'] }, note: { type: 'string' } }, required: ['criterion', 'status', 'note'] }
     }
   },
   required: ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']
