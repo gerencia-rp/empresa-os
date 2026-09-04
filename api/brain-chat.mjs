@@ -230,21 +230,21 @@ const GROWTH_AGENT_OUTPUT_SCHEMA = {
       required: ['tension', 'reframe', 'repeatable_idea', 'data_to_scene', 'credibility_guardrail']
     },
     deliverables: {
-      type: 'array', description: 'Máximo 6 elementos.',
+      type: 'array', minItems: 1, description: 'Máximo 6 elementos.',
       items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', description: 'Etiqueta breve.' }, content: { type: 'string', description: 'Máximo 120 palabras.' } }, required: ['label', 'content'] }
     },
     evidence: {
-      type: 'array', description: 'Máximo 5 elementos.',
+      type: 'array', minItems: 1, description: 'Máximo 5 elementos.',
       items: { type: 'object', additionalProperties: false, properties: { source: { type: 'string', description: 'Fuente breve.' }, note: { type: 'string', description: 'Nota breve.' } }, required: ['source', 'note'] }
     },
-    assumptions: { type: 'array', description: 'Máximo 5 elementos.', items: { type: 'string' } },
-    risks: { type: 'array', description: 'Máximo 5 elementos.', items: { type: 'string' } },
+    assumptions: { type: 'array', minItems: 1, description: 'Máximo 5 elementos.', items: { type: 'string' } },
+    risks: { type: 'array', minItems: 1, description: 'Máximo 5 elementos.', items: { type: 'string' } },
     next_actions: {
-      type: 'array', description: 'Máximo 5 elementos.',
+      type: 'array', minItems: 1, description: 'Máximo 5 elementos.',
       items: { type: 'object', additionalProperties: false, properties: { owner: { type: 'string' }, action: { type: 'string' }, due: { type: 'string' } }, required: ['owner', 'action', 'due'] }
     },
     quality_checks: {
-      type: 'array', description: 'Máximo 8 elementos.',
+      type: 'array', minItems: 1, description: 'Máximo 8 elementos.',
       items: { type: 'object', additionalProperties: false, properties: { criterion: { type: 'string' }, status: { type: 'string', enum: ['pass', 'warn', 'fail'] }, note: { type: 'string' } }, required: ['criterion', 'status', 'note'] }
     }
   },
