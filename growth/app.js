@@ -621,7 +621,11 @@
       return null;
     }
     const batchId = options?.batchId || null;
-    const previous = state.agentRuns.filter(run => run.status === 'completed' && run.agentId !== agentId && (!batchId || run.batchId === batchId));
+    const previous = batchId
+      ? state.agentRuns.filter(run => run.status === 'completed' && run.agentId !== agentId && run.batchId === batchId)
+      : agentId === 'quality'
+        ? state.agentRuns.filter(run => run.status === 'completed' && run.agentId !== agentId)
+        : [];
     setLatestRun(agentId, { agentId, batchId, status: 'running', startedAt: new Date().toISOString() });
     updateCounts();
     render();
