@@ -17,6 +17,22 @@
   ];
 
   function safeSnapshot(snapshot) {
+    if (snapshot.research?.status === 'verified_public') {
+      return clone({
+        meta: { ...snapshot.meta, mode: 'mixed', label: 'Investigación pública verificada; sin analítica privada' },
+        communicationPlaybook: snapshot.communicationPlaybook,
+        platforms: snapshot.platforms.map(platform => ({ id: platform.id, name: platform.name, minimumWeeklyPieces: platform.goal })),
+        research: snapshot.research,
+        operatingConstraints: {
+          publicationAuthorized: false,
+          humanApprovalRequired: true,
+          metricoolConnected: false,
+          driveConnected: false,
+          privateAnalyticsAvailable: false,
+          instruction: 'Crear entregables nuevos desde research. No usar ni inferir el funnel, piezas, calendario, señales o métricas del escenario demo.'
+        }
+      });
+    }
     return clone({
       meta: snapshot.meta,
       directive: snapshot.directive,

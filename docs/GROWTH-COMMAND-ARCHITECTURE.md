@@ -56,6 +56,8 @@ El centro puede consultar, con autenticación administradora, las superficies p�
 
 El modo resultante es **mixto**: únicamente `research` se considera evidencia real; embudo, calendario, señales editoriales y métricas privadas continúan siendo demostración. La lectura pública no sustituye Metricool ni YouTube Studio porque no expone retención, guardados, CTR, leads, agendas, ventas o atribución. Las transcripciones automáticas requieren revisión humana.
 
+YouTube e Instagram pueden bloquear lecturas desde centros de datos. Para los cuatro Shorts líderes y el conteo público de Instagram existe una línea base verificada y fechada que solo actúa como respaldo del mismo recurso exacto. La respuesta identifica esa procedencia; nunca convierte un bloqueo en cero ni llama “en vivo” al respaldo.
+
 ## Modelo de dominio
 
 - **Directiva semanal:** objetivo, cuello de botella, meta y confianza.
