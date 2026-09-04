@@ -20,6 +20,7 @@
     return clone({
       meta: snapshot.meta,
       directive: snapshot.directive,
+      communicationPlaybook: snapshot.communicationPlaybook,
       funnel: snapshot.funnel,
       platforms: snapshot.platforms,
       signals: snapshot.signals,
@@ -36,6 +37,7 @@
       agentId: run.agentId,
       headline: run.output && run.output.headline,
       summary: run.output && run.output.summary,
+      communication: run.output && run.output.communication,
       deliverables: (run.output && run.output.deliverables || []).slice(0, 4)
     }));
   }
@@ -56,6 +58,13 @@
         verdict: 'needs_review',
         headline: `${agent.name}: interfaz de resultado comprobada`,
         summary: 'Fixture exclusiva de localhost. En producción esta tarjeta se sustituye por una respuesta real del modelo configurado.',
+        communication: {
+          tension: 'Una interfaz sin ejecución puede parecer más operativa de lo que es.',
+          reframe: 'El fixture valida presentación, no calidad del modelo ni resultados.',
+          repeatable_idea: 'Una prueba visual no equivale a una ejecución real.',
+          data_to_scene: 'Sin datos reales → sin evidencia de negocio → revisar la salida como maqueta local.',
+          credibility_guardrail: 'Rotular siempre el fixture y sustituirlo por una ejecución autenticada antes de decidir.'
+        },
         deliverables: [{ label: 'Entrega de prueba', content: 'La interfaz puede mostrar, expandir y conservar una salida estructurada.' }],
         evidence: [{ source: 'Fixture local', note: 'No representa ejecución de negocio ni llamada al modelo.' }],
         assumptions: ['La prueba se ejecuta en localhost.'],

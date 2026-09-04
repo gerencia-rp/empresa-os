@@ -40,6 +40,7 @@ assert.equal(brokerRuntime.endpoint, 'https://example.supabase.co/functions/v1/g
 
 const normalized = normalizeGrowthAgentOutput({
   verdict: 'usable', headline: 'Prueba', summary: 'Entrega controlada',
+  communication: { tension: 'Tensión', reframe: 'Reencuadre', repeatable_idea: 'Idea', data_to_scene: 'Dato → beneficio → escena', credibility_guardrail: 'Límite' },
   deliverables: [{ label: 'Salida', content: 'Contenido' }],
   evidence: [{ source: 'Brief demo', note: 'No es un resultado real.' }],
   assumptions: ['Datos ficticios'], risks: ['Revisión humana requerida'],
@@ -51,6 +52,7 @@ assert.equal(normalized.output.verdict, 'usable');
 const safeDisclaimer = normalizeGrowthAgentOutput({
   verdict: 'needs_review', headline: 'Prueba controlada',
   summary: 'El consejo no garantiza que sea viral ni que esté libre de fallos.',
+  communication: { tension: 'Tensión', reframe: 'Reencuadre', repeatable_idea: 'Idea', data_to_scene: 'Dato → beneficio → escena', credibility_guardrail: 'Límite' },
   deliverables: [{ label: 'Salida', content: 'Evitar cualquier promesa de viralidad garantizada.' }],
   evidence: [{ source: 'Brief demo', note: 'No es un resultado real.' }],
   assumptions: ['Datos ficticios'], risks: ['Revisión humana requerida'],
@@ -62,6 +64,7 @@ assert.equal(safeDisclaimer.score, 100);
 
 const unsafe = normalizeGrowthAgentOutput({
   verdict: 'usable', headline: 'Viralidad garantizada', summary: 'Será viral',
+  communication: { tension: 'Tensión', reframe: 'Reencuadre', repeatable_idea: 'Idea', data_to_scene: 'Dato → beneficio → escena', credibility_guardrail: 'Límite' },
   deliverables: [{ label: 'Salida', content: 'Resultado' }], evidence: [{ source: 'Ninguna', note: 'Sin evidencia' }],
   assumptions: ['Ninguno'], risks: ['Ninguno'], next_actions: [{ owner: 'IA', action: 'Publicar', due: 'Ya' }]
 });

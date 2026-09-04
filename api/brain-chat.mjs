@@ -217,6 +217,18 @@ const GROWTH_AGENT_OUTPUT_SCHEMA = {
     verdict: { type: 'string', enum: ['usable', 'needs_review', 'blocked'] },
     headline: { type: 'string', description: 'Máximo 20 palabras.' },
     summary: { type: 'string', description: 'Máximo 100 palabras.' },
+    communication: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        tension: { type: 'string', description: 'Tensión central en una frase.' },
+        reframe: { type: 'string', description: 'Nuevo encuadre honesto en una frase.' },
+        repeatable_idea: { type: 'string', description: 'Idea que puede repetirse en diez segundos.' },
+        data_to_scene: { type: 'string', description: 'Dato → beneficio → escena concreta; declarar si falta un dato real.' },
+        credibility_guardrail: { type: 'string', description: 'Límite que mantiene alineadas promesa, prueba y entrega.' }
+      },
+      required: ['tension', 'reframe', 'repeatable_idea', 'data_to_scene', 'credibility_guardrail']
+    },
     deliverables: {
       type: 'array', description: 'Máximo 6 elementos.',
       items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', description: 'Etiqueta breve.' }, content: { type: 'string', description: 'Máximo 120 palabras.' } }, required: ['label', 'content'] }
@@ -236,7 +248,7 @@ const GROWTH_AGENT_OUTPUT_SCHEMA = {
       items: { type: 'object', additionalProperties: false, properties: { criterion: { type: 'string' }, status: { type: 'string', enum: ['pass', 'warn', 'fail'] }, note: { type: 'string' } }, required: ['criterion', 'status', 'note'] }
     }
   },
-  required: ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']
+  required: ['verdict', 'headline', 'summary', 'communication', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']
 };
 
 export function growthAgentCatalog() {
@@ -261,6 +273,13 @@ export function normalizeGrowthAgentOutput(raw) {
     verdict: ['usable', 'needs_review', 'blocked'].includes(output.verdict) ? output.verdict : 'needs_review',
     headline: short(output.headline, 180),
     summary: short(output.summary, 1200),
+    communication: {
+      tension: short(output.communication?.tension, 400),
+      reframe: short(output.communication?.reframe, 400),
+      repeatable_idea: short(output.communication?.repeatable_idea, 400),
+      data_to_scene: short(output.communication?.data_to_scene, 600),
+      credibility_guardrail: short(output.communication?.credibility_guardrail, 500)
+    },
     deliverables: list(output.deliverables, 8, item => ({ label: short(item?.label, 100), content: short(item?.content, 1800) })).filter(item => item.label && item.content),
     evidence: list(output.evidence, 8, item => ({ source: short(item?.source, 120), note: short(item?.note, 600) })).filter(item => item.source && item.note),
     assumptions: list(output.assumptions, 8, item => short(item, 500)).filter(Boolean),
@@ -280,6 +299,7 @@ export function normalizeGrowthAgentOutput(raw) {
   });
   const checks = [
     { id: 'structured', label: 'Entrega estructurada', passed: Boolean(normalized.headline && normalized.summary && normalized.deliverables.length) },
+    { id: 'communication', label: 'Decisión narrativa explícita', passed: Object.values(normalized.communication).every(Boolean) },
     { id: 'evidence', label: 'Fuentes y límites visibles', passed: normalized.evidence.length > 0 },
     { id: 'assumptions', label: 'Supuestos declarados', passed: normalized.assumptions.length > 0 },
     { id: 'risks', label: 'Riesgos declarados', passed: normalized.risks.length > 0 },
@@ -322,12 +342,13 @@ LÍMITES:
 
 CONCISIÓN OBLIGATORIA:
 - headline: máximo 20 palabras; summary: máximo 100 palabras.
+- communication: una frase por campo; máximo 30 palabras por frase.
 - Máximo 6 deliverables de 120 palabras cada uno. Si adaptás cinco plataformas, usá un deliverable breve por plataforma.
 - Máximo 5 evidencias, 5 supuestos, 5 riesgos y 5 próximos pasos.
 - Máximo 8 quality_checks. Cerrá siempre el JSON completo dentro del presupuesto.
 
 Respondé SOLO JSON válido, sin markdown, con esta forma exacta:
-{"verdict":"usable|needs_review|blocked","headline":"...","summary":"...","deliverables":[{"label":"...","content":"..."}],"evidence":[{"source":"...","note":"..."}],"assumptions":["..."],"risks":["..."],"next_actions":[{"owner":"...","action":"...","due":"..."}],"quality_checks":[{"criterion":"...","status":"pass|warn|fail","note":"..."}]}`;
+{"verdict":"usable|needs_review|blocked","headline":"...","summary":"...","communication":{"tension":"...","reframe":"...","repeatable_idea":"...","data_to_scene":"...","credibility_guardrail":"..."},"deliverables":[{"label":"...","content":"..."}],"evidence":[{"source":"...","note":"..."}],"assumptions":["..."],"risks":["..."],"next_actions":[{"owner":"...","action":"...","due":"..."}],"quality_checks":[{"criterion":"...","status":"pass|warn|fail","note":"..."}]}`;
 }
 
 async function growthAgentRunHandler(req, res) {

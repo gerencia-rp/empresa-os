@@ -68,6 +68,8 @@ try {
   await page.click('[data-action="run-all"]');
   await page.waitForFunction(() => Number(document.querySelector('#agent-run-count')?.textContent || 0) === 9, { timeout: 20000 });
   assert.equal(await page.$$eval('.agent-run-card.is-complete', nodes => nodes.length), 9, 'La batería local debe mostrar nueve entregas completas');
+  await page.click('.agent-run-card .run-details summary');
+  assert.equal(await page.$$eval('.agent-run-card:first-child .run-communication > div', nodes => nodes.length), 5, 'Cada entrega debe exponer las cinco decisiones de comunicación');
   assert.ok((await page.$$eval('.run-foot > span', nodes => nodes.map(node => node.innerText))).every(text => /Fixture local/.test(text)), 'Las pruebas locales deben rotularse como fixtures');
   assert.ok(await page.evaluate(() => JSON.parse(localStorage.getItem('empresa-os-growth-agent-runs-v1') || '[]').length === 9), 'Las entregas deben conservarse en el navegador');
   assert.equal(await page.evaluate(() => new Set(JSON.parse(localStorage.getItem('empresa-os-growth-agent-runs-v1') || '[]').map(run => run.batchId)).size), 1, 'La batería debe compartir un identificador y no mezclar entregas anteriores');

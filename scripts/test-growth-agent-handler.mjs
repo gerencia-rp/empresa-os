@@ -22,7 +22,7 @@ globalThis.fetch = async (url, options) => {
   const request = JSON.parse(options.body);
   assert.match(request.system, /dato → beneficio → escena concreta/i, 'Cada agente debe recibir el sistema de comunicación');
   assert.equal(request.output_config.format.type, 'json_schema');
-  assert.deepEqual(request.output_config.format.schema.required, ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']);
+  assert.deepEqual(request.output_config.format.schema.required, ['verdict', 'headline', 'summary', 'communication', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']);
   assert.equal(/maxItems|maxLength/.test(JSON.stringify(request.output_config.format.schema)), false, 'El esquema no debe incluir restricciones rechazadas por Anthropic');
   if (expectedProvider === 'vercel-ai-gateway') {
     assert.match(String(url), /ai-gateway\.vercel\.sh\/v1\/messages/);
@@ -39,6 +39,7 @@ globalThis.fetch = async (url, options) => {
   return new Response(JSON.stringify({
     content: [{ type: 'text', text: JSON.stringify({
       verdict: 'needs_review', headline: 'Directiva de prueba', summary: 'Resultado limitado a datos demo.',
+      communication: { tension: 'Falta una decisión.', reframe: 'El sistema prioriza criterio.', repeatable_idea: 'Una decisión a la vez.', data_to_scene: 'Dato → beneficio → escena demo.', credibility_guardrail: 'No presentar datos demo como reales.' },
       deliverables: [{ label: 'Directiva', content: 'Priorizar conversaciones calificadas.' }],
       evidence: [{ source: 'Brief demo', note: 'No contiene resultados reales.' }],
       assumptions: ['Escenario ficticio'], risks: ['Requiere revisión humana'],

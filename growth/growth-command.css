@@ -397,6 +397,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .run-deliverable + .run-deliverable { margin-top: 7px; }
 .run-deliverable strong { display: block; font-size: 10px; }
 .run-deliverable p, .run-section li { margin: 4px 0 0; color: var(--mut); font-size: 9px; line-height: 1.55; white-space: pre-line; }
+.run-communication { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.run-communication > div { padding: 10px; border-radius: 9px; background: var(--surface-2); }
+.run-communication > div:nth-child(5) { grid-column: 1 / -1; }
+.run-communication span { color: var(--a1); font-family: var(--font-mono); font-size: 8px; text-transform: uppercase; }
+.run-communication p { margin: 5px 0 0; color: var(--txt2); font-size: 9px; line-height: 1.5; }
 .run-section ul { display: grid; gap: 5px; margin: 0; padding-left: 17px; }
 .run-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
 .next-action-list { display: grid; gap: 6px; }
@@ -524,6 +529,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .run-columns { grid-template-columns: 1fr; }
   .next-action-list > div { grid-template-columns: 1fr; }
   .run-foot { align-items: stretch; flex-direction: column; }
+  .run-communication { grid-template-columns: 1fr; }
+  .run-communication > div:nth-child(5) { grid-column: auto; }
   .communication-grid { grid-template-columns: 1fr; }
   .communication-formula { align-items: flex-start; flex-direction: column; }
   .communication-formula i { transform: rotate(90deg); }
