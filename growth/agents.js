@@ -28,6 +28,7 @@
       pieces: snapshot.pieces,
       calendar: snapshot.calendar,
       metrics: snapshot.metrics,
+      research: snapshot.research || null,
       qualityCouncil: { status: snapshot.qualityCouncil.status, summary: snapshot.qualityCouncil.summary }
     });
   }
@@ -99,7 +100,10 @@
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         cache: 'no-store',
-        body: JSON.stringify({ agentId, brief, snapshot: safeSnapshot(snapshot), priorOutputs: priorSummary(completedRuns || []), inputMode: snapshot.meta.mode === 'demo' ? 'demo' : 'real' })
+        body: JSON.stringify({
+          agentId, brief, snapshot: safeSnapshot(snapshot), priorOutputs: priorSummary(completedRuns || []),
+          inputMode: snapshot.meta.mode === 'demo' && snapshot.research?.status === 'verified_public' ? 'mixed' : snapshot.meta.mode === 'demo' ? 'demo' : 'real'
+        })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !payload.ok || !payload.run) throw new Error(payload.error || 'El agente no devolvió una entrega.');

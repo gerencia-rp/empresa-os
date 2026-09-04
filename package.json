@@ -13,6 +13,7 @@
     "test:growth:readiness": "node scripts/test-growth-readiness.mjs",
     "test:growth:agents": "node scripts/test-growth-agent-handler.mjs",
     "smoke:growth:agent": "node scripts/smoke-growth-agent-live.mjs",
+    "smoke:growth:research": "node scripts/smoke-growth-public-research.mjs",
     "test:cierre": "node scripts/test-cierre-engine.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs",

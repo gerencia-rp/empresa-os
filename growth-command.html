@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/ui/tokens.css?v=growth-v1">
-  <link rel="stylesheet" href="/growth/growth-command.css?v=growth-v3">
+  <link rel="stylesheet" href="/growth/growth-command.css?v=growth-v4">
 </head>
 <body>
   <a class="skip-link" href="#workspace">Saltar al contenido</a>
@@ -52,7 +52,7 @@
       <nav id="primary-nav" class="primary-nav">
         <button class="nav-item is-active" type="button" data-view="today" aria-current="page" data-icon="play">Hoy <span id="today-count" class="nav-count nav-count-warn">0</span></button>
         <button class="nav-item" type="button" data-view="command" data-icon="layout">Mando</button>
-        <button class="nav-item" type="button" data-view="radar" data-icon="compass">Radar</button>
+        <button class="nav-item" type="button" data-view="radar" data-icon="compass">Fuentes y radar</button>
         <button class="nav-item" type="button" data-view="teams" data-icon="users">Equipos</button>
         <button class="nav-item" type="button" data-view="lab" data-icon="bot">Agentes en vivo <span id="agent-run-count" class="nav-count">0</span></button>
         <button class="nav-item" type="button" data-view="flow" data-icon="network">Flujo</button>
@@ -64,8 +64,8 @@
 
       <div class="sidebar-foot">
         <div class="demo-stamp">
-          <span class="status-dot warn"><span class="dot"></span>Entorno demo</span>
-          <span>Decisiones demo · sin publicación automática</span>
+          <span class="status-dot warn"><span class="dot"></span>Operación mixta</span>
+          <span>Fuentes públicas reales · operación demo</span>
         </div>
         <button id="back-to-os" class="text-action" type="button" data-icon="arrow-left">Volver a Empresa OS</button>
       </div>
@@ -97,7 +97,7 @@
 
       <div class="demo-banner" role="status">
         <span class="banner-icon" data-icon="flask"></span>
-        <div><strong>Datos y decisiones de demostración</strong><span>Los números, ejecuciones, señales y hallazgos son ficticios. Supabase solo valida el acceso; no hay publicación ni persistencia operativa conectada.</span></div>
+        <div><strong>Fuentes reales dentro de una operación de demostración</strong><span>Las cuentas, vistas y transcripciones de “Fuentes y radar” se consultan públicamente. Embudo, calendario, decisiones y publicación siguen en demo hasta conectar Metricool, Drive y persistencia Growth.</span></div>
         <button id="reset-demo" class="text-action" type="button" data-icon="undo">Restaurar</button>
       </div>
 
@@ -111,8 +111,8 @@
   <script src="/config.public.js"></script>
   <script src="/ui/icons.js?v=growth-v1"></script>
   <script src="/growth/data.js?v=growth-v3"></script>
-  <script src="/growth/agents.js?v=growth-v3"></script>
-  <script src="/growth/integrations.js?v=growth-v3"></script>
-  <script src="/growth/app.js?v=growth-v3"></script>
+  <script src="/growth/agents.js?v=growth-v4"></script>
+  <script src="/growth/integrations.js?v=growth-v4"></script>
+  <script src="/growth/app.js?v=growth-v4"></script>
 </body>
 </html>

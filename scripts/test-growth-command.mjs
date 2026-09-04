@@ -41,7 +41,7 @@ try {
     throw new Error(`La vista inicial no apareció. Errores: ${pageErrors.join(' | ') || 'ninguno'}. Pantalla: ${body}`, { cause: error });
   }
 
-  assert.match(await page.$eval('.demo-banner', element => element.innerText), /Datos y decisiones de demostración/);
+  assert.match(await page.$eval('.demo-banner', element => element.innerText), /Fuentes reales dentro de una operación de demostración/);
   assert.equal(await page.$$eval('.day-step', nodes => nodes.length), 9, 'La jornada inicial debe tener nueve pasos operables');
   assert.equal(await page.$$eval('.connection-card', nodes => nodes.length), 4, 'Debe explicar el estado de las cuatro capas de integración');
   assert.match(await page.$eval('.today-side', node => node.innerText), /Preparar, no publicar/);
@@ -51,6 +51,7 @@ try {
   await page.waitForFunction(before => Number(document.querySelector('#today-count').textContent) < before, {}, todayBefore);
 
   await page.click('[data-view="radar"]');
+  assert.match(await page.$eval('.research-empty', node => node.innerText), /vista local no consulta redes externas/i);
   assert.equal(await page.$$eval('.signal-card', nodes => nodes.length), 5, 'El radar debe mostrar señales con fuente y vigencia');
   await page.click('[data-action="signal-decision"][data-id="signal-1"][data-status="test"]');
   await page.waitForFunction(() => document.querySelector('.signal-card')?.innerText.includes('Probar'));
@@ -78,7 +79,7 @@ try {
     await page.click(`[data-view="${view}"]`);
     await page.waitForSelector('#view-root > *');
     assert.equal(await page.$eval('#view-title', node => node.textContent.trim()), {
-      today: 'Qué hacer hoy', radar: 'Radar de oportunidades', teams: 'Equipos de agentes', lab: 'Agentes en vivo', flow: 'Flujo integral', approval: 'Aprobación semanal', calendar: 'Calendario editorial', learning: 'Aprendizaje', quality: 'Consejo de calidad'
+      today: 'Qué hacer hoy', radar: 'Fuentes reales y radar', teams: 'Equipos de agentes', lab: 'Agentes en vivo', flow: 'Flujo integral', approval: 'Aprobación semanal', calendar: 'Calendario editorial', learning: 'Aprendizaje', quality: 'Consejo de calidad'
     }[view]);
     const accessibility = await page.evaluate(() => {
       const buttonsWithoutName = Array.from(document.querySelectorAll('button')).filter(button => !String(button.innerText || button.getAttribute('aria-label') || button.title || '').trim()).length;

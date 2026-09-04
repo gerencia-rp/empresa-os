@@ -23,6 +23,8 @@ growth-command.html
                 estado de configuración, solo para admin activo
         +-- api/brain-chat?resource=growth-agent-run
                 inferencia autenticada y salida normalizada por agente
+        +-- api/brain-chat?resource=growth-content-research
+                perfiles públicos, ranking visible de YouTube y transcripciones
 
 Adaptadores externos, todavía no conectados:
 Google Drive | Metricool | Supabase Growth
@@ -47,6 +49,12 @@ El motor de agentes agrega un segundo contrato, separado del repositorio demo:
 La batería completa ejecuta primero Gerencia; después Viralidad y Avatares; luego Producción y Lead Magnets; después Conversaciones y Nutrición; posteriormente Analítica; y termina con el Consejo de Calidad. Los grupos intermedios pueden correr en paralelo. Cada batería tiene un identificador propio: las salidas se resumen y entregan solo a agentes posteriores de la misma corrida, evitando mezclar evidencia antigua y acotando el prompt.
 
 Los adaptadores futuros deberán implementar el mismo comportamiento y agregar control de concurrencia, auditoría y procedencia sin cambiar los componentes de vista.
+
+### Investigación pública operativa
+
+El centro puede consultar, con autenticación administradora, las superficies públicas documentadas de `@soynicolaslara` y `@Flippingrentalss`. El recolector usa destinos fijos —no acepta URLs del usuario— y devuelve fecha de consulta, alcance de la muestra, perfiles, vistas visibles, enlaces y hasta cuatro transcripciones públicas de los Shorts líderes. Esa evidencia entra al contrato de agentes bajo `snapshot.research`.
+
+El modo resultante es **mixto**: únicamente `research` se considera evidencia real; embudo, calendario, señales editoriales y métricas privadas continúan siendo demostración. La lectura pública no sustituye Metricool ni YouTube Studio porque no expone retención, guardados, CTR, leads, agendas, ventas o atribución. Las transcripciones automáticas requieren revisión humana.
 
 ## Modelo de dominio
 
@@ -113,7 +121,7 @@ Esto permite ensayar el sistema sin fingir publicación, métricas o almacenamie
 ## Riesgos conocidos
 
 - La primera entrega usa datos demo y no demuestra la calidad de una integración real.
-- Los agentes razonan sobre el brief y snapshot entregados; no navegan la web ni consultan tendencias, métricas, Drive, Metricool o conversaciones reales.
+- Los agentes razonan sobre el brief y snapshot entregados. Pueden recibir la investigación pública ya recolectada por el servidor, pero no navegan por su cuenta ni consultan Metricool, Drive, conversaciones o analítica privada.
 - El score automático verifica forma y cautelas mínimas; no sustituye la revisión humana del contenido.
 - El almacenamiento local no sirve como fuente de verdad multiusuario.
 - La exportación manual es una transferencia controlada, no una integración ni una autorización para publicar.

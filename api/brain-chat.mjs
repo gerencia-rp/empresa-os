@@ -123,6 +123,192 @@ export function growthIntegrationReadiness(env = process.env) {
   ];
 }
 
+const GROWTH_PUBLIC_SOURCES = {
+  youtubeVideos: 'https://www.youtube.com/@Flippingrentalss/videos',
+  youtubeShorts: 'https://www.youtube.com/@Flippingrentalss/shorts',
+  instagram: 'https://www.instagram.com/soynicolaslara/',
+  tiktok: 'https://www.tiktok.com/@soynicolaslara'
+};
+
+function parseAssignedJson(html, name) {
+  const tokens = [`var ${name} = `, `${name} = `];
+  let start = -1;
+  for (const token of tokens) {
+    const index = html.indexOf(token);
+    if (index >= 0) { start = index + token.length; break; }
+  }
+  if (start < 0) return null;
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let index = start; index < html.length; index += 1) {
+    const char = html[index];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') quoted = false;
+      continue;
+    }
+    if (char === '"') { quoted = true; continue; }
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        try { return JSON.parse(html.slice(start, index + 1)); }
+        catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
+function findObjects(root, key) {
+  const found = [];
+  const visit = value => {
+    if (!value || typeof value !== 'object') return;
+    if (value[key] && typeof value[key] === 'object') found.push(value[key]);
+    Object.values(value).forEach(visit);
+  };
+  visit(root);
+  return found;
+}
+
+function publicCount(value) {
+  const text = String(value || '').replace(/views?/i, '').trim().toUpperCase();
+  const match = text.match(/([\d.,]+)\s*([KMB])?/);
+  if (!match) return 0;
+  const number = Number(match[1].replace(/,/g, '')) || 0;
+  return Math.round(number * ({ K: 1e3, M: 1e6, B: 1e9 }[match[2]] || 1));
+}
+
+function extractYouTubeItems(html, kind) {
+  const initial = parseAssignedJson(html, 'ytInitialData');
+  if (!initial) return [];
+  if (kind === 'short') {
+    return findObjects(initial, 'shortsLockupViewModel').map(item => ({
+      id: String(item.entityId || '').replace(/^shorts-shelf-item-/, ''),
+      title: short(item.overlayMetadata?.primaryText?.content, 240),
+      views: publicCount(item.overlayMetadata?.secondaryText?.content),
+      viewsLabel: short(item.overlayMetadata?.secondaryText?.content, 60),
+      url: `https://www.youtube.com/shorts/${String(item.entityId || '').replace(/^shorts-shelf-item-/, '')}`
+    })).filter(item => /^[\w-]{11}$/.test(item.id));
+  }
+  return findObjects(initial, 'lockupViewModel').map(item => {
+    const metadata = item.metadata?.lockupMetadataViewModel;
+    const parts = metadata?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts || [];
+    return {
+      id: short(item.contentId, 20),
+      title: short(metadata?.title?.content, 240),
+      views: publicCount(parts[0]?.text?.content),
+      viewsLabel: short(parts[0]?.text?.content, 60),
+      published: short(parts[1]?.text?.content, 80),
+      duration: short(item.contentImage?.thumbnailViewModel?.overlays?.[0]?.thumbnailBottomOverlayViewModel?.badges?.[0]?.thumbnailBadgeViewModel?.text, 40),
+      url: `https://www.youtube.com/watch?v=${short(item.contentId, 20)}`
+    };
+  }).filter(item => /^[\w-]{11}$/.test(item.id));
+}
+
+function decodeXml(value) {
+  return String(value || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16))).replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+}
+
+function transcriptText(xml) {
+  const lines = [];
+  for (const match of String(xml || '').matchAll(/<p\s+[^>]*>([\s\S]*?)<\/p>/g)) {
+    const words = [...match[1].matchAll(/<s[^>]*>([^<]*)<\/s>/g)].map(word => word[1]).join('');
+    const text = decodeXml(words || match[1].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+    if (text) lines.push(text);
+  }
+  return lines.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+async function fetchPublicPage(url) {
+  const response = await fetchWithTimeout(url, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; EmpresaOS-GrowthResearch/1.0)', 'accept-language': 'es-US,es;q=0.9,en;q=0.7' } }, 12000);
+  if (!response.ok) throw new Error(`Fuente pública HTTP ${response.status}.`);
+  return response.text();
+}
+
+async function fetchYouTubeTranscript(video) {
+  try {
+    const player = await fetchWithTimeout('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'user-agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)' },
+      body: JSON.stringify({ context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38' } }, videoId: video.id })
+    }, 12000);
+    if (!player.ok) throw new Error(`YouTube player HTTP ${player.status}`);
+    const data = await player.json();
+    const tracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+    const track = tracks.find(item => item.languageCode === 'es') || tracks[0];
+    if (!track?.baseUrl || !new URL(track.baseUrl).hostname.endsWith('.youtube.com')) throw new Error('Sin subtítulos públicos.');
+    const response = await fetchWithTimeout(track.baseUrl, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; EmpresaOS-GrowthResearch/1.0)' } }, 12000);
+    const transcript = transcriptText(await response.text());
+    if (!transcript) throw new Error('Transcripción pública vacía.');
+    return { ...video, transcript: short(transcript, 12000), transcriptStatus: 'available', transcriptLanguage: track.languageCode || null };
+  } catch (error) {
+    return { ...video, transcript: '', transcriptStatus: 'unavailable', transcriptError: short(error.message, 180) };
+  }
+}
+
+export async function collectGrowthPublicResearch() {
+  const collectedAt = new Date().toISOString();
+  const [youtubeVideosHtml, youtubeShortsHtml, instagramHtml, tiktokHtml] = await Promise.all([
+    fetchPublicPage(GROWTH_PUBLIC_SOURCES.youtubeVideos), fetchPublicPage(GROWTH_PUBLIC_SOURCES.youtubeShorts),
+    fetchPublicPage(GROWTH_PUBLIC_SOURCES.instagram), fetchPublicPage(GROWTH_PUBLIC_SOURCES.tiktok)
+  ]);
+  const shorts = extractYouTubeItems(youtubeShortsHtml, 'short');
+  const videos = extractYouTubeItems(youtubeVideosHtml, 'video');
+  const rankedShorts = [...new Map(shorts.map(item => [item.id, item])).values()].sort((a, b) => b.views - a.views);
+  const rankedVideos = [...new Map(videos.map(item => [item.id, item])).values()].sort((a, b) => b.views - a.views);
+  const transcribed = await Promise.all(rankedShorts.slice(0, 4).map(fetchYouTubeTranscript));
+  const instagramDescription = (instagramHtml.match(/<meta property="og:description" content="([^"]+)"/) || [])[1] || '';
+  const instagramCounts = decodeXml(instagramDescription).match(/([\d.,]+\s*[KMB]?) (?:Followers|seguidores),\s*([\d.,]+\s*[KMB]?) (?:Following|seguidos),\s*([\d.,]+\s*[KMB]?) (?:Posts|publicaciones)/i);
+  const tiktokMatch = tiktokHtml.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">([\s\S]*?)<\/script>/);
+  let tiktok = null;
+  try { tiktok = tiktokMatch ? JSON.parse(tiktokMatch[1]).__DEFAULT_SCOPE__?.['webapp.user-detail']?.userInfo : null; } catch { tiktok = null; }
+  const youtubeSubscribers = (youtubeVideosHtml.match(/([\d.,]+\s*[KMB]?) (?:subscribers|suscriptores)/i) || [])[1] || null;
+  const youtubeVideoCount = (youtubeVideosHtml.match(/([\d.,]+\s*[KMB]?) videos/i) || [])[1] || null;
+  const median = rows => rows.length ? rows.map(item => item.views).sort((a, b) => a - b)[Math.floor(rows.length / 2)] : 0;
+  return {
+    status: 'verified_public', collectedAt,
+    scope: 'Lectura pública puntual. No incluye retención, alcance único, guardados, CTR, leads, agendas, ventas ni atribución privada.',
+    profiles: [
+      { platform: 'instagram', handle: '@soynicolaslara', url: GROWTH_PUBLIC_SOURCES.instagram, followers: publicCount(instagramCounts?.[1]), following: publicCount(instagramCounts?.[2]), posts: publicCount(instagramCounts?.[3]), source: 'Metadatos públicos del perfil' },
+      { platform: 'tiktok', handle: '@soynicolaslara', url: GROWTH_PUBLIC_SOURCES.tiktok, followers: Number(tiktok?.stats?.followerCount || 0), following: Number(tiktok?.stats?.followingCount || 0), posts: Number(tiktok?.stats?.videoCount || 0), likes: Number(tiktok?.stats?.heartCount || 0), source: 'Datos públicos del perfil' },
+      { platform: 'youtube', handle: '@Flippingrentalss', url: GROWTH_PUBLIC_SOURCES.youtubeVideos, followers: publicCount(youtubeSubscribers), posts: publicCount(youtubeVideoCount), source: 'Página pública del canal' }
+    ],
+    youtube: {
+      sample: { shorts: rankedShorts.length, videos: rankedVideos.length, note: 'Muestra visible sin iniciar sesión; no representa el histórico completo.' },
+      topShorts: rankedShorts.slice(0, 12), topVideos: rankedVideos.slice(0, 12), transcripts: transcribed,
+      summary: { bestShortViews: rankedShorts[0]?.views || 0, medianShortViews: median(rankedShorts), bestRecentVideoViews: rankedVideos[0]?.views || 0, medianRecentVideoViews: median(rankedVideos) }
+    },
+    limitations: [
+      'Instagram y TikTok no exponen métricas por publicación en esta lectura pública; se requiere Metricool o exportación nativa.',
+      'Las vistas públicas no sustituyen retención, tiempo visto, guardados, comentarios, clics ni conversiones.',
+      'Las transcripciones automáticas pueden contener errores y requieren revisión humana antes de reutilizar afirmaciones.'
+    ]
+  };
+}
+
+async function growthContentResearchHandler(req, res) {
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  const auth = await verifyAuth(req);
+  if (!auth.ok) { res.status(401).json({ ok: false, error: 'Sesión válida requerida.' }); return; }
+  if (auth.via === 'user') {
+    try {
+      const profile = await sbREST(`profiles?select=role,active&email=eq.${encodeURIComponent(auth.email || '')}&limit=1`, { bearer: auth.token });
+      const me = Array.isArray(profile) ? profile[0] : null;
+      if (!me || me.role !== 'admin' || me.active === false) { res.status(403).json({ ok: false, error: 'Solo administradores activos pueden actualizar fuentes.' }); return; }
+    } catch { res.status(503).json({ ok: false, error: 'No pudimos validar el permiso para investigar fuentes.' }); return; }
+  }
+  try {
+    const research = await collectGrowthPublicResearch();
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.status(200).json({ ok: true, research });
+  } catch (error) {
+    res.status(502).json({ ok: false, error: error.message || 'No pudimos leer las fuentes públicas.' });
+  }
+}
+
 const GROWTH_AGENT_MODELS = {
   management: MODEL,
   virality: MODEL,
@@ -372,7 +558,11 @@ async function growthAgentRunHandler(req, res) {
   if (brief.length < 20) { res.status(400).json({ ok: false, error: 'La prueba necesita un contexto concreto.' }); return; }
   const snapshot = JSON.stringify(body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : {}).slice(0, 48000);
   const priorOutputs = JSON.stringify(Array.isArray(body.priorOutputs) ? body.priorOutputs.slice(-8) : []).slice(0, 24000);
-  const inputMode = body.inputMode === 'real' ? 'real verificado por el usuario' : 'demostración';
+  const inputMode = body.inputMode === 'real'
+    ? 'real verificado por el usuario'
+    : body.inputMode === 'mixed'
+      ? 'mixto: investigación pública verificada dentro de un escenario operativo demo; solo los campos research son evidencia real'
+      : 'demostración';
   const started = Date.now();
   const startedAt = new Date(started).toISOString();
   const model = runtime.model(agentId);
@@ -402,7 +592,7 @@ async function growthAgentRunHandler(req, res) {
     res.status(200).json({
       ok: true,
       run: {
-        id: randomUUID(), agentId, agentName: definition.name, model, provider: runtime.provider, inputMode: body.inputMode === 'real' ? 'real' : 'demo',
+        id: randomUUID(), agentId, agentName: definition.name, model, provider: runtime.provider, inputMode: ['real', 'mixed'].includes(body.inputMode) ? body.inputMode : 'demo',
         startedAt, completedAt: new Date().toISOString(), durationMs: Date.now() - started,
         score: normalized.score, checks: normalized.checks, output: normalized.output, usage: data.usage || null
       }
@@ -564,6 +754,7 @@ export default async function handler(req, res) {
   // Routing: ?resource=memory → CRUD de memoria; ?resource=parse-doc → parser Capa 0; si no → chat.
   if ((req.query && req.query.resource) === 'health') return healthHandler(req, res);
   if ((req.query && req.query.resource) === 'growth-readiness') return growthReadinessHandler(req, res);
+  if ((req.query && req.query.resource) === 'growth-content-research') return growthContentResearchHandler(req, res);
   if ((req.query && req.query.resource) === 'growth-agent-run') return growthAgentRunHandler(req, res);
   if ((req.query && req.query.resource) === 'lineage-run') return lineageRunHandler(req, res);
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);

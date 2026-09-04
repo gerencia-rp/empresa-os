@@ -48,7 +48,7 @@ Convertir tendencias, estrategia, producción y resultados en un solo ciclo oper
 
 ### MVP Definition
 
-Aplicación privada publicada en `/viral` y `/growth`. Usa la sesión administradora existente de Empresa OS y datos de demostración claramente rotulados. Incluye centro de mando, ejecución controlada de nueve agentes de IA, flujo integral, aprobación semanal, calendario multiplataforma, aprendizaje desde métricas y un Consejo de Calidad que corre al final. Excluye publicación automática, escritura de datos operativos e integraciones reales con Google Drive, Metricool o Supabase Growth.
+Aplicación privada publicada en `/viral` y `/growth`. Usa la sesión administradora existente de Empresa OS, combina investigación pública fechada con datos operativos de demostración claramente rotulados e incluye centro de mando, ranking y transcripciones de YouTube, ejecución controlada de nueve agentes de IA, flujo integral, aprobación semanal, calendario multiplataforma, aprendizaje y un Consejo de Calidad que corre al final. Excluye publicación automática, escritura de datos operativos e integraciones reales con Google Drive, Metricool o Supabase Growth.
 
 Una ejecución de agente es inferencia real sobre el brief y el escenario demo visibles; no implica acceso a tendencias, métricas, archivos o conversaciones en vivo. Cada salida debe separar evidencia, supuestos, riesgos, próximos pasos y controles de calidad. Los resultados quedan en el navegador hasta que exista persistencia Growth aprobada.
 

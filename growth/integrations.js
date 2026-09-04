@@ -31,6 +31,19 @@
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'No pudimos revisar las conexiones.');
       return { checkedAt: payload.checkedAt, source: 'server', integrations: payload.integrations || clone(fallback), agentRuntime: payload.agentRuntime || { configured: false, catalog: [] } };
     }
+
+    async getContentResearch() {
+      if (this.localPreview || !this.authClient) return null;
+      const { data } = await this.authClient.auth.getSession();
+      const token = data && data.session && data.session.access_token;
+      if (!token) throw new Error('No hay una sesión para actualizar fuentes públicas.');
+      const response = await fetch('/api/brain-chat?resource=growth-content-research', {
+        method: 'GET', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store'
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.ok || !payload.research) throw new Error(payload.error || 'No pudimos actualizar las fuentes públicas.');
+      return payload.research;
+    }
   }
 
   function calendarExport(snapshot) {

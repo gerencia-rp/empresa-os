@@ -4,7 +4,7 @@
   const VIEW_META = {
     today: { eyebrow: 'Jornada guiada', title: 'Qué hacer hoy' },
     command: { eyebrow: 'Vista ejecutiva', title: 'Mando semanal' },
-    radar: { eyebrow: 'Señales con criterio', title: 'Radar de oportunidades' },
+    radar: { eyebrow: 'Evidencia antes de crear', title: 'Fuentes reales y radar' },
     teams: { eyebrow: 'Sistema operativo', title: 'Equipos de agentes' },
     lab: { eyebrow: 'Ejecuciones verificables', title: 'Agentes en vivo' },
     flow: { eyebrow: 'De señal a aprendizaje', title: 'Flujo integral' },
@@ -31,7 +31,7 @@
   const state = {
     view: 'today', mode: 'demo', snapshot: null, repository: null, loading: false,
     teamFilter: 'Todos', pieceFilter: 'Pendientes', qaFilter: 'Todos', signalFilter: 'Todos', authClient: null,
-    integrationCheck: { checkedAt: null, source: 'pending', error: null },
+    integrationCheck: { checkedAt: null, source: 'pending', error: null }, researchCheck: { checkedAt: null, error: null },
     agentRuntime: { configured: false, fixture: false, catalog: [] }, agentRuns: [], agentClient: null, agentBrief: '', runningAll: false, activeBatchId: null
   };
 
@@ -250,6 +250,7 @@
       state.snapshot = await state.repository.getSnapshot();
       if (!state.agentBrief) state.agentBrief = state.snapshot.agentTest.brief;
       await loadIntegrationReadiness();
+      await loadPublicResearch();
       $('#app-status').innerHTML = '';
       updateCounts();
       state.loading = false;
@@ -285,6 +286,32 @@
     state.snapshot.firstDay.steps = state.snapshot.firstDay.steps.map(step => step.calculated === 'connections'
       ? { ...step, status: allOperational ? 'completed' : 'blocked' }
       : step);
+  }
+
+  function researchBrief(research) {
+    const best = research?.youtube?.topShorts?.[0];
+    const transcribed = research?.youtube?.transcripts?.filter(item => item.transcriptStatus === 'available').length || 0;
+    return `Corrida operativa sobre investigación pública verificada el ${new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(research.collectedAt))}. Analizar el desempeño público visible de @soynicolaslara y @Flippingrentalss. YouTube: mejor Short visible “${best?.title || 'sin dato'}” con ${formatNumber(best?.views || 0)} vistas; ${transcribed} transcripciones disponibles dentro de research. Crear una semana completa para Instagram, TikTok, YouTube, LinkedIn y X: conceptos, guiones/copies nativos, carrusel, CTA con recurso, nutrición, experimento medible y siguientes acciones. Usar como hechos únicamente research; tratar funnel, calendario, señales y métricas del escenario como demo. No publicar ni fingir Metricool, Drive, conversaciones, retención o conversiones.`;
+  }
+
+  async function loadPublicResearch(force) {
+    const previousDemoBrief = state.snapshot.agentTest.brief;
+    const client = new window.GrowthIntegrations.GrowthIntegrationClient({ authClient: state.authClient, localPreview: isLocalPreview() });
+    try {
+      const research = await client.getContentResearch();
+      if (!research) {
+        state.researchCheck = { checkedAt: null, error: 'La vista local no consulta redes externas.' };
+        return;
+      }
+      state.snapshot.research = research;
+      state.researchCheck = { checkedAt: research.collectedAt, error: null };
+      state.snapshot.agentTest.inputLabel = 'Cuentas públicas verificadas + tablero operativo demo';
+      state.snapshot.agentTest.brief = researchBrief(research);
+      if (force || !state.agentBrief || state.agentBrief === previousDemoBrief) state.agentBrief = state.snapshot.agentTest.brief;
+    } catch (error) {
+      state.snapshot.research = null;
+      state.researchCheck = { checkedAt: null, error: error.message || 'No pudimos actualizar las fuentes públicas.' };
+    }
   }
 
   function updateCounts() {
@@ -364,12 +391,31 @@
     </div>`;
   }
 
+  function renderPublicResearch() {
+    const research = state.snapshot.research;
+    if (!research) return `<section class="research-empty ui-card"><div><span class="section-kicker">Fuentes públicas</span><h2>No hay una lectura disponible</h2><p>${esc(state.researchCheck.error || 'Todavía no se consultaron las cuentas públicas.')}</p></div><button class="btn btn-primary" type="button" data-action="refresh-research">${icon('refresh', 13)} Volver a intentar</button></section>`;
+    const yt = research.youtube;
+    const collected = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(research.collectedAt));
+    return `<section class="research-stack">
+      <div class="research-hero ui-card"><div><p class="eyebrow">Lectura pública real · ${esc(collected)}</p><h2>El contenido que ya está funcionando</h2><p>${esc(research.scope)}</p></div><button class="btn" type="button" data-action="refresh-research">${icon('refresh', 13)} Actualizar ahora</button></div>
+      <div class="research-profiles">${research.profiles.map(profile => `<a class="research-profile ui-card" href="${esc(profile.url)}" target="_blank" rel="noopener noreferrer"><span>${esc(profile.platform)}</span><strong>${esc(profile.handle)}</strong><div><b>${formatNumber(profile.followers || 0)}</b> seguidores · <b>${formatNumber(profile.posts || 0)}</b> piezas${profile.likes ? ` · <b>${formatNumber(profile.likes)}</b> me gusta` : ''}</div><small>${esc(profile.source)}</small></a>`).join('')}</div>
+      <div class="research-summary ui-card"><div><span>Mejor Short visible</span><strong>${formatNumber(yt.summary.bestShortViews)}</strong></div><div><span>Mediana Shorts · muestra</span><strong>${formatNumber(yt.summary.medianShortViews)}</strong></div><div><span>Mejor video largo reciente</span><strong>${formatNumber(yt.summary.bestRecentVideoViews)}</strong></div><div><span>Mediana largos · muestra</span><strong>${formatNumber(yt.summary.medianRecentVideoViews)}</strong></div></div>
+      <div class="section-grid equal">
+        <div class="panel ui-card"><div class="section-head"><div><span class="section-kicker">Ranking verificable</span><h2>Shorts con más vistas</h2><p>${esc(yt.sample.note)}</p></div><span class="source-chip">${yt.sample.shorts} visibles</span></div><div class="content-rank">${yt.topShorts.map((item, index) => `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer"><span>${String(index + 1).padStart(2, '0')}</span><strong>${esc(item.title)}</strong><b>${formatNumber(item.views)}</b></a>`).join('')}</div></div>
+        <div class="panel ui-card"><div class="section-head"><div><span class="section-kicker">Desempeño reciente</span><h2>Videos largos</h2><p>Vistas públicas; no equivalen a alcance único ni retención.</p></div><span class="source-chip">${yt.sample.videos} visibles</span></div><div class="content-rank">${yt.topVideos.map((item, index) => `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer"><span>${String(index + 1).padStart(2, '0')}</span><strong>${esc(item.title)}</strong><b>${formatNumber(item.views)}</b></a>`).join('')}</div></div>
+      </div>
+      <div class="panel ui-card"><div class="section-head"><div><span class="section-kicker">Texto fuente</span><h2>Transcripciones de las piezas líderes</h2><p>Subtítulos públicos automáticos. Revisar nombres, cifras y términos antes de convertirlos en afirmaciones.</p></div></div><div class="transcript-list">${yt.transcripts.map(item => `<details><summary><span>${formatNumber(item.views)} vistas</span><strong>${esc(item.title)}</strong><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Ver video</a></summary>${item.transcriptStatus === 'available' ? `<p>${esc(item.transcript)}</p>` : `<p>No disponible: ${esc(item.transcriptError || 'sin subtítulos públicos')}</p>`}</details>`).join('')}</div></div>
+      <div class="research-limits ui-card"><strong>Qué falta para analítica completa</strong><ul>${research.limitations.map(item => `<li>${esc(item)}</li>`).join('')}</ul></div>
+    </section>`;
+  }
+
   function renderRadar() {
     const data = state.snapshot;
     const filters = ['Todos', ...data.platforms.map(platform => platform.name)];
     const platformId = data.platforms.find(platform => platform.name === state.signalFilter)?.id;
     const signals = state.signalFilter === 'Todos' ? data.signals : data.signals.filter(signal => signal.platform === platformId);
     return `<div class="stack">
+      ${renderPublicResearch()}
       <section class="radar-intro ui-card"><div><p class="eyebrow">Investigación demo, no escucha automática</p><h2>De una señal a una prueba deliberada</h2><p>Estas señales son ficticias y sirven para probar el flujo. Cada una exige fuente, vigencia, ajuste de marca y una decisión humana.</p></div><div class="radar-legend"><span>${data.signals.filter(item => item.decision === 'test').length} por probar</span><span>${data.signals.filter(item => item.decision === 'discard').length} descartadas</span></div></section>
       <section><div class="team-toolbar"><div><span class="section-kicker">Radar priorizado</span><h2>Señales con vida útil</h2></div><div class="filter-pills" aria-label="Filtrar señales por plataforma">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.signalFilter ? 'is-active' : ''}" data-action="signal-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></div>
         <div class="signal-grid">${signals.map(signal => { const platform = data.platforms.find(item => item.id === signal.platform); return `<article class="signal-card ui-card"><div class="signal-card-top"><span class="platform-badge">${esc(platform?.short || signal.platform)}</span>${statusBadge(signal.decision)}</div><h3>${esc(signal.pattern)}</h3><p>${esc(signal.why)}</p><dl><div><dt>Fuente</dt><dd>${esc(signal.source)}</dd></div><div><dt>Ventana</dt><dd>${esc(signal.window)}</dd></div><div><dt>Ajuste</dt><dd>${esc(signal.fit)}</dd></div></dl><div class="signal-actions"><button class="btn btn-primary" type="button" data-action="signal-decision" data-id="${esc(signal.id)}" data-status="test">Probar</button><button class="btn" type="button" data-action="signal-decision" data-id="${esc(signal.id)}" data-status="discard">Descartar</button></div></article>`; }).join('')}</div>
@@ -420,7 +466,7 @@
         <div><p class="eyebrow">Banco de pruebas controlado</p><h2>Hacé trabajar al equipo y revisá la evidencia</h2><p>Cada agente recibe el mismo brief, su misión y las entregas previas relevantes. La batería produce propuestas estructuradas; no publica, agenda ni escribe en servicios externos.</p><div class="runtime-line">${statusDot(completed ? 'verified' : realReady ? 'configured' : state.agentRuntime.fixture ? 'unverified' : 'blocked', completed ? 'Motor probado en este navegador' : realReady ? `Motor listo para probar · ${esc(state.agentRuntime.provider || 'proveedor configurado')}` : state.agentRuntime.fixture ? 'Fixture exclusiva de localhost' : 'Motor IA no disponible')}<span>${completed}/9 completados${failed ? ` · ${failed} fallaron` : ''}</span></div></div>
         <div class="lab-primary-actions"><button class="btn btn-primary" type="button" data-action="run-all" ${!canRun || state.runningAll ? 'disabled' : ''}>${state.runningAll ? '<span class="ui-spinner" aria-hidden="true"></span> Ejecutando equipo…' : `${icon('play', 13)} Ejecutar los 9 agentes`}</button><button class="btn" type="button" data-action="export-runs" ${completed ? '' : 'disabled'}>${icon('download', 13)} Exportar resultados</button></div>
       </section>
-      <section class="brief-panel ui-card"><div class="brief-copy"><span class="section-kicker">Entrada compartida</span><h2>Brief de la prueba</h2><p>${esc(state.snapshot.agentTest.inputLabel)}. Podés editarlo antes de ejecutar. Se envía al modelo, pero no se guarda en Supabase.</p></div><label for="agent-brief">Contexto y objetivo</label><textarea id="agent-brief" rows="5" maxlength="5000">${esc(state.agentBrief)}</textarea><div class="brief-foot"><span>${icon('lock', 12)} ${esc(state.snapshot.agentTest.rule)}</span><button class="text-action" type="button" data-action="reset-brief">Restaurar brief demo</button></div></section>
+      <section class="brief-panel ui-card"><div class="brief-copy"><span class="section-kicker">Entrada compartida</span><h2>Brief de la prueba</h2><p>${esc(state.snapshot.agentTest.inputLabel)}. Podés editarlo antes de ejecutar. Se envía al modelo, pero no se guarda en Supabase.</p></div><label for="agent-brief">Contexto y objetivo</label><textarea id="agent-brief" rows="5" maxlength="5000">${esc(state.agentBrief)}</textarea><div class="brief-foot"><span>${icon('lock', 12)} ${esc(state.snapshot.agentTest.rule)}</span><button class="text-action" type="button" data-action="reset-brief">Restaurar entrada recomendada</button></div></section>
       <section><div class="section-head"><div><span class="section-kicker">Evidencia por función</span><h2>Entradas, salidas y control</h2><p>Los resultados quedan solo en este navegador hasta que se active Supabase Growth.</p></div><button class="text-action" type="button" data-action="clear-runs" ${state.agentRuns.length ? '' : 'disabled'}>Limpiar resultados</button></div><div class="agent-run-grid">${catalog.map(agent => renderRunResult(agent, latestRun(agent.id))).join('')}</div></section>
     </div>`;
   }
@@ -697,6 +743,14 @@
     if (action === 'signal-filter') { state.signalFilter = target.dataset.value; return render(); }
     if (action === 'run-agent') return executeAgent(target.dataset.id);
     if (action === 'run-all') return executeAllAgents();
+    if (action === 'refresh-research') {
+      target.disabled = true;
+      toast('Actualizando cuentas y transcripciones públicas…');
+      await loadPublicResearch(true);
+      render();
+      toast(state.snapshot.research ? 'Fuentes públicas actualizadas. Los agentes usarán esta evidencia.' : state.researchCheck.error, state.snapshot.research ? undefined : 'error');
+      return;
+    }
     if (action === 'reset-brief') { state.agentBrief = state.snapshot.agentTest.brief; render(); toast('Brief de demostración restaurado.'); return; }
     if (action === 'clear-runs') {
       state.agentRuns = [];
