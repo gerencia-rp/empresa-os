@@ -22,3 +22,14 @@ Denfield · Wellington · Starbright · Arthur Stiles · Charles · Bitter Creek
 Juan carga Monto HML/tasa/plazo/fechas del term sheet real → el sync los trae y todo se recalcula solo.
 Deep-links directos en Admin → Inversionistas → 📊 Global → checklist "Por completar".
 También pendiente: precio de venta de Slaughter (hoy ARV como proxy, declarado).
+
+## 04-sep-2026 · 81 pagos sin UNIDAD marcada en Airtable — EQUIPO RENTAS (no es software)
+El Ledger y el portal ya muestran de qué unidad es cada renta cobrada ("Renta cobrada · 2026-07 ·
+Julio 2026 — Habitación 4"). Sale de **pm_payments.unit_id**, que espeja la columna **"unidades"**
+de la tabla **"pagos"** en Airtable *Empresa Rentas — Modelo Nuevo (sandbox)* (`apptTKRYbx6gu701i`).
+**81 de los 275 pagos del ledger no tienen esa columna cargada** → esas filas salen sin unidad
+(no rompen nada, simplemente no la declaran; el software NO adivina).
+Dónde están los huecos (04-sep): **4916 Barkbridge 33** (casi todos de 2025) · **2315 Dove Springs 16** ·
+**9909 Childress 11** · **407 Capitol 9** · **6504 Stonleigh 9** · 311 Bartlett 1 · 5003 Michelle 1 ·
+1607 Picnic Cove 1. Completar la columna "unidades" en esos pagos y esperar el sync (cada 15 min):
+la etiqueta aparece sola, sin tocar código.
