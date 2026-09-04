@@ -34,8 +34,7 @@ serve(async (req: Request) => {
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model,
-        max_tokens: Math.min(Math.max(Number(body.max_tokens) || 1600, 400), 2400),
-        temperature: Math.min(Math.max(Number(body.temperature) || 0.2, 0), 0.5),
+        max_tokens: Math.min(Math.max(Number(body.max_tokens) || 3200, 800), 4500),
         system,
         messages
       }),

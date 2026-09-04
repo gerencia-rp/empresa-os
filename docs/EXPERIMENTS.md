@@ -53,4 +53,4 @@
 - Primary metric & threshold (pre-committed): 9/9 agentes completan; cada resultado incluye entregables, evidencia, supuestos, riesgos y próximos pasos; el Consejo de Calidad recibe las salidas previas.
 - Guardrail metric: cero publicaciones o escrituras externas; cero afirmaciones de acceso a fuentes no conectadas; cero promesas de viralidad, ventas o ausencia total de fallos.
 - Decision rule (pivot / persevere / iterate): perseverar con 9/9 y dictamen utilizable; iterar si alguna salida completa pero requiere revisión; bloquear si una ejecución falla, omite el contrato o simula evidencia externa.
-- Result & verdict: motor, contrato y prueba UI local implementados; batería real en producción pendiente.
+- Result & verdict: primera batería real ejecutada el 04-sep-2026; 9/9 solicitudes alcanzaron el proveedor, pero Opus rechazó un parámetro obsoleto y cuatro respuestas Haiku agotaron el presupuesto antes de cerrar JSON. Corrección aplicada: eliminar `temperature`, imponer límites de concisión y ampliar el presupuesto. Repetición completa pendiente.
