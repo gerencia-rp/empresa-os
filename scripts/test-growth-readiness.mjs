@@ -48,6 +48,18 @@ const normalized = normalizeGrowthAgentOutput({
 assert.equal(normalized.score, 100);
 assert.equal(normalized.output.verdict, 'usable');
 
+const safeDisclaimer = normalizeGrowthAgentOutput({
+  verdict: 'needs_review', headline: 'Prueba controlada',
+  summary: 'El consejo no garantiza que sea viral ni que esté libre de fallos.',
+  deliverables: [{ label: 'Salida', content: 'Evitar cualquier promesa de viralidad garantizada.' }],
+  evidence: [{ source: 'Brief demo', note: 'No es un resultado real.' }],
+  assumptions: ['Datos ficticios'], risks: ['Revisión humana requerida'],
+  next_actions: [{ owner: 'Nicolás', action: 'Revisar', due: 'Hoy' }],
+  quality_checks: [{ criterion: 'Garantías', status: 'pass', note: 'No promete resultados.' }]
+});
+assert.equal(safeDisclaimer.checks.find(check => check.id === 'no_false_guarantee').passed, true, 'Las advertencias contra garantías no deben producir falsos positivos');
+assert.equal(safeDisclaimer.score, 100);
+
 const unsafe = normalizeGrowthAgentOutput({
   verdict: 'usable', headline: 'Viralidad garantizada', summary: 'Será viral',
   deliverables: [{ label: 'Salida', content: 'Resultado' }], evidence: [{ source: 'Ninguna', note: 'Sin evidencia' }],

@@ -268,8 +268,16 @@ export function normalizeGrowthAgentOutput(raw) {
     next_actions: list(output.next_actions, 8, item => ({ owner: short(item?.owner, 100), action: short(item?.action, 500), due: short(item?.due, 100) })).filter(item => item.owner && item.action),
     quality_checks: list(output.quality_checks, 12, item => ({ criterion: short(item?.criterion, 120), status: ['pass', 'warn', 'fail'].includes(item?.status) ? item.status : 'warn', note: short(item?.note, 500) })).filter(item => item.criterion)
   };
-  const serialized = JSON.stringify(normalized).toLowerCase();
-  const forbiddenClaim = /viralidad garantizada|garantiza(?:mos|do)? (?:que )?(?:será|sea|es) viral|libre de (?:todo )?(?:fallo|error)/i.test(serialized);
+  const claimSurface = [
+    normalized.headline,
+    normalized.summary,
+    ...normalized.deliverables.map(item => item.content)
+  ].join(' ').toLowerCase();
+  const guaranteePattern = /viralidad garantizada|garantiza(?:mos|do)? (?:que )?(?:será|sea|es) viral|libre de (?:todo )?(?:fallo|error)/gi;
+  const forbiddenClaim = [...claimSurface.matchAll(guaranteePattern)].some(match => {
+    const prefix = claimSurface.slice(Math.max(0, (match.index || 0) - 48), match.index || 0);
+    return !/(?:\bno\b|\bsin\b|\bnunca\b|\bevitar?\b|\bprohibid[oa]s?\b|\bni\b)[^.!?]{0,40}$/.test(prefix);
+  });
   const checks = [
     { id: 'structured', label: 'Entrega estructurada', passed: Boolean(normalized.headline && normalized.summary && normalized.deliverables.length) },
     { id: 'evidence', label: 'Fuentes y límites visibles', passed: normalized.evidence.length > 0 },
