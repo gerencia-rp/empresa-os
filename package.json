@@ -10,6 +10,7 @@
     "audit:jarvis": "node scripts/audit-jarvis-readiness.mjs",
     "test:jarvis:ui": "node scripts/test-jarvis-ui.mjs",
     "test:growth:ui": "node scripts/test-growth-command.mjs",
+    "test:growth:readiness": "node scripts/test-growth-readiness.mjs",
     "test:cierre": "node scripts/test-cierre-engine.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs",

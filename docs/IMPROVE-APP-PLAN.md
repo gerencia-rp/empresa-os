@@ -32,6 +32,20 @@
 | 24-ago-2026 | 1 | Un dato, una fuente y evidencia fechada | Evita cifras distintas entre pantallas y agentes falsamente “activos”. |
 | 24-ago-2026 | 2 | Corregir primero severidad 4/3 y alta frecuencia | Seguridad, pérdidas de datos, acciones rotas y bloqueos superan cualquier ajuste visual. |
 | 24-ago-2026 | 8 | Objetivos: llamadas acotadas, estado profundo visible, LCP <2.5s, INP <200ms, CLS <0.1 | Son límites operables y medibles. |
+| 03-sep-2026 | Growth closure | Convertir `/viral` y `/growth` de tablero descriptivo a jornada guiada | El CEO necesita saber qué hacer hoy y qué sigue bloqueado, no reconstruir el proceso desde módulos separados. |
+| 03-sep-2026 | Growth closure | Separar `verificado`, `configurado`, `no configurado` y `demo` | La presencia de una variable o un estado ficticio no demuestra que un proveedor opere. |
+| 03-sep-2026 | Growth closure | Mantener publicación deshabilitada y ofrecer entrega manual marcada | Metricool y Drive no tienen credenciales disponibles; el producto debe degradar con honestidad. |
+
+## Growth Command closure — 03-sep-2026
+
+Este frente queda cerrado dentro del alcance del centro de crecimiento, sin cambiar el estado de las fases globales que todavía abarcan otras superficies de Empresa OS.
+
+- Auditoría UX: la nueva vista **Hoy** concentra el siguiente paso, progreso, responsables y bloqueos.
+- Diseño cotidiano/refinamiento: navegación ampliada, jerarquía de jornada, radar y estados completos en escritorio/móvil.
+- Microinteracciones: marcar/reabrir pasos, priorizar/descartar señales, aprobar/devolver piezas y revisar controles con feedback.
+- Mensaje recordable: “Preparar, no publicar” cuando no existen conexiones verificadas.
+- Rendimiento: solución estática sin framework adicional; un único chequeo autenticado y sin caché para preparación de conexiones.
+- Revisión final: ninguna ejecución, publicación, métrica o activo demo se presenta como hecho real.
 
 ## Next Actions
 
@@ -42,5 +56,5 @@
 - [ ] Ejecutar QA autenticado por cada ruta central y registrar errores de consola/red (Codex).
 - [ ] Ejecutar `ci:gate` con credencial de CI y renovar linaje (Codex).
 - [x] Actualizar Chromium/Puppeteer juntos y reducir alertas compatibles con Node 20 (Codex, 24-ago-2026).
-- [ ] Migrar a Node 22 + Puppeteer 25 en una fase separada para eliminar la cadena restante (Codex).
+- [x] Alinear runtime a Node 24.x y Puppeteer 25 según la decisión vigente D-004 (Codex, 03-sep-2026).
 - [ ] Completar auditoría UX por flujo y corregir severidad 4/3 (Codex).

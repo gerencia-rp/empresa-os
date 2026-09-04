@@ -2,7 +2,9 @@
   'use strict';
 
   const VIEW_META = {
+    today: { eyebrow: 'Jornada guiada', title: 'Qué hacer hoy' },
     command: { eyebrow: 'Vista ejecutiva', title: 'Mando semanal' },
+    radar: { eyebrow: 'Señales con criterio', title: 'Radar de oportunidades' },
     teams: { eyebrow: 'Sistema operativo', title: 'Equipos de agentes' },
     flow: { eyebrow: 'De señal a aprendizaje', title: 'Flujo integral' },
     approval: { eyebrow: 'Supervisión humana', title: 'Aprobación semanal' },
@@ -12,9 +14,11 @@
   };
 
   const STATUS_LABELS = {
-    draft: 'Borrador', pending: 'Pendiente', approved: 'Aprobada', revision: 'Revisión', scheduled: 'Programada',
-    active: 'Activo', attention: 'Atención', supervised: 'Supervisado', planned: 'Planeado', done: 'Listo',
-    passed: 'Aprobado', improve: 'Mejorar', blocked: 'Bloqueado', running: 'En curso', review: 'Revisar'
+    draft: 'Borrador', pending: 'Pendiente', approved: 'Aprobada · demo', revision: 'Revisión', scheduled: 'Programada · demo',
+    active: 'Activo · demo', attention: 'Atención · demo', supervised: 'Supervisado · demo', planned: 'Planeado', done: 'Listo · demo',
+    passed: 'Aprobado · demo', improve: 'Mejorar', blocked: 'Bloqueado', running: 'En curso · demo', review: 'Revisar · demo',
+    completed: 'Completado', test: 'Probar', discard: 'Descartada', verified: 'Verificado', configured: 'Configurado · sin prueba',
+    not_configured: 'No configurado', unverified: 'No verificado'
   };
 
   const TEAM_ICONS = {
@@ -23,8 +27,9 @@
   };
 
   const state = {
-    view: 'command', mode: 'demo', snapshot: null, repository: null, loading: false,
-    teamFilter: 'Todos', pieceFilter: 'Pendientes', qaFilter: 'Todos', authClient: null
+    view: 'today', mode: 'demo', snapshot: null, repository: null, loading: false,
+    teamFilter: 'Todos', pieceFilter: 'Pendientes', qaFilter: 'Todos', signalFilter: 'Todos', authClient: null,
+    integrationCheck: { checkedAt: null, source: 'pending', error: null }
   };
 
   const $ = selector => document.querySelector(selector);
@@ -48,13 +53,14 @@
   }
 
   function statusDot(status, label) {
-    const map = { active: 'ok', done: 'ok', approved: 'ok', scheduled: 'ok', passed: 'ok', supervised: 'warn', attention: 'warn', pending: 'warn', improve: 'warn', revision: 'bad', blocked: 'bad', planned: 'off', draft: 'off' };
+    const map = { active: 'ok', done: 'ok', approved: 'ok', scheduled: 'ok', passed: 'ok', completed: 'ok', verified: 'ok', supervised: 'warn', attention: 'warn', pending: 'warn', improve: 'warn', configured: 'warn', test: 'warn', revision: 'bad', blocked: 'bad', planned: 'off', draft: 'off', discard: 'off', not_configured: 'off', unverified: 'off' };
     return window.kitStatusDot ? window.kitStatusDot(map[status] || 'off', label || STATUS_LABELS[status] || status) : statusBadge(status);
   }
 
   function toast(message, kind) {
     const region = $('#toast-region');
     if (!region) return;
+    region.replaceChildren();
     const node = document.createElement('div');
     node.className = 'toast';
     node.innerHTML = icon(kind === 'error' ? 'alert' : 'check', 15) + `<span>${esc(message)}</span>`;
@@ -237,6 +243,7 @@
     state.repository = window.GrowthData.createRepository(state.mode);
     try {
       state.snapshot = await state.repository.getSnapshot();
+      await loadIntegrationReadiness();
       $('#app-status').innerHTML = '';
       updateCounts();
       state.loading = false;
@@ -256,11 +263,28 @@
     }
   }
 
+  async function loadIntegrationReadiness() {
+    const client = new window.GrowthIntegrations.GrowthIntegrationClient({ authClient: state.authClient, localPreview: isLocalPreview() });
+    try {
+      const result = await client.getReadiness(state.snapshot.integrations);
+      state.snapshot.integrations = result.integrations;
+      state.integrationCheck = { checkedAt: result.checkedAt, source: result.source, error: null };
+    } catch (error) {
+      state.integrationCheck = { checkedAt: null, source: 'failed', error: error.message };
+      state.snapshot.integrations = state.snapshot.integrations.map(item => ({ ...item, status: item.id === 'supabase-auth' ? 'verified' : 'unverified' }));
+    }
+    const allOperational = state.snapshot.integrations.filter(item => item.id !== 'supabase-auth').every(item => item.status === 'verified');
+    state.snapshot.firstDay.steps = state.snapshot.firstDay.steps.map(step => step.calculated === 'connections'
+      ? { ...step, status: allOperational ? 'completed' : 'blocked' }
+      : step);
+  }
+
   function updateCounts() {
     const snapshot = state.snapshot;
     if (!snapshot) return;
     $('#approval-count').textContent = snapshot.pieces.filter(piece => ['pending', 'revision'].includes(piece.status)).length;
     $('#quality-count').textContent = snapshot.qualityCouncil.reviewers.filter(item => item.status !== 'passed').length;
+    $('#today-count').textContent = snapshot.firstDay.steps.filter(item => item.status !== 'completed').length;
   }
 
   function render() {
@@ -276,8 +300,70 @@
         </div>`;
       return;
     }
-    const renderers = { command: renderCommand, teams: renderTeams, flow: renderFlow, approval: renderApproval, calendar: renderCalendar, learning: renderLearning, quality: renderQuality };
+    const renderers = { today: renderToday, command: renderCommand, radar: renderRadar, teams: renderTeams, flow: renderFlow, approval: renderApproval, calendar: renderCalendar, learning: renderLearning, quality: renderQuality };
     $('#view-root').innerHTML = renderers[state.view]();
+  }
+
+  function integrationStatusText(status) {
+    return STATUS_LABELS[status] || 'Estado desconocido';
+  }
+
+  function renderIntegrationCards() {
+    const check = state.integrationCheck;
+    const checked = check.checkedAt
+      ? `Comprobado en servidor: ${new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(check.checkedAt))}`
+      : check.source === 'local-preview' ? 'Vista local: no se consultó producción' : check.error || 'Verificación no disponible';
+    return `<div class="connection-grid">${state.snapshot.integrations.map(item => `
+      <article class="connection-card ui-card">
+        <div class="connection-head"><div><span class="section-kicker">${esc(item.id)}</span><h3>${esc(item.name)}</h3></div>${statusDot(item.status, integrationStatusText(item.status))}</div>
+        <p>${esc(item.purpose)}</p>
+        <small>${esc(item.detail || item.action || 'Requiere configuración externa.')}</small>
+        ${item.required && item.required.length ? `<details><summary>Ver requisitos</summary><ul>${item.required.map(name => `<li><code>${esc(name)}</code></li>`).join('')}</ul></details>` : ''}
+      </article>`).join('')}</div><p class="connection-check">${icon('lock', 12)} ${esc(checked)}. “Configurado” solo confirma presencia de variables; no equivale a una conexión probada.</p>`;
+  }
+
+  function renderToday() {
+    const data = state.snapshot;
+    const steps = data.firstDay.steps;
+    const completed = steps.filter(step => step.status === 'completed').length;
+    const actionable = steps.filter(step => step.status !== 'blocked').length;
+    const progress = percent(completed, Math.max(1, actionable));
+    const next = steps.find(step => step.status === 'pending');
+    return `<div class="stack">
+      <section class="today-hero ui-card">
+        <div><p class="eyebrow">Primer día operable · escenario demo</p><h2>${esc(data.firstDay.title)}</h2><p>${esc(data.firstDay.outcome)}</p></div>
+        <div class="today-progress" aria-label="${completed} de ${actionable} pasos accionables completados"><strong>${progress}%</strong><span>${completed} de ${actionable}<br>pasos accionables</span></div>
+      </section>
+      <section class="section-grid">
+        <div>
+          <div class="section-head"><div><span class="section-kicker">Secuencia recomendada</span><h2>Una decisión a la vez</h2><p>Los cambios se guardan solo en este navegador como demostración.</p></div>${next ? `<button class="btn btn-primary" type="button" data-action="open-step" data-view="${esc(next.view)}">Continuar con el paso ${esc(next.order)} ${icon('arrow-right', 13)}</button>` : ''}</div>
+          <div class="day-list">${steps.map(step => `
+            <article class="day-step ui-card ${step.status === 'completed' ? 'is-complete' : step.status === 'blocked' ? 'is-blocked' : ''}">
+              <span class="day-number">${String(step.order).padStart(2, '0')}</span>
+              <div><div class="piece-head"><h3>${esc(step.title)}</h3>${statusBadge(step.status)}</div><p>${esc(step.detail)}</p><small>${esc(step.owner)}</small></div>
+              <div class="day-actions">
+                <button class="btn" type="button" data-action="open-step" data-view="${esc(step.view)}">Abrir</button>
+                ${!step.calculated && step.status !== 'blocked' ? `<button class="btn ${step.status === 'completed' ? '' : 'btn-primary'}" type="button" data-action="day-status" data-id="${esc(step.id)}" data-status="${step.status === 'completed' ? 'pending' : 'completed'}">${step.status === 'completed' ? 'Reabrir' : 'Marcar listo'}</button>` : ''}
+              </div>
+            </article>`).join('')}</div>
+        </div>
+        <aside class="panel ui-card today-side"><span class="section-kicker">Salida segura de hoy</span><h2>Preparar, no publicar</h2><p>Mientras Drive y Metricool sigan sin verificar, la salida correcta es revisar, aprobar y exportar un paquete manual. Ningún botón de esta aplicación publica contenido.</p><button class="btn btn-primary btn-wide" type="button" data-action="open-step" data-view="calendar">Preparar entrega manual</button><div class="today-rule">${icon('shield-check', 14)} El Consejo de calidad conserva la última palabra antes de cualquier salida.</div></aside>
+      </section>
+      <section id="connections"><div class="section-head"><div><span class="section-kicker">Estado real del entorno</span><h2>Conexiones y bloqueos</h2><p>La aplicación consulta el servidor después de validar la sesión y nunca devuelve secretos.</p></div></div>${renderIntegrationCards()}</section>
+    </div>`;
+  }
+
+  function renderRadar() {
+    const data = state.snapshot;
+    const filters = ['Todos', ...data.platforms.map(platform => platform.name)];
+    const platformId = data.platforms.find(platform => platform.name === state.signalFilter)?.id;
+    const signals = state.signalFilter === 'Todos' ? data.signals : data.signals.filter(signal => signal.platform === platformId);
+    return `<div class="stack">
+      <section class="radar-intro ui-card"><div><p class="eyebrow">Investigación demo, no escucha automática</p><h2>De una señal a una prueba deliberada</h2><p>Estas señales son ficticias y sirven para probar el flujo. Cada una exige fuente, vigencia, ajuste de marca y una decisión humana.</p></div><div class="radar-legend"><span>${data.signals.filter(item => item.decision === 'test').length} por probar</span><span>${data.signals.filter(item => item.decision === 'discard').length} descartadas</span></div></section>
+      <section><div class="team-toolbar"><div><span class="section-kicker">Radar priorizado</span><h2>Señales con vida útil</h2></div><div class="filter-pills" aria-label="Filtrar señales por plataforma">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.signalFilter ? 'is-active' : ''}" data-action="signal-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></div>
+        <div class="signal-grid">${signals.map(signal => { const platform = data.platforms.find(item => item.id === signal.platform); return `<article class="signal-card ui-card"><div class="signal-card-top"><span class="platform-badge">${esc(platform?.short || signal.platform)}</span>${statusBadge(signal.decision)}</div><h3>${esc(signal.pattern)}</h3><p>${esc(signal.why)}</p><dl><div><dt>Fuente</dt><dd>${esc(signal.source)}</dd></div><div><dt>Ventana</dt><dd>${esc(signal.window)}</dd></div><div><dt>Ajuste</dt><dd>${esc(signal.fit)}</dd></div></dl><div class="signal-actions"><button class="btn btn-primary" type="button" data-action="signal-decision" data-id="${esc(signal.id)}" data-status="test">Probar</button><button class="btn" type="button" data-action="signal-decision" data-id="${esc(signal.id)}" data-status="discard">Descartar</button></div></article>`; }).join('')}</div>
+      </section>
+    </div>`;
   }
 
   function renderCommand() {
@@ -323,8 +409,8 @@
             <article class="alert-row"><span class="alert-icon ${esc(alert.severity)}">${icon(alert.severity === 'info' ? 'info' : 'alert', 14)}</span><div><strong>${esc(alert.title)}</strong><p>${esc(alert.detail)}</p></div><span class="owner-tag">${esc(alert.owner)}</span></article>`).join('')}</div>
         </div>
         <div class="panel ui-card">
-          <div class="section-head"><div><span class="section-kicker">Base futura</span><h2>Integraciones</h2><p>Ninguna conexión se presenta como activa.</p></div></div>
-          <div class="integration-list">${data.integrations.map(item => `<div class="integration-row"><div><strong>${esc(item.name)}</strong><small>${esc(item.purpose)}</small></div>${statusDot('planned', 'No conectado')}</div>`).join('')}</div>
+          <div class="section-head"><div><span class="section-kicker">Estado verificable</span><h2>Integraciones</h2><p>Configuración no equivale a conexión probada.</p></div><button class="text-action" type="button" data-action="open-step" data-view="today">Ver requisitos ${icon('arrow-right', 13)}</button></div>
+          <div class="integration-list">${data.integrations.map(item => `<div class="integration-row"><div><strong>${esc(item.name)}</strong><small>${esc(item.purpose)}</small></div>${statusDot(item.status, integrationStatusText(item.status))}</div>`).join('')}</div>
         </div>
       </section>
     </div>`;
@@ -371,7 +457,7 @@
       return true;
     });
     return `<div class="stack">
-      <section class="piece-toolbar"><div><span class="section-kicker">Revisión humana obligatoria</span><h2>Decidí con contexto completo</h2></div><div class="filter-pills">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.pieceFilter ? 'is-active' : ''}" data-action="piece-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></section>
+      <section class="piece-toolbar"><div><span class="section-kicker">Revisión humana obligatoria</span><h2>Decidí con contexto completo</h2></div><div class="filter-pills" aria-label="Filtrar piezas por estado">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.pieceFilter ? 'is-active' : ''}" data-action="piece-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></section>
       <section class="piece-list">${pieces.length ? pieces.map(piece => `
         <article class="piece-card ui-card">
           <div>
@@ -383,6 +469,7 @@
               <div class="piece-detail"><span>Prueba</span><p>${esc(piece.proof)}</p></div>
               <div class="piece-detail"><span>CTA</span><p>${esc(piece.cta)}</p></div>
               <div class="piece-detail"><span>Riesgo a validar</span><p>${esc(piece.risk)}</p></div>
+              <div class="piece-detail"><span>Activo</span><p>${esc(piece.asset?.label || 'Sin activo')} · ${esc(piece.asset?.detail || 'Sin vínculo verificado.')}</p></div>
             </div>
           </div>
           <div class="piece-actions">
@@ -398,13 +485,15 @@
     const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const slots = ['Mañana', 'Mediodía', 'Tarde'];
     const at = (day, slot) => data.calendar.filter(item => item.day === day && (slot === 'Mañana' ? Number(item.time.split(':')[0]) < 11 : slot === 'Mediodía' ? Number(item.time.split(':')[0]) < 15 : Number(item.time.split(':')[0]) >= 15));
+    const metricool = data.integrations.find(item => item.id === 'metricool');
+    const drive = data.integrations.find(item => item.id === 'drive');
     return `<div class="stack">
-      <section class="section-head"><div><span class="section-kicker">Semana editorial demo</span><h2>Adaptaciones y dependencias visibles</h2><p>El estado “programada” no implica conexión con Metricool.</p></div></section>
+      <section class="calendar-gate ui-card"><div><span class="section-kicker">Salida controlada</span><h2>Adaptaciones y dependencias visibles</h2><p>El estado “programada” es parte del escenario: no implica conexión con Metricool ni activo disponible en Drive.</p><div class="calendar-deps"><span>${statusDot(metricool?.status || 'not_configured', `Metricool · ${integrationStatusText(metricool?.status || 'not_configured')}`)}</span><span>${statusDot(drive?.status || 'not_configured', `Drive · ${integrationStatusText(drive?.status || 'not_configured')}`)}</span></div></div><div class="calendar-actions"><button class="btn btn-primary" type="button" data-action="export-week">${icon('download', 13)} Exportar paquete manual</button><button class="btn" type="button" disabled aria-describedby="publish-disabled-reason">Programar en Metricool</button><small id="publish-disabled-reason">Disponible solo después de configurar y probar la integración.</small></div></section>
       <section class="calendar-wrap"><div class="calendar-grid">
         <div class="calendar-cell calendar-head">Franja</div>${days.map(day => `<div class="calendar-cell calendar-head">${day}</div>`).join('')}
         ${slots.map(slot => `<div class="calendar-cell calendar-time">${slot}</div>${days.map(day => `<div class="calendar-cell">${at(day, slot).map(item => { const piece = data.pieces.find(candidate => candidate.id === item.pieceId); const platform = data.platforms.find(candidate => candidate.id === item.platform); return `<article class="calendar-item"><div class="calendar-meta"><span>${esc(item.time)} · ${esc(platform?.short || item.platform)}</span>${statusBadge(item.status)}</div><strong>${esc(piece?.title || 'Pieza sin detalle')}</strong></article>`; }).join('')}</div>`).join('')}`).join('')}
       </div></section>
-      <p class="qa-disclaimer">${icon('info', 14)} Este calendario representa intención editorial. La primera integración real deberá confirmar identidad de la pieza, destino, fecha, zona horaria y respuesta del proveedor antes de mostrar “publicado”.</p>
+      <p class="qa-disclaimer">${icon('info', 14)} Este calendario representa intención editorial. La primera integración real deberá confirmar pieza, activo, destino, fecha, zona horaria y respuesta del proveedor antes de mostrar “publicado”. El archivo exportado lleva una prohibición explícita de publicación.</p>
     </div>`;
   }
 
@@ -440,7 +529,7 @@
         <div class="qa-scope ui-card"><div class="qa-scope-row"><span>Alcance</span><strong>${esc(council.scope)}</strong></div><div class="qa-scope-row"><span>Última revisión</span><strong>${new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(council.reviewedAt))}</strong></div><div class="qa-scope-row"><span>Controles</span><strong>${council.reviewers.length}</strong></div><div class="qa-scope-row"><span>Hallazgos abiertos</span><strong>${open}</strong></div></div>
       </section>
       <section>
-        <div class="qa-toolbar"><div><span class="section-kicker">Revisión independiente</span><h2>Criterios, hallazgos y evidencia</h2></div><div class="filter-pills">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.qaFilter ? 'is-active' : ''}" data-action="qa-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></div>
+        <div class="qa-toolbar"><div><span class="section-kicker">Revisión independiente</span><h2>Criterios, hallazgos y evidencia</h2></div><div class="filter-pills" aria-label="Filtrar controles de calidad">${filters.map(filter => `<button type="button" class="filter-pill ${filter === state.qaFilter ? 'is-active' : ''}" data-action="qa-filter" data-value="${esc(filter)}">${esc(filter)}</button>`).join('')}</div></div>
         <div class="qa-grid">${reviewers.map((reviewer, index) => `<article class="qa-card ui-card"><span class="qa-number">${String(index + 1).padStart(2, '0')}</span><div><div class="piece-head"><h3>${esc(reviewer.name)}</h3>${statusBadge(reviewer.status)}</div><p class="qa-specialty">${esc(reviewer.specialty)}</p><p class="qa-finding">${esc(reviewer.finding)}</p><span class="qa-evidence">${icon('file', 11)} Evidencia: ${esc(reviewer.evidence)}</span></div><div class="qa-actions"><button class="btn" type="button" title="Marcar aprobado" aria-label="Marcar ${esc(reviewer.name)} como aprobado" data-action="qa-status" data-id="${esc(reviewer.id)}" data-status="passed">${icon('check', 13)}</button><button class="btn btn-danger" type="button" title="Pedir mejora" aria-label="Pedir mejora en ${esc(reviewer.name)}" data-action="qa-status" data-id="${esc(reviewer.id)}" data-status="improve">${icon('refresh', 13)}</button></div></article>`).join('')}</div>
         <div class="qa-disclaimer">${icon('info', 14)} Este dictamen reduce riesgo con los controles y la evidencia disponibles. No garantiza que una pieza se vuelva viral ni que el sistema esté libre de todo fallo. Nicolás conserva la decisión final de salida.</div>
       </section>
@@ -452,16 +541,58 @@
     if (!target) return;
     const action = target.dataset.action;
     if (action === 'retry') return loadSnapshot();
-    if (action === 'show-demo') { state.mode = 'demo'; $('#demo-state').value = 'demo'; return loadSnapshot(); }
+    if (action === 'show-demo') {
+      state.mode = 'demo';
+      $('#demo-state').value = 'demo';
+      await loadSnapshot();
+      navigate('today');
+      return;
+    }
     if (action === 'go-learning') return navigate('learning');
+    if (action === 'open-step') {
+      navigate(target.dataset.view || 'today');
+      if ((target.dataset.view || '') === 'today') setTimeout(() => $('#connections')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+      return;
+    }
     if (action === 'team-filter') { state.teamFilter = target.dataset.value; return render(); }
     if (action === 'piece-filter') { state.pieceFilter = target.dataset.value; return render(); }
     if (action === 'qa-filter') { state.qaFilter = target.dataset.value; return render(); }
+    if (action === 'signal-filter') { state.signalFilter = target.dataset.value; return render(); }
+    if (action === 'export-week') {
+      window.GrowthIntegrations.downloadCalendarExport(state.snapshot);
+      toast('Paquete demo exportado. No autoriza publicación.');
+      return;
+    }
+    if (action === 'day-status') {
+      target.disabled = true;
+      try {
+        await state.repository.updateFirstDayStep(target.dataset.id, target.dataset.status);
+        state.snapshot = await state.repository.getSnapshot();
+        await loadIntegrationReadiness();
+        updateCounts();
+        render();
+        toast(target.dataset.status === 'completed' ? 'Paso marcado como listo en este navegador.' : 'Paso reabierto en el escenario demo.');
+      } catch (error) { toast(error.message, 'error'); }
+      return;
+    }
+    if (action === 'signal-decision') {
+      target.disabled = true;
+      try {
+        await state.repository.updateSignalDecision(target.dataset.id, target.dataset.status);
+        state.snapshot = await state.repository.getSnapshot();
+        await loadIntegrationReadiness();
+        updateCounts();
+        render();
+        toast(target.dataset.status === 'test' ? 'Señal priorizada para una prueba demo.' : 'Señal descartada con decisión visible.');
+      } catch (error) { toast(error.message, 'error'); }
+      return;
+    }
     if (action === 'piece-status') {
       target.disabled = true;
       try {
         await state.repository.updatePieceStatus(target.dataset.id, target.dataset.status);
         state.snapshot = await state.repository.getSnapshot();
+        await loadIntegrationReadiness();
         updateCounts();
         render();
         toast(target.dataset.status === 'approved' ? 'Pieza aprobada en el escenario demo.' : 'La pieza quedó marcada para mejora.');
@@ -473,6 +604,7 @@
       try {
         await state.repository.updateQaCheck(target.dataset.id, target.dataset.status);
         state.snapshot = await state.repository.getSnapshot();
+        await loadIntegrationReadiness();
         updateCounts();
         render();
         toast(target.dataset.status === 'passed' ? 'Control aprobado con evidencia demo.' : 'El control volvió a pedir una mejora.');

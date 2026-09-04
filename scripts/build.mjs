@@ -108,6 +108,7 @@ const STATIC_COPY = [
   "config.public.js",
   "growth-command.html",
   "growth/data.js",
+  "growth/integrations.js",
   "growth/app.js",
   "growth/growth-command.css",
   "viral-memory.js",

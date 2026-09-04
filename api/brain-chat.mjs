@@ -91,6 +91,52 @@ async function healthHandler(req, res) {
   res.status(ok ? 200 : 503).json({ ok, status: ok ? 'ready' : 'degraded', version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local', region: process.env.VERCEL_REGION || 'local', duration_ms: Date.now() - started, checks, timestamp: new Date().toISOString() });
 }
 
+// Growth Command comparte esta función serverless para no superar el límite del
+// proyecto en Vercel. Solo expone presencia de configuración, nunca valores.
+export function growthIntegrationReadiness(env = process.env) {
+  const all = keys => keys.every(key => Boolean(String(env[key] || '').trim()));
+  return [
+    {
+      id: 'supabase-auth', name: 'Supabase · acceso', status: 'verified',
+      purpose: 'Sesión privada y permisos', detail: 'Sesión administradora verificada por el servidor.',
+      required: []
+    },
+    {
+      id: 'supabase-growth', name: 'Supabase · datos Growth',
+      status: all(['GROWTH_SUPABASE_ENABLED', 'GROWTH_SUPABASE_SCHEMA_VERSION']) && String(env.GROWTH_SUPABASE_ENABLED).toLowerCase() === 'true' ? 'configured' : 'not_configured',
+      purpose: 'Persistencia, auditoría y aprendizaje', detail: 'La autenticación existe; el esquema operativo de Growth todavía requiere activación explícita.',
+      required: ['GROWTH_SUPABASE_ENABLED', 'GROWTH_SUPABASE_SCHEMA_VERSION']
+    },
+    {
+      id: 'drive', name: 'Google Drive',
+      status: all(['GOOGLE_DRIVE_CLIENT_EMAIL', 'GOOGLE_DRIVE_PRIVATE_KEY', 'GOOGLE_DRIVE_ROOT_FOLDER_ID']) ? 'configured' : 'not_configured',
+      purpose: 'Guiones, recursos y entregables', detail: 'Requiere cuenta de servicio y una carpeta raíz compartida.',
+      required: ['GOOGLE_DRIVE_CLIENT_EMAIL', 'GOOGLE_DRIVE_PRIVATE_KEY', 'GOOGLE_DRIVE_ROOT_FOLDER_ID']
+    },
+    {
+      id: 'metricool', name: 'Metricool',
+      status: all(['METRICOOL_API_TOKEN', 'METRICOOL_USER_ID', 'METRICOOL_BLOG_ID']) ? 'configured' : 'not_configured',
+      purpose: 'Calendario, publicación y métricas', detail: 'Requiere credenciales de API y los identificadores de cuenta.',
+      required: ['METRICOOL_API_TOKEN', 'METRICOOL_USER_ID', 'METRICOOL_BLOG_ID']
+    }
+  ];
+}
+
+async function growthReadinessHandler(req, res) {
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return; }
+  const auth = await verifyAuth(req);
+  if (!auth.ok || auth.via !== 'user' || !auth.email) { res.status(401).json({ ok: false, error: 'Sesión de usuario requerida.' }); return; }
+  try {
+    const profile = await sbREST(`profiles?select=role,active&email=eq.${encodeURIComponent(auth.email)}&limit=1`, { bearer: auth.token });
+    const me = Array.isArray(profile) ? profile[0] : null;
+    if (!me || me.role !== 'admin' || me.active === false) { res.status(403).json({ ok: false, error: 'Solo administradores activos pueden revisar conexiones.' }); return; }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({ ok: true, checkedAt: new Date().toISOString(), integrations: growthIntegrationReadiness(process.env) });
+  } catch {
+    res.status(503).json({ ok: false, error: 'No pudimos comprobar la configuración en este momento.' });
+  }
+}
+
 // Registra el resultado del crawler de linaje sin abrir INSERT por RLS a todo
 // usuario autenticado. El endpoint valida la sesión y confirma el rol admin;
 // la escritura se hace server-side con la service key y un payload acotado.
@@ -222,6 +268,7 @@ async function parseDocHandler(req, res) {
 export default async function handler(req, res) {
   // Routing: ?resource=memory → CRUD de memoria; ?resource=parse-doc → parser Capa 0; si no → chat.
   if ((req.query && req.query.resource) === 'health') return healthHandler(req, res);
+  if ((req.query && req.query.resource) === 'growth-readiness') return growthReadinessHandler(req, res);
   if ((req.query && req.query.resource) === 'lineage-run') return lineageRunHandler(req, res);
   if ((req.query && req.query.resource) === 'memory') return memoryHandler(req, res);
   if ((req.query && req.query.resource) === 'parse-doc') return parseDocHandler(req, res);

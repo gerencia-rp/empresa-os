@@ -34,6 +34,27 @@
       { id: 'linkedin', name: 'LinkedIn', short: 'IN', planned: 5, goal: 5, reach: 16300, trend: 9 },
       { id: 'x', name: 'X', short: 'X', planned: 7, goal: 5, reach: 10900, trend: -4 }
     ],
+    firstDay: {
+      title: 'Poner la semana en marcha sin publicar por accidente',
+      outcome: 'Al terminar, Nicolás tendrá una directiva revisada, señales priorizadas, piezas decididas, riesgos visibles y un paquete listo para entrega manual.',
+      steps: [
+        { id: 'directive', order: 1, title: 'Confirmar la directiva semanal', detail: 'Validar foco, meta e hipótesis antes de producir.', owner: 'Nicolás', view: 'command', status: 'pending' },
+        { id: 'radar', order: 2, title: 'Priorizar el radar de señales', detail: 'Elegir qué probar y qué descartar antes de que pierda vigencia.', owner: 'Radar de viralidad', view: 'radar', status: 'pending' },
+        { id: 'angles', order: 3, title: 'Revisar avatar y ángulo', detail: 'Confirmar dolor, objeción y promesa de cada apuesta.', owner: 'Avatares y ángulos', view: 'approval', status: 'pending' },
+        { id: 'approval', order: 4, title: 'Decidir las piezas pendientes', detail: 'Aprobar o devolver con una razón concreta.', owner: 'Nicolás', view: 'approval', status: 'pending', calculated: 'approval' },
+        { id: 'quality', order: 5, title: 'Cerrar hallazgos del Consejo', detail: 'Ninguna entrega sale con controles abiertos.', owner: 'Consejo de calidad', view: 'quality', status: 'pending', calculated: 'quality' },
+        { id: 'connections', order: 6, title: 'Revisar conexiones externas', detail: 'Confirmar qué está verificado y qué exige configuración.', owner: 'Arquitectura', view: 'today', status: 'blocked', calculated: 'connections' },
+        { id: 'handoff', order: 7, title: 'Preparar la entrega semanal', detail: 'Exportar el paquete manual mientras Metricool y Drive no estén activos.', owner: 'Orquestador', view: 'calendar', status: 'pending' },
+        { id: 'learning', order: 8, title: 'Registrar la decisión de aprendizaje', detail: 'Dejar explícito qué repetir, detener o probar después.', owner: 'Analítica', view: 'learning', status: 'pending' }
+      ]
+    },
+    signals: [
+      { id: 'signal-1', platform: 'instagram', source: 'Exploración manual demo', pattern: 'Costo invisible explicado con objeto físico', window: '48 horas', fit: 'Alto', decision: 'pending', why: 'Une autoridad, prueba visible y una objeción frecuente.' },
+      { id: 'signal-2', platform: 'tiktok', source: 'Exploración manual demo', pattern: 'Decisión contrarreloj con tres opciones', window: '24 horas', fit: 'Alto', decision: 'test', why: 'Permite participación y una adaptación nativa de ritmo rápido.' },
+      { id: 'signal-3', platform: 'youtube', source: 'Búsquedas demo', pattern: 'Desglose de un error completo, no una lista', window: '14 días', fit: 'Medio', decision: 'pending', why: 'Responde intención profunda y puede originar recortes.' },
+      { id: 'signal-4', platform: 'linkedin', source: 'Conversaciones demo', pattern: 'Decisión difícil narrada con datos y aprendizaje', window: '7 días', fit: 'Alto', decision: 'test', why: 'Construye autoridad sin tono promocional.' },
+      { id: 'signal-5', platform: 'x', source: 'Exploración manual demo', pattern: 'Checklist abierto sin evidencia', window: '12 horas', fit: 'Bajo', decision: 'discard', why: 'El formato circula, pero no demuestra una ventaja propia.' }
+    ],
     alerts: [
       { id: 'alert-1', severity: 'high', title: 'Leads por debajo del ritmo', detail: 'Faltan 64 leads para la meta semanal. Revisar CTA y distribución.', owner: 'Conversaciones y CTA' },
       { id: 'alert-2', severity: 'medium', title: 'Dos piezas esperan aprobación', detail: 'El calendario del viernes depende de estas decisiones.', owner: 'Gerencia de crecimiento' },
@@ -42,12 +63,12 @@
     stages: [
       { id: 'signals', label: 'Tendencias', verb: 'Detectar', count: 18, status: 'done', owner: 'Radar de viralidad', sla: 'Diario 07:10', detail: 'Señales con contexto, vida útil y ajuste de marca.' },
       { id: 'strategy', label: 'Estrategia', verb: 'Priorizar', count: 8, status: 'done', owner: 'Gerencia de crecimiento', sla: 'Lunes 08:00', detail: 'Apuestas semanales por objetivo, avatar y ángulo.' },
-      { id: 'production', label: 'Producción', verb: 'Crear', count: 25, status: 'active', owner: 'Fábrica de contenido', sla: 'Lun a jue', detail: 'Piezas listas con gancho, valor, prueba y siguiente acción.' },
+      { id: 'production', label: 'Producción', verb: 'Crear', count: 25, status: 'planned', owner: 'Fábrica de contenido', sla: 'Lun a jue', detail: 'Piezas demo propuestas con gancho, valor, prueba y siguiente acción.' },
       { id: 'approval', label: 'Aprobación', verb: 'Decidir', count: 2, status: 'attention', owner: 'Nicolás', sla: 'Jueves 16:00', detail: 'Revisión humana de precisión, marca, riesgo y prioridad.' },
       { id: 'quality', label: 'Consejo de calidad', verb: 'Verificar', count: 3, status: 'attention', owner: 'Consejo de calidad', sla: 'Jueves 17:00', detail: 'Controles independientes antes de autorizar calendario o entrega.' },
-      { id: 'calendar', label: 'Calendario', verb: 'Programar', count: 30, status: 'active', owner: 'Orquestador', sla: 'Viernes 09:00', detail: 'Distribución adaptada por plataforma, sin publicar todavía.' },
-      { id: 'publish', label: 'Publicación', verb: 'Distribuir', count: 17, status: 'active', owner: 'Publicación multiplataforma', sla: 'Diario', detail: 'Estado de salida por canal con confirmación de entrega.' },
-      { id: 'metrics', label: 'Métricas', verb: 'Medir', count: 43, status: 'active', owner: 'Analítica y aprendizaje', sla: 'Diario 20:30', detail: 'Rendimiento por pieza, plataforma, avatar y CTA.' },
+      { id: 'calendar', label: 'Calendario', verb: 'Programar', count: 30, status: 'planned', owner: 'Orquestador', sla: 'Viernes 09:00', detail: 'Distribución demo adaptada por plataforma, sin conexión de publicación.' },
+      { id: 'publish', label: 'Publicación', verb: 'Distribuir', count: 0, status: 'planned', owner: 'Publicación multiplataforma', sla: 'Pendiente de Metricool', detail: 'Sin salidas reales: Metricool no está configurado.' },
+      { id: 'metrics', label: 'Métricas', verb: 'Medir', count: 0, status: 'planned', owner: 'Analítica y aprendizaje', sla: 'Pendiente de Metricool', detail: 'La muestra es ficticia; no hay ingestión automática de resultados.' },
       { id: 'learning', label: 'Aprendizaje', verb: 'Reinvertir', count: 6, status: 'attention', owner: 'Gerencia de crecimiento', sla: 'Domingo 18:00', detail: 'Decisiones comprobables que alimentan la próxima estrategia.' }
     ],
     teams: [
@@ -56,63 +77,63 @@
         mission: 'Elegir el cuello de botella y convertirlo en una apuesta semanal medible.',
         inputs: ['Embudo completo', 'Alertas', 'Aprendizajes validados'],
         outputs: ['Directiva semanal', 'Prioridades', 'Decisiones para Nicolás'],
-        kpis: ['Leads calificados', 'Agendas', 'Ventas'], lastRun: 'Hoy, 08:02', nextRun: 'Domingo, 18:00'
+        kpis: ['Leads calificados', 'Agendas', 'Ventas'], lastRun: 'Ejecución demo · 08:02', nextRun: 'Cadencia propuesta · domingo 18:00'
       },
       {
         id: 'virality', name: 'Radar de viralidad', area: 'Descubrimiento', status: 'active', cadence: 'Diario 07:10',
         mission: 'Detectar señales aprovechables antes de que pierdan relevancia.',
         inputs: ['Tendencias por canal', 'Referentes', 'Comentarios y búsquedas'],
         outputs: ['Radar priorizado', 'Patrones de gancho', 'Ventana de oportunidad'],
-        kpis: ['Señales útiles', 'Tiempo a producción', 'Alcance'], lastRun: 'Hoy, 07:12', nextRun: 'Mañana, 07:10'
+        kpis: ['Señales útiles', 'Tiempo a producción', 'Alcance'], lastRun: 'Ejecución demo · 07:12', nextRun: 'Cadencia propuesta · 07:10'
       },
       {
         id: 'avatars', name: 'Avatares y ángulos', area: 'Estrategia', status: 'active', cadence: 'Lunes y jueves',
         mission: 'Relacionar dolores, deseos y objeciones con una promesa comprobable.',
         inputs: ['Conversaciones', 'Objeciones', 'Resultados por segmento'],
         outputs: ['Mapa de ángulos', 'Hipótesis de mensaje', 'Criterios de prueba'],
-        kpis: ['Retención', 'Respuestas útiles', 'Conversión por avatar'], lastRun: 'Ayer, 17:40', nextRun: 'Jueves, 09:30'
+        kpis: ['Retención', 'Respuestas útiles', 'Conversión por avatar'], lastRun: 'Ejecución demo · 17:40', nextRun: 'Cadencia propuesta · jueves 09:30'
       },
       {
         id: 'production', name: 'Fábrica de contenido', area: 'Producción', status: 'supervised', cadence: 'Lunes a jueves 10:00',
         mission: 'Convertir una apuesta en piezas nativas para cinco plataformas.',
         inputs: ['Brief aprobado', 'Prueba', 'Formato y canal'],
         outputs: ['Guion', 'Paquete visual', 'Adaptaciones por canal'],
-        kpis: ['Piezas listas', 'Retrabajo', 'Tiempo de ciclo'], lastRun: 'Hoy, 10:18', nextRun: 'Mañana, 10:00'
+        kpis: ['Piezas listas', 'Retrabajo', 'Tiempo de ciclo'], lastRun: 'Ejecución demo · 10:18', nextRun: 'Cadencia propuesta · 10:00'
       },
       {
         id: 'magnets', name: 'Lead magnets', area: 'Conversión', status: 'active', cadence: 'Martes 11:00',
         mission: 'Crear recursos que resuelvan el siguiente problema real del prospecto.',
         inputs: ['CTA ganadores', 'Preguntas frecuentes', 'Oferta vigente'],
         outputs: ['Recurso', 'Página o entrega', 'Criterio de calificación'],
-        kpis: ['Tasa de solicitud', 'Consumo', 'Lead calificado'], lastRun: 'Martes, 11:21', nextRun: 'Próximo martes, 11:00'
+        kpis: ['Tasa de solicitud', 'Consumo', 'Lead calificado'], lastRun: 'Ejecución demo · 11:21', nextRun: 'Cadencia propuesta · martes 11:00'
       },
       {
         id: 'conversations', name: 'Conversaciones y CTA', area: 'Conversión', status: 'attention', cadence: 'Cada 2 horas, 09:00-19:00',
         mission: 'Transformar intención visible en conversación útil y siguiente paso.',
         inputs: ['Comentarios', 'Mensajes', 'Palabras clave'],
         outputs: ['Respuesta sugerida', 'Calificación', 'Agenda o nutrición'],
-        kpis: ['Respuesta', 'Lead calificado', 'Agenda'], lastRun: 'Hoy, 14:05', nextRun: 'Hoy, 16:00'
+        kpis: ['Respuesta', 'Lead calificado', 'Agenda'], lastRun: 'Ejecución demo · 14:05', nextRun: 'Cadencia propuesta · cada 2 horas'
       },
       {
         id: 'nurture', name: 'Nutrición', area: 'Conversión', status: 'planned', cadence: 'Miércoles y sábado',
         mission: 'Mantener confianza hasta que el prospecto esté listo para avanzar.',
         inputs: ['Lead calificado', 'Etapa', 'Objeción principal'],
         outputs: ['Secuencia', 'Historia de prueba', 'Próxima conversación'],
-        kpis: ['Respuesta diferida', 'Agenda asistida', 'Tiempo a venta'], lastRun: 'Sin ejecución real', nextRun: 'Miércoles, 12:00'
+        kpis: ['Respuesta diferida', 'Agenda asistida', 'Tiempo a venta'], lastRun: 'Sin ejecución real', nextRun: 'Cadencia propuesta · miércoles 12:00'
       },
       {
         id: 'analytics', name: 'Analítica y aprendizaje', area: 'Inteligencia', status: 'active', cadence: 'Diario 20:30',
         mission: 'Explicar qué funcionó, para quién y qué debe cambiar después.',
         inputs: ['Métricas por pieza', 'Embudo', 'Decisiones humanas'],
         outputs: ['Patrones ganadores', 'Alertas', 'Experimentos'],
-        kpis: ['Aprendizajes accionables', 'Lift por iteración', 'Datos completos'], lastRun: 'Ayer, 20:36', nextRun: 'Hoy, 20:30'
+        kpis: ['Aprendizajes accionables', 'Lift por iteración', 'Datos completos'], lastRun: 'Ejecución demo · 20:36', nextRun: 'Cadencia propuesta · 20:30'
       },
       {
         id: 'quality', name: 'Consejo de calidad', area: 'Aseguramiento', status: 'attention', cadence: 'Jueves 17:00 y antes de cada entrega',
         mission: 'Encontrar riesgos y mejoras antes de autorizar una pieza, una campaña o una versión del sistema.',
         inputs: ['Piezas aprobadas', 'Plan por plataforma', 'Resultados de pruebas', 'Cambios del sistema'],
         outputs: ['Dictamen verificable', 'Hallazgos con responsable', 'Decisión de salida'],
-        kpis: ['Hallazgos resueltos', 'Retrabajo posterior', 'Controles con evidencia'], lastRun: 'Hoy, 13:40', nextRun: 'Jueves, 17:00'
+        kpis: ['Hallazgos resueltos', 'Retrabajo posterior', 'Controles con evidencia'], lastRun: 'Revisión demo · 13:40', nextRun: 'Cadencia propuesta · jueves 17:00'
       }
     ],
     pieces: [
@@ -121,42 +142,48 @@
         platforms: ['instagram', 'tiktok', 'youtube'], owner: 'Fábrica de contenido', status: 'pending', due: 'Jue 16:00',
         avatar: 'Profesional que evalúa su primer deal', angle: 'El precio de compra no decide solo',
         hook: 'Ese flip no cuesta lo que dice el contrato.', proof: 'Desglose demo de cinco costos ignorados',
-        cta: 'Comentá NÚMEROS para recibir la hoja de revisión.', risk: 'Validar que ningún monto se presente como caso real.'
+        cta: 'Comentá NÚMEROS para recibir la hoja de revisión.', risk: 'Validar que ningún monto se presente como caso real.',
+        asset: { label: 'Guion y hoja visual', status: 'missing', detail: 'Sin archivo real en Drive.' }
       },
       {
         id: 'piece-2', title: 'La pregunta que evita contratar al GC equivocado', format: 'Carrusel', category: 'valor',
         platforms: ['instagram', 'linkedin'], owner: 'Fábrica de contenido', status: 'pending', due: 'Jue 16:00',
         avatar: 'Operador con una obra en puerta', angle: 'Seleccionar por proceso, no por precio',
         hook: 'Antes del presupuesto, pedile esto.', proof: 'Lista demo de evidencia y referencias',
-        cta: 'Escribí FILTRO para recibir el checklist.', risk: 'Evitar promesas legales o garantías.'
+        cta: 'Escribí FILTRO para recibir el checklist.', risk: 'Evitar promesas legales o garantías.',
+        asset: { label: 'Carrusel y checklist', status: 'missing', detail: 'Sin archivo real en Drive.' }
       },
       {
         id: 'piece-3', title: 'Lo que aprendí de una semana sin alcance', format: 'Post', category: 'personalidad',
         platforms: ['linkedin', 'x'], owner: 'Nicolás', status: 'approved', due: 'Vie 09:00',
         avatar: 'Emprendedor que publica sin sistema', angle: 'Aprender del resultado sin dramatizar',
         hook: 'Publicar más no arregló el problema.', proof: 'Reflexión en primera persona, datos demo rotulados',
-        cta: 'Responder con el cuello de botella actual.', risk: 'Sustituir los números demo antes de publicar.'
+        cta: 'Responder con el cuello de botella actual.', risk: 'Sustituir los números demo antes de publicar.',
+        asset: { label: 'Texto final', status: 'missing', detail: 'Sin archivo real en Drive.' }
       },
       {
         id: 'piece-4', title: 'Deal rápido: comprar, pasar o renegociar', format: 'Video', category: 'comunidad',
         platforms: ['youtube', 'instagram'], owner: 'Nicolás', status: 'scheduled', due: 'Sáb 11:00',
         avatar: 'Flipper que necesita criterio', angle: 'Decisión acompañada por la audiencia',
         hook: 'Tenés 30 segundos para decidir este deal.', proof: 'Escenario completamente ficticio',
-        cta: 'Votar y explicar la decisión.', risk: 'Mostrar “caso ficticio” durante todo el ejercicio.'
+        cta: 'Votar y explicar la decisión.', risk: 'Mostrar “caso ficticio” durante todo el ejercicio.',
+        asset: { label: 'Video y recortes', status: 'missing', detail: 'Sin archivo real en Drive.' }
       },
       {
         id: 'piece-5', title: 'Tres señales de que tu análisis está incompleto', format: 'Hilo', category: 'conversión',
         platforms: ['x', 'linkedin'], owner: 'Avatares y ángulos', status: 'revision', due: 'Vie 12:00',
         avatar: 'Analista autodidacta', angle: 'Incertidumbre visible antes de ofertar',
         hook: 'Si no podés responder estas tres preguntas, todavía no tenés un deal.', proof: 'Criterios de decisión, sin cifras operativas',
-        cta: 'Solicitar el mapa de decisión.', risk: 'CTA todavía demasiado genérico.'
+        cta: 'Solicitar el mapa de decisión.', risk: 'CTA todavía demasiado genérico.',
+        asset: { label: 'Hilo final', status: 'missing', detail: 'Sin archivo real en Drive.' }
       },
       {
         id: 'piece-6', title: 'De comentario a conversación calificada', format: 'Historia', category: 'conversión',
         platforms: ['instagram'], owner: 'Conversaciones y CTA', status: 'draft', due: 'Lun 14:00',
         avatar: 'Seguidor con interés activo', angle: 'Dar el siguiente paso sin presión',
         hook: 'Si ya guardaste tres videos, esta pregunta es para vos.', proof: 'Secuencia demo con encuesta y respuesta',
-        cta: 'Elegir entre analizar, financiar o ejecutar.', risk: 'Requiere revisión de tono.'
+        cta: 'Elegir entre analizar, financiar o ejecutar.', risk: 'Requiere revisión de tono.',
+        asset: { label: 'Secuencia de historias', status: 'missing', detail: 'Sin archivo real en Drive.' }
       }
     ],
     calendar: [
@@ -211,9 +238,10 @@
       ]
     },
     integrations: [
-      { id: 'drive', name: 'Google Drive', purpose: 'Guiones, recursos y entregables', status: 'not_connected' },
-      { id: 'metricool', name: 'Metricool', purpose: 'Calendario, publicación y métricas', status: 'not_connected' },
-      { id: 'supabase', name: 'Supabase', purpose: 'Persistencia, auditoría y aprendizaje', status: 'not_connected' }
+      { id: 'supabase-auth', name: 'Supabase · acceso', purpose: 'Sesión privada y permisos', status: 'unverified', action: 'Se verifica al entrar con una cuenta administradora.' },
+      { id: 'supabase-growth', name: 'Supabase · datos Growth', purpose: 'Persistencia, auditoría y aprendizaje', status: 'not_configured', action: 'Crear el esquema versionado y activar el adaptador de Growth.' },
+      { id: 'drive', name: 'Google Drive', purpose: 'Guiones, recursos y entregables', status: 'not_configured', action: 'Agregar la cuenta de servicio y carpeta raíz en Vercel.' },
+      { id: 'metricool', name: 'Metricool', purpose: 'Calendario, publicación y métricas', status: 'not_configured', action: 'Agregar token, usuario y blog de Metricool en Vercel.' }
     ]
   };
 
@@ -228,6 +256,7 @@
       const snapshot = clone(DEMO_SNAPSHOT);
       const saved = this.readSavedState();
       snapshot.pieces = snapshot.pieces.map(piece => ({ ...piece, ...(saved.pieces[piece.id] || {}) }));
+      snapshot.signals = snapshot.signals.map(signal => ({ ...signal, ...(saved.signals[signal.id] || {}) }));
       snapshot.qualityCouncil.reviewers = snapshot.qualityCouncil.reviewers.map(reviewer => ({ ...reviewer, ...(saved.qa[reviewer.id] || {}) }));
       const openFindings = snapshot.qualityCouncil.reviewers.filter(reviewer => reviewer.status !== 'passed').length;
       snapshot.qualityCouncil.status = openFindings ? 'blocked' : 'passed';
@@ -235,6 +264,11 @@
       snapshot.qualityCouncil.summary = openFindings
         ? `${openFindings} controles de demostración requieren evidencia o corrección antes de autorizar la salida.`
         : 'Todos los controles de demostración tienen evidencia registrada. La decisión final sigue siendo humana.';
+      snapshot.firstDay.steps = snapshot.firstDay.steps.map(step => {
+        if (step.calculated === 'approval') return { ...step, status: snapshot.pieces.some(piece => ['pending', 'revision'].includes(piece.status)) ? 'pending' : 'completed' };
+        if (step.calculated === 'quality') return { ...step, status: openFindings ? 'pending' : 'completed' };
+        return { ...step, ...(saved.firstDay[step.id] || {}) };
+      });
       return snapshot;
     }
 
@@ -258,6 +292,24 @@
       return { reviewerId, status, demo: true };
     }
 
+    async updateFirstDayStep(stepId, status) {
+      if (!['pending', 'completed'].includes(status)) throw new Error('Estado de jornada no válido.');
+      const saved = this.readSavedState();
+      saved.firstDay[stepId] = { status };
+      saved.updatedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      return { stepId, status, demo: true };
+    }
+
+    async updateSignalDecision(signalId, decision) {
+      if (!['pending', 'test', 'discard'].includes(decision)) throw new Error('Decisión de señal no válida.');
+      const saved = this.readSavedState();
+      saved.signals[signalId] = { decision };
+      saved.updatedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+      return { signalId, decision, demo: true };
+    }
+
     async reset() {
       localStorage.removeItem(STORAGE_KEY);
       return true;
@@ -266,9 +318,9 @@
     readSavedState() {
       try {
         const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        return { pieces: value.pieces || {}, qa: value.qa || {}, updatedAt: value.updatedAt || null };
+        return { pieces: value.pieces || {}, qa: value.qa || {}, firstDay: value.firstDay || {}, signals: value.signals || {}, updatedAt: value.updatedAt || null };
       } catch (_) {
-        return { pieces: {}, qa: {}, updatedAt: null };
+        return { pieces: {}, qa: {}, firstDay: {}, signals: {}, updatedAt: null };
       }
     }
   }
@@ -280,6 +332,8 @@
       snapshot.meta.label = 'Estado vacío de demostración';
       snapshot.funnel = [];
       snapshot.alerts = [];
+      snapshot.signals = [];
+      snapshot.firstDay.steps = [];
       snapshot.stages = [];
       snapshot.teams = [];
       snapshot.pieces = [];
@@ -299,7 +353,7 @@
       return new DemoGrowthRepository({ delay: 380 });
     },
     contracts: {
-      repository: ['getSnapshot()', 'updatePieceStatus(pieceId, status)', 'updateQaCheck(reviewerId, status)', 'reset()'],
+      repository: ['getSnapshot()', 'updatePieceStatus(pieceId, status)', 'updateQaCheck(reviewerId, status)', 'updateFirstDayStep(stepId, status)', 'updateSignalDecision(signalId, decision)', 'reset()'],
       futureAdapters: ['GoogleDriveRepository', 'MetricoolRepository', 'SupabaseGrowthRepository']
     }
   };

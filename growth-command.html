@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/ui/tokens.css?v=growth-v1">
-  <link rel="stylesheet" href="/growth/growth-command.css?v=growth-v1">
+  <link rel="stylesheet" href="/growth/growth-command.css?v=growth-v2">
 </head>
 <body>
   <a class="skip-link" href="#workspace">Saltar al contenido</a>
@@ -50,7 +50,9 @@
       </div>
 
       <nav id="primary-nav" class="primary-nav">
-        <button class="nav-item is-active" type="button" data-view="command" aria-current="page" data-icon="layout">Mando</button>
+        <button class="nav-item is-active" type="button" data-view="today" aria-current="page" data-icon="play">Hoy <span id="today-count" class="nav-count nav-count-warn">0</span></button>
+        <button class="nav-item" type="button" data-view="command" data-icon="layout">Mando</button>
+        <button class="nav-item" type="button" data-view="radar" data-icon="compass">Radar</button>
         <button class="nav-item" type="button" data-view="teams" data-icon="users">Equipos</button>
         <button class="nav-item" type="button" data-view="flow" data-icon="network">Flujo</button>
         <button class="nav-item" type="button" data-view="approval" data-icon="check-circle">Aprobación <span id="approval-count" class="nav-count">0</span></button>
@@ -62,7 +64,7 @@
       <div class="sidebar-foot">
         <div class="demo-stamp">
           <span class="status-dot warn"><span class="dot"></span>Entorno demo</span>
-          <span>Sin publicación automática</span>
+          <span>Decisiones demo · sin publicación automática</span>
         </div>
         <button id="back-to-os" class="text-action" type="button" data-icon="arrow-left">Volver a Empresa OS</button>
       </div>
@@ -71,8 +73,8 @@
     <main id="workspace" class="workspace" tabindex="-1">
       <header class="topbar">
         <div class="topbar-heading">
-          <p id="view-eyebrow" class="eyebrow">Vista ejecutiva</p>
-          <h1 id="view-title">Mando semanal</h1>
+          <p id="view-eyebrow" class="eyebrow">Jornada guiada</p>
+          <h1 id="view-title">Qué hacer hoy</h1>
         </div>
         <div class="topbar-actions">
           <label class="state-control" for="demo-state">
@@ -94,7 +96,7 @@
 
       <div class="demo-banner" role="status">
         <span class="banner-icon" data-icon="flask"></span>
-        <div><strong>Datos de demostración</strong><span>Todo número, ejecución y hallazgo en esta versión es ficticio. Las integraciones todavía no operan.</span></div>
+        <div><strong>Datos y decisiones de demostración</strong><span>Los números, ejecuciones, señales y hallazgos son ficticios. Supabase solo valida el acceso; no hay publicación ni persistencia operativa conectada.</span></div>
         <button id="reset-demo" class="text-action" type="button" data-icon="undo">Restaurar</button>
       </div>
 
@@ -107,7 +109,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.public.js"></script>
   <script src="/ui/icons.js?v=growth-v1"></script>
-  <script src="/growth/data.js?v=growth-v1"></script>
-  <script src="/growth/app.js?v=growth-v1"></script>
+  <script src="/growth/data.js?v=growth-v2"></script>
+  <script src="/growth/integrations.js?v=growth-v2"></script>
+  <script src="/growth/app.js?v=growth-v2"></script>
 </body>
 </html>
