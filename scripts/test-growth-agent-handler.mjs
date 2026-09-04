@@ -19,15 +19,16 @@ function responseRecorder() {
 const originalFetch = globalThis.fetch;
 let expectedProvider = 'anthropic-direct';
 globalThis.fetch = async (url, options) => {
+  const request = JSON.parse(options.body);
+  assert.equal(request.output_config.format.type, 'json_schema');
+  assert.deepEqual(request.output_config.format.schema.required, ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']);
   if (expectedProvider === 'vercel-ai-gateway') {
     assert.match(String(url), /ai-gateway\.vercel\.sh\/v1\/messages/);
     assert.equal(options.headers.authorization, 'Bearer test-oidc-token');
-    const request = JSON.parse(options.body);
     assert.equal(request.model, 'anthropic/claude-haiku-4.5');
   } else if (expectedProvider === 'supabase-anthropic-broker') {
     assert.match(String(url), /nezbaljfhhyznhltpjnk\.supabase\.co\/functions\/v1\/growth-agent-inference/);
     assert.equal(options.headers.authorization, 'Bearer test-service-key');
-    const request = JSON.parse(options.body);
     assert.equal(request.model, 'claude-opus-4-8');
   } else {
     assert.match(String(url), /api\.anthropic\.com\/v1\/messages/);

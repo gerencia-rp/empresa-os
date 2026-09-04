@@ -20,6 +20,7 @@ serve(async (req: Request) => {
   const model = String(body.model || '');
   if (!ALLOWED_MODELS.has(model)) return corsResponse(req, { ok: false, error: 'Modelo no permitido.' }, 400);
   const system = typeof body.system === 'string' ? body.system.slice(0, 16000) : '';
+  const outputConfig = body.output_config && typeof body.output_config === 'object' && JSON.stringify(body.output_config).length < 20000 ? body.output_config : undefined;
   const messages = Array.isArray(body.messages) ? body.messages.slice(0, 4).map((item: any) => ({
     role: item?.role === 'assistant' ? 'assistant' : 'user',
     content: String(item?.content || '').slice(0, 90000)
@@ -34,9 +35,10 @@ serve(async (req: Request) => {
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model,
-        max_tokens: Math.min(Math.max(Number(body.max_tokens) || 3200, 800), 4500),
+        max_tokens: Math.min(Math.max(Number(body.max_tokens) || 5000, 800), 6500),
         system,
-        messages
+        messages,
+        ...(outputConfig ? { output_config: outputConfig } : {})
       }),
       signal: controller.signal
     });

@@ -210,6 +210,35 @@ const GROWTH_AGENT_DEFINITIONS = {
   }
 };
 
+const GROWTH_AGENT_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    verdict: { type: 'string', enum: ['usable', 'needs_review', 'blocked'] },
+    headline: { type: 'string', maxLength: 180 },
+    summary: { type: 'string', maxLength: 1200 },
+    deliverables: {
+      type: 'array', maxItems: 6,
+      items: { type: 'object', additionalProperties: false, properties: { label: { type: 'string', maxLength: 100 }, content: { type: 'string', maxLength: 1800 } }, required: ['label', 'content'] }
+    },
+    evidence: {
+      type: 'array', maxItems: 5,
+      items: { type: 'object', additionalProperties: false, properties: { source: { type: 'string', maxLength: 120 }, note: { type: 'string', maxLength: 600 } }, required: ['source', 'note'] }
+    },
+    assumptions: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: 500 } },
+    risks: { type: 'array', maxItems: 5, items: { type: 'string', maxLength: 500 } },
+    next_actions: {
+      type: 'array', maxItems: 5,
+      items: { type: 'object', additionalProperties: false, properties: { owner: { type: 'string', maxLength: 100 }, action: { type: 'string', maxLength: 500 }, due: { type: 'string', maxLength: 100 } }, required: ['owner', 'action', 'due'] }
+    },
+    quality_checks: {
+      type: 'array', maxItems: 8,
+      items: { type: 'object', additionalProperties: false, properties: { criterion: { type: 'string', maxLength: 120 }, status: { type: 'string', enum: ['pass', 'warn', 'fail'] }, note: { type: 'string', maxLength: 500 } }, required: ['criterion', 'status', 'note'] }
+    }
+  },
+  required: ['verdict', 'headline', 'summary', 'deliverables', 'evidence', 'assumptions', 'risks', 'next_actions', 'quality_checks']
+};
+
 export function growthAgentCatalog() {
   return Object.entries(GROWTH_AGENT_DEFINITIONS).map(([id, definition]) => ({ id, name: definition.name, model: GROWTH_AGENT_MODELS[id] }));
 }
@@ -316,7 +345,8 @@ async function growthAgentRunHandler(req, res) {
       headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01', ...runtimeHeaders },
       body: JSON.stringify({
         model,
-        max_tokens: agentId === 'quality' ? 4000 : 3200,
+        max_tokens: agentId === 'quality' ? 6000 : 5000,
+        output_config: { format: { type: 'json_schema', schema: GROWTH_AGENT_OUTPUT_SCHEMA } },
         system: growthAgentSystem(definition, inputMode),
         messages: [{ role: 'user', content: `BRIEF DE PRUEBA:\n${brief}\n\nSNAPSHOT DISPONIBLE:\n${snapshot}\n\nENTREGAS PREVIAS DEL EQUIPO (pueden estar vacías):\n${priorOutputs}` }]
       })

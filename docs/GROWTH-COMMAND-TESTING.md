@@ -23,7 +23,7 @@ La prueba debe ejecutarse con Node 24.x y Chrome disponible. El script no usa cr
 
 `npm run test:growth:readiness` comprueba que el verificador server-side distingue configuración ausente/presente y que su respuesta no refleja ningún valor secreto.
 
-`npm run test:growth:agents` prueba el endpoint de ejecución con una respuesta Anthropic controlada: autenticación interna, catálogo de nueve agentes, selección Opus/Haiku, normalización del contrato, score, rechazo de agente desconocido, rechazo sin autorización y ausencia de secretos.
+`npm run test:growth:agents` prueba el endpoint de ejecución con una respuesta Anthropic controlada: autenticación interna, catálogo de nueve agentes, selección Opus/Haiku, structured output, normalización del contrato, score, rechazo de agente desconocido, rechazo sin autorización y ausencia de secretos.
 
 `npm run smoke:growth:agent -- management` hace una inferencia real y muestra únicamente agente, proveedor, modelo, score, dictamen, titular y duración. En modo Vercel usa `SUPABASE_SERVICE_ROLE_KEY` para el broker interno; fuera de Vercel admite `AI_GATEWAY_API_KEY`, `VERCEL_OIDC_TOKEN` o `ANTHROPIC_API_KEY`. Las credenciales deben inyectarse temporalmente y nunca guardarse ni imprimirse.
 

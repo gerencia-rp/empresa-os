@@ -82,7 +82,7 @@ Las funciones de juicio usan Claude Opus 4.8: Gerencia, Viralidad, Avatares, Ana
 
 `growth-agent-inference` no contiene estrategia ni persiste información: vuelve a validar el JWT y rol administrador que Vercel ya verificó, restringe modelos, tamaños, temperatura y timeout, y devuelve únicamente contenido/uso del proveedor. El endpoint de Vercel sigue siendo responsable del prompt, secuencia y normalización. El broker no comparte claves entre plataformas.
 
-Cada respuesta se normaliza a: dictamen, titular, resumen, entregables, evidencia, supuestos, riesgos, próximos pasos y controles de calidad. El score refleja cumplimiento del contrato, no probabilidad de viralidad ni calidad comercial garantizada.
+Cada respuesta usa structured outputs con un JSON Schema acotado y después se normaliza a: dictamen, titular, resumen, entregables, evidencia, supuestos, riesgos, próximos pasos y controles de calidad. El score refleja cumplimiento del contrato, no probabilidad de viralidad ni calidad comercial garantizada.
 
 ## Estados y recuperación
 
