@@ -28,7 +28,7 @@ serve(async (req: Request) => {
   if (!system || !messages.length) return corsResponse(req, { ok: false, error: 'Falta contexto para la inferencia.' }, 400);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 52000);
+  const timeout = setTimeout(() => controller.abort(), 55000);
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -49,7 +49,7 @@ serve(async (req: Request) => {
     }
     return corsResponse(req, { ok: true, content: payload.content || [], usage: payload.usage || null, model: payload.model || model });
   } catch (error) {
-    const message = error instanceof Error && error.name === 'AbortError' ? 'La inferencia excedió 52 segundos.' : 'No se pudo contactar el motor Anthropic.';
+    const message = error instanceof Error && error.name === 'AbortError' ? 'La inferencia excedió 55 segundos.' : 'No se pudo contactar el motor Anthropic.';
     return corsResponse(req, { ok: false, error: message }, 502);
   } finally {
     clearTimeout(timeout);

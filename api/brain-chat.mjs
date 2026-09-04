@@ -343,9 +343,9 @@ LÍMITES:
 CONCISIÓN OBLIGATORIA:
 - headline: máximo 20 palabras; summary: máximo 100 palabras.
 - communication: una frase por campo; máximo 30 palabras por frase.
-- Máximo 6 deliverables de 120 palabras cada uno. Si adaptás cinco plataformas, usá un deliverable breve por plataforma.
-- Máximo 5 evidencias, 5 supuestos, 5 riesgos y 5 próximos pasos.
-- Máximo 8 quality_checks. Cerrá siempre el JSON completo dentro del presupuesto.
+- Máximo 6 deliverables de 80 palabras cada uno. Si adaptás cinco plataformas, usá un deliverable breve por plataforma.
+- Máximo 4 evidencias, 4 supuestos, 4 riesgos y 4 próximos pasos.
+- Máximo 6 quality_checks. Priorizá decisiones sobre explicación y cerrá siempre el JSON completo.
 
 Respondé SOLO JSON válido, sin markdown, con esta forma exacta:
 {"verdict":"usable|needs_review|blocked","headline":"...","summary":"...","communication":{"tension":"...","reframe":"...","repeatable_idea":"...","data_to_scene":"...","credibility_guardrail":"..."},"deliverables":[{"label":"...","content":"..."}],"evidence":[{"source":"...","note":"..."}],"assumptions":["..."],"risks":["..."],"next_actions":[{"owner":"...","action":"...","due":"..."}],"quality_checks":[{"criterion":"...","status":"pass|warn|fail","note":"..."}]}`;
@@ -384,12 +384,12 @@ async function growthAgentRunHandler(req, res) {
       headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01', ...runtimeHeaders },
       body: JSON.stringify({
         model,
-        max_tokens: agentId === 'quality' ? 6000 : 5000,
+        max_tokens: agentId === 'quality' ? 5000 : 3800,
         output_config: { format: { type: 'json_schema', schema: GROWTH_AGENT_OUTPUT_SCHEMA } },
         system: growthAgentSystem(definition, inputMode),
         messages: [{ role: 'user', content: `BRIEF DE PRUEBA:\n${brief}\n\nSNAPSHOT DISPONIBLE:\n${snapshot}\n\nENTREGAS PREVIAS DEL EQUIPO (pueden estar vacías):\n${priorOutputs}` }]
       })
-    }, 50000);
+    }, 57000);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = typeof data?.error === 'string' ? data.error : data?.error?.message;
