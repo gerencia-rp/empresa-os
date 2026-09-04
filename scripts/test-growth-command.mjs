@@ -68,6 +68,7 @@ try {
   assert.equal(await page.$$eval('.agent-run-card.is-complete', nodes => nodes.length), 9, 'La batería local debe mostrar nueve entregas completas');
   assert.ok((await page.$$eval('.run-foot > span', nodes => nodes.map(node => node.innerText))).every(text => /Fixture local/.test(text)), 'Las pruebas locales deben rotularse como fixtures');
   assert.ok(await page.evaluate(() => JSON.parse(localStorage.getItem('empresa-os-growth-agent-runs-v1') || '[]').length === 9), 'Las entregas deben conservarse en el navegador');
+  assert.equal(await page.evaluate(() => new Set(JSON.parse(localStorage.getItem('empresa-os-growth-agent-runs-v1') || '[]').map(run => run.batchId)).size), 1, 'La batería debe compartir un identificador y no mezclar entregas anteriores');
 
   for (const view of ['today', 'radar', 'teams', 'lab', 'flow', 'approval', 'calendar', 'learning', 'quality']) {
     await page.click(`[data-view="${view}"]`);

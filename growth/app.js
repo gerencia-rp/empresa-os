@@ -32,7 +32,7 @@
     view: 'today', mode: 'demo', snapshot: null, repository: null, loading: false,
     teamFilter: 'Todos', pieceFilter: 'Pendientes', qaFilter: 'Todos', signalFilter: 'Todos', authClient: null,
     integrationCheck: { checkedAt: null, source: 'pending', error: null },
-    agentRuntime: { configured: false, fixture: false, catalog: [] }, agentRuns: [], agentClient: null, agentBrief: '', runningAll: false
+    agentRuntime: { configured: false, fixture: false, catalog: [] }, agentRuns: [], agentClient: null, agentBrief: '', runningAll: false, activeBatchId: null
   };
 
   const $ = selector => document.querySelector(selector);
@@ -378,6 +378,7 @@
   }
 
   function latestRun(agentId) {
+    if (state.activeBatchId) return state.agentRuns.find(run => run.agentId === agentId && run.batchId === state.activeBatchId) || null;
     return state.agentRuns.find(run => run.agentId === agentId) || null;
   }
 
@@ -609,13 +610,14 @@
       toast('Agregá un contexto concreto antes de ejecutar.', 'error');
       return null;
     }
-    const previous = state.agentRuns.filter(run => run.status === 'completed');
-    setLatestRun(agentId, { agentId, status: 'running', startedAt: new Date().toISOString() });
+    const batchId = options?.batchId || null;
+    const previous = state.agentRuns.filter(run => run.status === 'completed' && run.agentId !== agentId && (!batchId || run.batchId === batchId));
+    setLatestRun(agentId, { agentId, batchId, status: 'running', startedAt: new Date().toISOString() });
     updateCounts();
     render();
     try {
       const result = await state.agentClient.run(agentId, brief, state.snapshot, previous);
-      const completed = { ...result, status: 'completed' };
+      const completed = { ...result, batchId, status: 'completed' };
       setLatestRun(agentId, completed);
       window.GrowthAgents.saveRuns(state.agentRuns);
       updateCounts();
@@ -623,7 +625,7 @@
       if (!options?.silent) toast(`${result.agentName} entregó una prueba para revisión.`);
       return completed;
     } catch (error) {
-      const failed = { agentId, status: 'error', error: error.message, completedAt: new Date().toISOString() };
+      const failed = { agentId, batchId, status: 'error', error: error.message, completedAt: new Date().toISOString() };
       setLatestRun(agentId, failed);
       window.GrowthAgents.saveRuns(state.agentRuns);
       updateCounts();
@@ -638,15 +640,17 @@
     captureAgentBrief();
     if (state.agentBrief.length < 20) { toast('Agregá un contexto concreto antes de ejecutar.', 'error'); return; }
     state.runningAll = true;
+    const batchId = crypto.randomUUID();
+    state.activeBatchId = batchId;
     render();
     try {
-      await executeAgent('management', { silent: true });
-      await Promise.all(['virality', 'avatars'].map(id => executeAgent(id, { silent: true })));
-      await Promise.all(['production', 'magnets'].map(id => executeAgent(id, { silent: true })));
-      await Promise.all(['conversations', 'nurture'].map(id => executeAgent(id, { silent: true })));
-      await executeAgent('analytics', { silent: true });
-      await executeAgent('quality', { silent: true });
-      const failures = state.agentRuns.filter(run => run.status === 'error').length;
+      await executeAgent('management', { silent: true, batchId });
+      await Promise.all(['virality', 'avatars'].map(id => executeAgent(id, { silent: true, batchId })));
+      await Promise.all(['production', 'magnets'].map(id => executeAgent(id, { silent: true, batchId })));
+      await Promise.all(['conversations', 'nurture'].map(id => executeAgent(id, { silent: true, batchId })));
+      await executeAgent('analytics', { silent: true, batchId });
+      await executeAgent('quality', { silent: true, batchId });
+      const failures = state.agentRuns.filter(run => run.batchId === batchId && run.status === 'error').length;
       toast(failures ? `La batería terminó con ${failures} fallos para revisar.` : 'Los 9 agentes terminaron. Revisá las entregas antes de usar.', failures ? 'error' : undefined);
     } finally {
       state.runningAll = false;

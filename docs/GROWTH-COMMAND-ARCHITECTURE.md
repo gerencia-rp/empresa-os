@@ -44,7 +44,7 @@ El motor de agentes agrega un segundo contrato, separado del repositorio demo:
 - `loadRuns()`, `saveRuns()` y `clearRuns()` mantienen la evidencia en el navegador;
 - `exportRuns()` genera un paquete revisable que declara `publicationAuthorized: false`.
 
-La batería completa ejecuta primero Gerencia; después Viralidad y Avatares; luego Producción y Lead Magnets; después Conversaciones y Nutrición; posteriormente Analítica; y termina con el Consejo de Calidad. Los grupos intermedios pueden correr en paralelo. Las salidas anteriores se resumen y entregan a los agentes posteriores para conservar contexto sin crecimiento ilimitado del prompt.
+La batería completa ejecuta primero Gerencia; después Viralidad y Avatares; luego Producción y Lead Magnets; después Conversaciones y Nutrición; posteriormente Analítica; y termina con el Consejo de Calidad. Los grupos intermedios pueden correr en paralelo. Cada batería tiene un identificador propio: las salidas se resumen y entregan solo a agentes posteriores de la misma corrida, evitando mezclar evidencia antigua y acotando el prompt.
 
 Los adaptadores futuros deberán implementar el mismo comportamiento y agregar control de concurrencia, auditoría y procedencia sin cambiar los componentes de vista.
 
