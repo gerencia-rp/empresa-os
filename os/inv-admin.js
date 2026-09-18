@@ -25,12 +25,18 @@ async function iaLoad(force) {
   IA.loading = true; IA.err = null;
   try {
     const [acc, hold, inv, deals] = await Promise.all([
-      sb.from('inv_access').select('*').eq('active', true),
+      // RPC de admin: trae TODOS los accesos (incluidos los revocados, que quedan active=false y
+      // la consulta directa no veía) + rol/áreas del profile + las casas que REALMENTE ve cada uno.
+      sb.rpc('inv_admin_accesos'),
       sb.from('inv_holdings').select('*').eq('active', true),
       sb.from('ff_investors').select('airtable_id,name,email,label,capital_aportado').eq('active', true),
       sb.from('ff_deals').select('airtable_id,address,address_norm,property_id,stage,capital_inversionista,investor_rec_ids').eq('active', true),
     ]);
-    IA.access = iaRequire(acc, 'Accesos de inversionistas');
+    // fallback a la tabla si el front se deploya antes que la migración (o si el RPC no existe)
+    if (acc && acc.error) {
+      IA.accRpc = false;
+      IA.access = iaRequire(await sb.from('inv_access').select('*').eq('active', true), 'Accesos de inversionistas');
+    } else { IA.accRpc = true; IA.access = (acc && acc.data) || []; }
     IA.holdings = iaRequire(hold, 'Casas y reparto');
     IA.investors = iaRequire(inv, 'Inversionistas');
     IA.deals = iaRequire(deals, 'Casas de Fix & Flip');
@@ -182,12 +188,179 @@ async function iaEnviarLink(email) {
   if (window.toast) toast('Link de acceso enviado a ' + email, 'success');
 }
 window.iaEnviarLink = iaEnviarLink;
-async function iaRevocar(id, on) {
-  const { error } = await sb.from('inv_access').update({ estado: on ? 'invitado' : 'revocado' }).eq('id', id);
-  if (error) return alert('Error: ' + error.message);
+// ─── acciones sobre un acceso ya creado ───
+// TODAS pasan por una RPC SECURITY DEFINER que exige inv_es_admin() y deja rastro en inv_audit.
+// Nunca hay borrado físico: revocar = estado 'revocado' + active=false (la fila se conserva).
+function iaAccRow(id) { return (IA.access || []).find(a => a.id === id) || {}; }
+function iaAccNombre(a) { return a.nombre || iaInvName(a.investor_airtable_id) || a.email; }
+
+async function iaAccRpc(fn, args, msgOk) {
+  const { data, error } = await sb.rpc(fn, args);
+  if (error) { alert('Error: ' + error.message); return null; }
+  if (window.toast) toast(msgOk + (data && data.nota ? ' · ' + data.nota : ''), 'success');
   await iaLoad(true);
+  return data;
 }
-window.iaRevocar = iaRevocar;
+// pausar (temporal) / reactivar
+async function iaAccEstado(id, estado) {
+  const a = iaAccRow(id);
+  if (estado === 'pausado' && !confirm('¿Pausar el acceso de ' + iaAccNombre(a) + '?\n\nDeja de ver sus casas hasta que lo reactives. Si tiene áreas de staff en su perfil, se le quitan.')) return;
+  await iaAccRpc('inv_admin_set_estado', { p_access_id: id, p_estado: estado },
+    estado === 'pausado' ? '⏸ Acceso pausado' : '↩︎ Acceso reactivado');
+}
+window.iaAccEstado = iaAccEstado;
+// revocar = permanente (soft): se conserva la fila para auditoría
+async function iaAccRevocar(id) {
+  const a = iaAccRow(id);
+  if (!confirm('¿Revocar acceso a ' + iaAccNombre(a) + ' (' + a.email + ')?\n\nDejará de ver TODO: casas, ledger, distribuciones y documentos. También se le quitan las áreas de staff del perfil.\n\nEs permanente (el acceso queda archivado, no se borra: la historia se conserva para auditoría).')) return;
+  await iaAccRpc('inv_admin_set_estado', { p_access_id: id, p_estado: 'revocado' }, '🚫 Acceso revocado');
+}
+window.iaAccRevocar = iaAccRevocar;
+// editar casas: escribe property_filter (subconjunto de sus holdings). Vacío = todas sus casas.
+function iaAccCasas(id) { IA.accEdit = (IA.accEdit === 'casas:' + id) ? null : 'casas:' + id; osRender(); }
+window.iaAccCasas = iaAccCasas;
+async function iaAccCasasGuardar(id) {
+  const marcadas = Array.from(document.querySelectorAll('.ia-accpf-' + id + ':checked')).map(c => c.value);
+  const todas = (iaAccRow(id).casas_todas || []).length;
+  if (marcadas.length === todas) {
+    if (!confirm('Están marcadas todas sus casas: se guarda SIN restricción (ve todas las casas que se le asignen de ahora en más). ¿Seguir?')) return;
+    await iaAccRpc('inv_admin_set_property_filter', { p_access_id: id, p_props: null }, '🏠 Sin restricción: ve todas sus casas');
+  } else if (!marcadas.length) {
+    if (!confirm('Sin casas marcadas se quita la restricción (vuelve a ver TODAS sus casas).\n\nSi lo que querés es que no vea nada, usá Pausar o Revocar. ¿Seguir?')) return;
+    await iaAccRpc('inv_admin_set_property_filter', { p_access_id: id, p_props: null }, '🏠 Sin restricción: ve todas sus casas');
+  } else {
+    await iaAccRpc('inv_admin_set_property_filter', { p_access_id: id, p_props: marcadas }, '🏠 Acceso restringido a ' + marcadas.length + ' casa' + (marcadas.length === 1 ? '' : 's'));
+  }
+  IA.accEdit = null;
+}
+window.iaAccCasasGuardar = iaAccCasasGuardar;
+// editar rol/permiso: inversionista (solo lo suyo) vs admin (TODO)
+function iaAccRol(id) { IA.accEdit = (IA.accEdit === 'rol:' + id) ? null : 'rol:' + id; osRender(); }
+window.iaAccRol = iaAccRol;
+async function iaAccRolGuardar(id) {
+  const sel = document.getElementById('ia-accrol-' + id); if (!sel) return;
+  const rol = sel.value; const a = iaAccRow(id);
+  if (rol === 'admin') {
+    if (!confirm('⚠️ CUIDADO: vas a convertir a ' + iaAccNombre(a) + ' (' + a.email + ') en ADMINISTRADOR.\n\nVa a ver TODAS las casas del holding, el tablero interno y el Panel de Admin (invitar y desactivar usuarios). Es el permiso más potente del sistema.\n\n¿Confirmás?')) return;
+    if ((prompt('Para confirmar, escribí ADMIN:') || '').trim().toUpperCase() !== 'ADMIN') return alert('Cancelado.');
+    await iaAccRpc('inv_admin_set_rol', { p_access_id: id, p_rol: 'admin', p_confirmo: true }, '🛡 Ahora es administrador');
+  } else {
+    if (!confirm('¿Dejar a ' + iaAccNombre(a) + ' como Inversionista (solo sus propiedades)?\n\nSe le quitan el rol admin y las áreas de staff del perfil.')) return;
+    await iaAccRpc('inv_admin_set_rol', { p_access_id: id, p_rol: 'investor', p_confirmo: false }, '◍ Inversionista: solo sus propiedades');
+  }
+  IA.accEdit = null;
+}
+window.iaAccRolGuardar = iaAccRolGuardar;
+// cuenta del EQUIPO: única excepción a "fila en inv_access = inversionista"
+async function iaAccEquipo(id, on) {
+  const a = iaAccRow(id);
+  const msg = on
+    ? '¿Marcar ' + a.email + ' como cuenta del EQUIPO?\n\nDeja de contar como inversionista: vuelve a ver TODO el portafolio con las áreas de su perfil. Usalo solo para cuentas internas.'
+    : '¿Quitar la marca de cuenta del EQUIPO a ' + a.email + '?\n\nPasa a ser un inversionista común: solo verá sus casas.';
+  if (!confirm(msg)) return;
+  await iaAccRpc('inv_admin_set_es_equipo', { p_access_id: id, p_on: on }, on ? '👥 Marcada como cuenta del equipo' : '◍ Vuelve a ser inversionista');
+}
+window.iaAccEquipo = iaAccEquipo;
+
+// ─── tabla de accesos: qué ve CADA UNO y con qué permiso ───
+// El objetivo es que el CEO detecte de un vistazo quién ve de más: la columna "Casas con
+// acceso" muestra la lista REAL (holdings ∩ property_filter, calculada en la DB) y el ⚠️
+// marca las cuentas que además tienen áreas de staff o rol admin en su perfil.
+function iaAccCasasCell(a) {
+  if (a.es_equipo) return '<span class="badge b-warn" style="font-size:9px">TODO el portafolio</span> <span class="meta" style="font-size:10px">cuenta del equipo</span>';
+  if (a.profile_role === 'admin') return '<span class="badge b-warn" style="font-size:9px">TODO el portafolio</span> <span class="meta" style="font-size:10px">es administrador</span>';
+  if (a.estado === 'pausado' || a.estado === 'revocado') return '<span class="badge b-red" style="font-size:9px">ninguna</span> <span class="meta" style="font-size:10px">acceso ' + OS_E(a.estado) + '</span>';
+  const casas = a.casas || [], todas = a.casas_todas || [];
+  if (!casas.length) return '<span class="meta">sin casas asignadas</span>';
+  const nombres = casas.slice(0, 3).map(c => OS_E(c.casa)).join(' · ') + (casas.length > 3 ? ' · +' + (casas.length - 3) : '');
+  const restringido = !!(a.property_filter && a.property_filter.length);
+  return '<b>' + casas.length + '</b> ' + (restringido ? '<span class="badge b-warn" style="font-size:9px">restringido a ' + casas.length + ' de ' + todas.length + '</span>' : '<span class="meta" style="font-size:10px">(todas sus casas)</span>')
+    + '<div class="meta" style="font-size:10.5px;margin-top:2px">' + nombres + '</div>';
+}
+function iaAccTabla() {
+  const invOpts = IA.investors.map(i => '<option value="' + i.airtable_id + '">' + OS_E(i.name || i.airtable_id) + '</option>').join('');
+  if (IA.accRpc === false) {
+    return '<div class="card"><div class="chart-h"><div class="t">Accesos (' + IA.access.length + ')</div></div>'
+      + '<div class="empty">El panel completo de accesos necesita la migración <b>20260917100000_control_accesos_inversionistas</b> aplicada (RPC <code>inv_admin_accesos</code>). Mientras tanto se listan solo los accesos activos, sin acciones.</div>'
+      + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Email</th><th>Estado</th></tr></thead><tbody>'
+      + IA.access.map(a => '<tr><td>' + OS_E(iaInvName(a.investor_airtable_id)) + '</td><td>' + OS_E(a.email) + '</td><td>' + OS_E(a.estado) + '</td></tr>').join('')
+      + '</tbody></table></div>';
+  }
+  const sobre = IA.access.filter(a => !a.es_equipo && (a.profile_role === 'admin' || (a.profile_areas || []).length));
+  const aviso = sobre.length
+    ? '<div class="card" style="margin-bottom:12px;border-color:color-mix(in srgb,var(--amber) 42%,transparent)">'
+      + '<div class="chart-h"><div class="t">⚠️ ' + sobre.length + ' cuenta' + (sobre.length === 1 ? '' : 's') + ' de inversionista con permisos de más</div><div class="k">tienen rol admin o áreas internas en su perfil</div></div>'
+      + '<div class="meta">' + sobre.map(a => OS_E(a.email) + ' <b>(' + (a.profile_role === 'admin' ? 'ADMIN' : OS_E((a.profile_areas || []).join(', '))) + ')</b>').join(' · ') + '</div>'
+      + '<div class="meta" style="margin-top:6px">Sus casas ya están limitadas por la base (tener fila de inversionista manda sobre el área interna). Para sacarles también el tablero interno: <b>Rol → Inversionista</b>. Si es una cuenta del equipo, marcala como tal con 👥.</div></div>'
+    : '';
+  const filas = IA.access.map(a => {
+    const manual = a.origen === 'manual';
+    const badge = a.estado === 'activo' ? 'b-ok' : (a.estado === 'revocado' ? 'b-red' : 'b-warn');
+    const flags = (manual ? '<span class="badge" style="font-size:9px;background:rgba(192,132,252,.16);color:#c084fc">✍️ manual</span> ' : '')
+      + (a.es_equipo ? '<span class="badge b-warn" style="font-size:9px">👥 equipo</span> ' : '')
+      + (!a.es_equipo && (a.profile_role === 'admin' || (a.profile_areas || []).length)
+          ? '<span class="badge b-warn" style="font-size:9px" title="tiene permisos internos en su perfil: ' + OS_E(a.profile_role === 'admin' ? 'rol admin' : (a.profile_areas || []).join(', ')) + '">⚠️ ve de más</span>' : '');
+    const rolTxt = (a.profile_role === 'admin' || a.rol === 'admin')
+      ? '<span class="badge b-warn" style="font-size:9px">🛡 ADMIN (todo)</span>'
+      : '<span class="meta">Inversionista</span>';
+    // editores inline (una fila extra, como el ⇄ de vincular a Airtable)
+    let edit = '';
+    if (IA.accEdit === 'casas:' + a.id) {
+      const todas = a.casas_todas || [];
+      const sel = (a.property_filter || []).map(String);
+      edit = '<tr><td colspan="6" style="background:var(--glass)"><div style="padding:6px 0">'
+        + '<div style="font-weight:700;margin-bottom:4px">🏠 ¿A qué casas tiene acceso ' + OS_E(iaAccNombre(a)) + '?</div>'
+        + '<div class="meta" style="margin-bottom:8px">Por defecto ve <b>todas las casas que se le asignen</b> en Casas &amp; reparto. Marcá un subconjunto para restringirlo (marcar todas = sin restricción).</div>'
+        + (todas.length ? todas.map(c => '<label style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-size:12.5px">'
+            + '<input type="checkbox" class="ia-accpf-' + a.id + '" value="' + OS_E(c.property_id) + '"' + ((!sel.length || sel.indexOf(String(c.property_id)) >= 0) ? ' checked' : '') + '> ' + OS_E(c.casa) + '</label>').join('')
+            : '<div class="meta">Todavía no tiene casas asignadas. Vinculalo primero en <b>Casas &amp; reparto</b>.</div>')
+        + '<div style="margin-top:8px;display:flex;gap:8px"><button class="cbtn" style="padding:6px 12px" onclick="iaAccCasasGuardar(\'' + a.id + '\')">Guardar casas</button>'
+        + '<button class="ct-btn" onclick="IA.accEdit=null;osRender()">Cancelar</button></div></div></td></tr>';
+    } else if (IA.accEdit === 'rol:' + a.id) {
+      const esAdm = (a.profile_role === 'admin' || a.rol === 'admin');
+      edit = '<tr><td colspan="6" style="background:var(--glass)"><div style="padding:6px 0">'
+        + '<div style="font-weight:700;margin-bottom:4px">🔑 Permiso de ' + OS_E(iaAccNombre(a)) + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+        + '<select id="ia-accrol-' + a.id + '" class="osa-in" style="max-width:340px">'
+        + '<option value="investor"' + (esAdm ? '' : ' selected') + '>Inversionista — solo sus propiedades</option>'
+        + '<option value="admin"' + (esAdm ? ' selected' : '') + '>Admin — TODO el holding y el panel de administración</option></select>'
+        + '<button class="cbtn" style="padding:6px 12px" onclick="iaAccRolGuardar(\'' + a.id + '\')">Guardar permiso</button>'
+        + '<button class="ct-btn" onclick="IA.accEdit=null;osRender()">Cancelar</button></div>'
+        + '<div class="meta" style="margin-top:6px">⚠️ <b>Admin</b> es el permiso más potente: ve todas las casas de todas las empresas y puede invitar o desactivar usuarios. Pide doble confirmación.</div>'
+        + '<div class="meta" style="margin-top:4px">' + (a.es_equipo
+            ? 'Esta cuenta está marcada 👥 <b>equipo</b>: no cuenta como inversionista. <button class="ct-btn" onclick="iaAccEquipo(\'' + a.id + '\', false)">Quitar marca de equipo</button>'
+            : '¿Es una cuenta interna del equipo y no un inversionista? <button class="ct-btn" onclick="iaAccEquipo(\'' + a.id + '\', true)">👥 Marcar como cuenta del equipo</button>') + '</div>'
+        + '</div></td></tr>';
+    } else if (manual && IA.linkEdit === a.id) {
+      edit = '<tr><td colspan="6" style="background:var(--glass)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0">⇄ Vincular a Airtable: <select id="ia-link-' + a.id + '" class="osa-in" style="max-width:260px"><option value="">— elegí el inversionista —</option>' + invOpts + '</select>'
+        + '<button class="cbtn" style="padding:6px 12px" onclick="iaLinkManual(\'' + a.id + '\',\'' + OS_E(a.investor_airtable_id) + '\')">Vincular</button><button class="ct-btn" onclick="IA.linkEdit=null;osRender()">Cancelar</button></div></td></tr>';
+    }
+    return edit + '<tr' + (a.estado === 'revocado' ? ' style="opacity:.6"' : '') + '>'
+      + '<td>' + OS_E(iaAccNombre(a)) + '<div style="margin-top:3px">' + flags + '</div></td>'
+      + '<td>' + OS_E(a.email) + '<div class="meta" style="font-size:10px">' + (a.claimed_at ? 'entró el ' + new Date(a.claimed_at).toLocaleDateString('es-MX') : 'nunca entró') + '</div></td>'
+      + '<td><span class="badge ' + badge + '">' + OS_E(a.estado) + '</span></td>'
+      + '<td>' + rolTxt + '</td>'
+      + '<td>' + iaAccCasasCell(a) + '</td>'
+      + '<td style="text-align:right;white-space:nowrap">'
+      + '<button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">' + osIcon('mail') + ' Invitar</button> '
+      + (manual ? '<button class="ct-btn" title="vincular a un inversionista de Airtable" onclick="IA.linkEdit=\'' + a.id + '\';IA.accEdit=null;osRender()">⇄</button> ' : '')
+      + '<button class="ct-btn" title="elegir a qué casas tiene acceso" onclick="iaAccCasas(\'' + a.id + '\')">🏠 Casas</button> '
+      + '<button class="ct-btn" title="inversionista o admin" onclick="iaAccRol(\'' + a.id + '\')">🔑 Rol</button> '
+      + (a.estado === 'activo'
+          ? '<button class="ct-btn" onclick="iaAccEstado(\'' + a.id + '\', \'pausado\')">' + osIcon('pause') + ' Pausar</button> '
+          : (a.estado === 'revocado' ? '' : '<button class="ct-btn" onclick="iaAccEstado(\'' + a.id + '\', \'activo\')">↩︎ Reactivar</button> '))
+      + (a.estado === 'revocado'
+          ? '<button class="ct-btn" onclick="iaAccEstado(\'' + a.id + '\', \'activo\')">↩︎ Rehabilitar</button>'
+          : '<button class="ct-btn" style="color:var(--neg)" onclick="iaAccRevocar(\'' + a.id + '\')">🚫 Revocar</button>')
+      + '</td></tr>';
+  }).join('');
+  return aviso + '<div class="card overx"><div class="chart-h"><div class="t">Accesos (' + IA.access.length + ')</div>'
+    + '<div class="k">pausar / revocar / casas / rol — todo queda auditado en inv_audit</div></div>'
+    + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Email</th><th>Estado</th><th>Rol / permiso</th><th>Casas con acceso</th><th style="text-align:right">Acciones</th></tr></thead><tbody>'
+    + (filas || '<tr><td colspan="6" class="empty">Sin accesos.</td></tr>')
+    + '</tbody></table>'
+    + '<div class="meta" style="margin-top:8px">🚫 <b>Revocar</b> es permanente y corta todo (también las áreas internas del perfil), pero no borra la fila: queda archivada para auditoría. ⏸ <b>Pausar</b> es temporal y reversible.</div></div>';
+}
 async function iaVincular() {
   const invId = document.getElementById('ia-h-inv').value;
   const pid = document.getElementById('ia-h-casa').value;
@@ -1864,26 +2037,7 @@ function invAdminView() {
     body = '<div class="card" style="margin-bottom:14px"><div class="chart-h"><div class="t">' + osIcon('plus') + ' Crear acceso al portal</div><div class="k">el inversionista entra en /inversionista con magic link (sin contraseña)</div></div>'
       + '<div style="display:flex;gap:8px;margin-bottom:10px">' + modeBtn('airtable', 'Elegir de Airtable') + modeBtn('manual', '✍️ Agregar manual') + '</div>'
       + (mode === 'manual' ? formManual : formAirtable) + '</div>'
-      + '<div class="card overx"><div class="chart-h"><div class="t">Accesos (' + IA.access.length + ')</div><div class="k">quién creó cada acceso queda auditado (inv_audit)</div></div>'
-      + '<table class="ptable"><thead><tr><th>Inversionista</th><th>Email</th><th>Origen</th><th>Estado</th><th>Reclamado</th><th>Creado por</th><th style="text-align:right">Acciones</th></tr></thead><tbody>'
-      + (IA.access.map(a => {
-        const manual = a.origen === 'manual';
-        const nCasas = IA.holdings.filter(h => h.investor_airtable_id === a.investor_airtable_id).length;
-        const linkRow = (manual && IA.linkEdit === a.id)
-          ? '<tr><td colspan="7" style="background:var(--glass)"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 0">⇄ Vincular a Airtable: <select id="ia-link-' + a.id + '" class="osa-in" style="max-width:260px"><option value="">— elegí el inversionista —</option>' + invOpts + '</select>'
-            + '<button class="cbtn" style="padding:6px 12px" onclick="iaLinkManual(\'' + a.id + '\',\'' + OS_E(a.investor_airtable_id) + '\')">Vincular</button><button class="ct-btn" onclick="IA.linkEdit=null;osRender()">Cancelar</button></div></td></tr>'
-          : '';
-        return linkRow + '<tr><td>' + OS_E(iaInvName(a.investor_airtable_id)) + (manual ? ' <span class="meta" style="font-size:10px">(' + nCasas + ' casa' + (nCasas === 1 ? '' : 's') + ' asignada' + (nCasas === 1 ? '' : 's') + ')</span>' : '') + '</td><td>' + OS_E(a.email) + '</td>'
-          + '<td>' + (manual ? '<span class="badge" style="font-size:9px;background:rgba(192,132,252,.16);color:#c084fc">✍️ manual</span>' : '<span class="badge b-ok" style="font-size:9px">Airtable</span>') + '</td>'
-          + '<td><span class="badge ' + (a.estado === 'activo' ? 'b-ok' : a.estado === 'revocado' ? 'b-red' : 'b-warn') + '">' + a.estado + '</span></td>'
-          + '<td>' + (a.claimed_at ? new Date(a.claimed_at).toLocaleDateString('es-MX') : '—') + '</td>'
-          + '<td class="meta" style="font-size:10.5px">' + OS_E(a.created_by || '—') + '</td>'
-          + '<td style="text-align:right;white-space:nowrap"><button class="ct-btn" onclick="iaEnviarLink(\'' + OS_E(a.email) + '\')">' + osIcon('mail') + ' Invitar</button> '
-          + (manual ? '<button class="ct-btn" title="vincular a un inversionista de Airtable" onclick="IA.linkEdit=\'' + a.id + '\';osRender()">⇄</button> ' : '')
-          + (a.estado === 'revocado' ? '<button class="ct-btn" onclick="iaRevocar(\'' + a.id + '\', true)">↩︎ Rehabilitar</button>' : '<button class="ct-btn" style="color:var(--neg)" onclick="iaRevocar(\'' + a.id + '\', false)">' + osIcon('pause') + ' Revocar</button>')
-          + '</td></tr>';
-      }).join('') || '<tr><td colspan="7" class="empty">Sin accesos.</td></tr>')
-      + '</tbody></table></div>';
+      + iaAccTabla();
   }
 
   if (IA.tab === 'holdings') {

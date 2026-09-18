@@ -313,6 +313,21 @@ async function onLogin(user) {
   }
   state.role = profile?.role || 'viewer';
   state.allowedAreas = profile?.allowed_areas || [];
+  // 🔐 ADMIN vs INVERSIONISTA — lo decide la DB (inv_contexto_acceso: profiles.role='admin' y
+  // fila en inv_access), NUNCA allowed_areas, que es solo gating de UI. Un inversionista con un
+  // área de staff colgada del profile NO puede caer en el tablero del holding: su lugar es
+  // /inversionista. Aplica en cualquier estado (activo/pausado/revocado): el pausado/revocado
+  // entra al portal y lo ve vacío, que es exactamente lo que le corresponde.
+  // Las cuentas del EQUIPO marcadas inv_access.es_equipo y los admins reales NO se redirigen.
+  try {
+    const { data: invCtx } = await sb.rpc('inv_contexto_acceso');
+    window.INV_CTX = invCtx || null;
+    if (invCtx && invCtx.es_inversionista && !invCtx.es_admin) {
+      state.allowedAreas = []; state.role = 'viewer'; // defensa en profundidad si el redirect no corre
+      location.replace('/inversionista');
+      return;
+    }
+  } catch (e) { console.warn('inv_contexto_acceso no disponible:', e && e.message); }
   document.getElementById('user-email').textContent = user.email;
   const roleEl = document.getElementById('user-role');
   roleEl.textContent = state.role;
